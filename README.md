@@ -9,14 +9,14 @@ in seconds. It also generates connected lesson **series** (units) and printable
 It's a from-scratch build of what [Chalkie AI](https://chalkie.ai) does, powered
 by Anthropic's Claude.
 
-## ▲ Deploy your own (1 click)
+## 🌐 Live app
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/brandonabaki-design/boardmarkie&project-name=boardmarkie&repository-name=boardmarkie&env=ANTHROPIC_API_KEY&envDescription=Optional%20Anthropic%20API%20key%20—%20users%20can%20also%20add%20their%20own%20in%20the%20app%27s%20Settings)
+Published via GitHub Pages: **https://brandonabaki-design.github.io/boardmarkie/**
 
-Clicking the button forks the repo to your Vercel account and gives you a live
-URL. Setting `ANTHROPIC_API_KEY` is **optional** — without a server key, the app
-still works because each user can paste their own key in the in-app **Settings**
-dialog (stored only in their browser).
+Boardmarkie is a **bring-your-own-key** static app: open **Settings**, paste your
+Anthropic API key (stored only in your browser, sent directly to Anthropic), and
+start generating. Get a key at
+[console.anthropic.com](https://console.anthropic.com/settings/keys).
 
 ## ✨ Features
 
@@ -37,49 +37,44 @@ dialog (stored only in their browser).
 
 ## 🧱 Tech stack
 
-- **Next.js 16** (App Router) + **React 19** + **TypeScript**
+- **Next.js 16** (App Router, static export) + **React 19** + **TypeScript**
 - **Tailwind CSS v4** for styling
-- **Anthropic Claude** (`claude-opus-4-8`) via the official SDK, using
-  **structured outputs** (JSON Schema) for reliable, well-formed lesson data
+- **Anthropic Claude** (`claude-opus-4-8`) via the official SDK, called directly
+  from the browser with your key, using **structured outputs** (JSON Schema) for
+  reliable, well-formed lesson data
 - **pptxgenjs** for PowerPoint export, **lucide-react** for icons
 
-## 🚀 Getting started
+## 🚀 Run locally
 
 ```bash
 npm install
-
-# Option A: configure the key on the server
-echo "ANTHROPIC_API_KEY=sk-ant-..." > .env.local
-
-npm run dev          # http://localhost:3000
+npm run dev          # http://localhost:3000  (app lives at /create)
 ```
 
-Then open the app at **/create**.
-
-> **No server key?** No problem. Open **Settings** in the app and paste your own
-> Anthropic API key — it's stored only in your browser's local storage and sent
-> directly with each request. Get a key at
-> [console.anthropic.com](https://console.anthropic.com/settings/keys).
+Then open the app, click **Settings**, and add your Anthropic API key.
 
 ### Scripts
 
 | Command | Description |
 | --- | --- |
 | `npm run dev` | Start the dev server |
-| `npm run build` | Production build |
-| `npm run start` | Serve the production build |
+| `npm run build` | Static production build → `out/` |
+| `npm run start` | Serve a non-exported build (dev convenience) |
 | `npm run lint` | Lint |
 
-## 🔑 How the API key is resolved
+## ☁️ Deploying
 
-Each request resolves a key in this order:
+- **GitHub Pages** — the included workflow (`.github/workflows/deploy.yml`)
+  builds and publishes on every push. In the repo's **Settings → Pages**, set
+  **Source = GitHub Actions** (the workflow also tries to enable this for you).
+- **Any static host** — Vercel, Netlify and Cloudflare Pages auto-detect Next.js
+  and serve the static export. No server or secrets required.
 
-1. A per-request key from the in-app **Settings** dialog (sent as the
-   `x-user-key` header; stored only in the browser).
-2. The server's `ANTHROPIC_API_KEY` environment variable.
+  [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/brandonabaki-design/boardmarkie&project-name=boardmarkie&repository-name=boardmarkie)
 
-If neither is present, the app returns a friendly prompt to add a key. The
-Anthropic SDK also honours `ANTHROPIC_BASE_URL` if you use a gateway.
+> **Want a hosted version where visitors don't need their own key?** That needs a
+> small server to keep a shared key private (a static site can't hide one). The
+> app is structured so this is a quick change — see the notes in `AGENTS.md`.
 
 ## 🗂️ Project structure
 
@@ -88,26 +83,20 @@ src/
   app/
     page.tsx              # marketing landing page
     create/page.tsx       # the app
-    api/generate/route.ts # POST → lesson / series / worksheet
-    api/edit/route.ts     # POST → AI edits to an existing lesson
   components/
     landing/              # hero, features, pricing, FAQ, …
     app/                  # generator form, slide/worksheet/series views, exports
   lib/
-    anthropic.ts          # Claude client factory + model
+    client.ts             # browser-side Claude calls (BYO key)
+    anthropic.ts          # model id + shared constants
     prompts.ts            # system/user prompts per mode
     schemas.ts            # JSON Schemas for structured output
-    generate.ts           # Claude call + raw→clean mappers
+    generate.ts           # Claude call helper + raw→clean mappers
     curricula.ts          # regions, year groups, subjects
     export.ts             # PPTX / PDF / JSON export
     storage.ts            # local library + key storage
     types.ts              # shared types
 ```
-
-## ☁️ Deploying
-
-Deploy anywhere that runs Next.js (e.g. Vercel). Set `ANTHROPIC_API_KEY` as an
-environment variable, or let each user bring their own key via Settings.
 
 ---
 

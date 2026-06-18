@@ -1,41 +1,124 @@
 "use client";
 
+import Anthropic from "@anthropic-ai/sdk";
+import { NO_KEY_MESSAGE } from "./anthropic";
 import { getApiKey } from "./storage";
+import { lessonSchema, seriesSchema, worksheetSchema } from "./schemas";
+import {
+  lessonSystemPrompt,
+  lessonUserPrompt,
+  seriesSystemPrompt,
+  seriesUserPrompt,
+  worksheetSystemPrompt,
+  worksheetUserPrompt,
+  editSystemPrompt,
+  editUserPrompt,
+} from "./prompts";
+import { runStructured, toLesson, toSeries, toWorksheet } from "./generate";
 import type { Artifact, EditRequest, GenerateRequest, Lesson } from "./types";
 
-async function post<T>(url: string, body: unknown): Promise<T> {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-user-key": getApiKey(),
-    },
-    body: JSON.stringify(body),
+function err(message: string, status?: number): Error & { status?: number } {
+  const e = new Error(message) as Error & { status?: number };
+  if (status) e.status = status;
+  return e;
+}
+
+/**
+ * Build an Anthropic client that runs in the browser with the user's own key.
+ * dangerouslyAllowBrowser is intended exactly for bring-your-own-key apps like
+ * this one — the key is the user's, entered locally, and sent straight to
+ * Anthropic over HTTPS.
+ */
+function browserClient(): Anthropic {
+  const apiKey = getApiKey();
+  if (!apiKey) throw err(NO_KEY_MESSAGE, 401);
+  return new Anthropic({
+    apiKey,
+    dangerouslyAllowBrowser: true,
+    defaultHeaders: { "anthropic-dangerous-direct-browser-access": "true" },
+  });
+}
+
+function normalize(req: GenerateRequest): GenerateRequest {
+  return {
+    ...req,
+    topic: req.topic.trim(),
+    subject: req.subject?.trim() || "General",
+    yearGroup: req.yearGroup?.trim() || "Year 7",
+    region: req.region?.trim() || "United Kingdom (National Curriculum)",
+  };
+}
+
+export async function generateArtifact(input: GenerateRequest): Promise<Artifact> {
+  const client = browserClient();
+  const req = normalize(input);
+
+  if (req.mode === "worksheet") {
+    const raw = await runStructured({
+      client,
+      system: worksheetSystemPrompt(),
+      user: worksheetUserPrompt(req),
+      schema: worksheetSchema,
+      maxTokens: 12000,
+    });
+    return toWorksheet(raw as never, req);
+  }
+
+  if (req.mode === "series") {
+    const raw = await runStructured({
+      client,
+      system: seriesSystemPrompt(),
+      user: seriesUserPrompt(req),
+      schema: seriesSchema,
+      maxTokens: 10000,
+    });
+    return toSeries(raw as never, req);
+  }
+
+  const raw = await runStructured({
+    client,
+    system: lessonSystemPrompt(),
+    user: lessonUserPrompt(req),
+    schema: lessonSchema,
+    maxTokens: 24000,
+  });
+  return toLesson(raw as never, req);
+}
+
+export async function editLesson(input: EditRequest): Promise<Lesson> {
+  const client = browserClient();
+  const { lesson, action, slideId, instruction } = input;
+
+  const slideTitle = slideId ? lesson.slides.find((s) => s.id === slideId)?.title : undefined;
+
+  const lessonForModel = {
+    title: lesson.meta.title,
+    summary: lesson.meta.summary,
+    objectives: lesson.meta.objectives,
+    vocabulary: lesson.meta.vocabulary,
+    slides: lesson.slides.map(({ id: _id, ...rest }) => rest),
+  };
+
+  const req: GenerateRequest = {
+    mode: "lesson",
+    topic: lesson.meta.topic,
+    subject: lesson.meta.subject,
+    yearGroup: lesson.meta.yearGroup,
+    region: lesson.meta.region,
+    durationMinutes: lesson.meta.durationMinutes,
+  };
+
+  const raw = await runStructured({
+    client,
+    system: editSystemPrompt(),
+    user: editUserPrompt(action, JSON.stringify(lessonForModel), instruction, slideTitle),
+    schema: lessonSchema,
+    maxTokens: 24000,
+    effort: "low",
   });
 
-  let data: unknown = null;
-  try {
-    data = await res.json();
-  } catch {
-    /* ignore */
-  }
-
-  if (!res.ok) {
-    const message =
-      (data as { error?: string })?.error ?? `Request failed (${res.status}).`;
-    const error = new Error(message) as Error & { status?: number };
-    error.status = res.status;
-    throw error;
-  }
-  return data as T;
-}
-
-export async function generateArtifact(req: GenerateRequest): Promise<Artifact> {
-  const { artifact } = await post<{ artifact: Artifact }>("/api/generate", req);
-  return artifact;
-}
-
-export async function editLesson(req: EditRequest): Promise<Lesson> {
-  const { artifact } = await post<{ artifact: Lesson }>("/api/edit", req);
-  return artifact;
+  const updated = toLesson(raw as never, req);
+  updated.id = lesson.id;
+  updated.createdAt = lesson.createdAt;
+  return updated;
 }
