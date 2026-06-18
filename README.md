@@ -9,6 +9,15 @@ in seconds. It also generates connected lesson **series** (units) and printable
 It's a from-scratch build of what [Chalkie AI](https://chalkie.ai) does, powered
 by Anthropic's Claude.
 
+## ▲ Deploy your own (1 click)
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/brandonabaki-design/boardmarkie&project-name=boardmarkie&repository-name=boardmarkie&env=ANTHROPIC_API_KEY&envDescription=Optional%20Anthropic%20API%20key%20—%20users%20can%20also%20add%20their%20own%20in%20the%20app%27s%20Settings)
+
+Clicking the button forks the repo to your Vercel account and gives you a live
+URL. Setting `ANTHROPIC_API_KEY` is **optional** — without a server key, the app
+still works because each user can paste their own key in the in-app **Settings**
+dialog (stored only in their browser).
+
 ## ✨ Features
 
 - **Full lesson decks** — title, objectives, vocabulary, teaching slides,
