@@ -1,0 +1,147 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-hand: var(--font-caveat), ui-rounded, cursive;
+
+  --color-brand-50: #edfcf7;
+  --color-brand-100: #d2f6ec;
+  --color-brand-200: #a9ecdb;
+  --color-brand-300: #71dcc6;
+  --color-brand-400: #38c2ac;
+  --color-brand-500: #14a892;
+  --color-brand-600: #0c8a78;
+  --color-brand-700: #0c6e62;
+  --color-brand-800: #0e574f;
+  --color-brand-900: #0f4842;
+
+  --color-ink: #16181d;
+  --color-muted: #5a6472;
+  --color-line: #e7e9ef;
+  --color-paper: #faf6ee;
+  --color-mint: #effbf6;
+  --color-coral: #ff6f5e;
+  --color-amber: #f6a609;
+  --color-sky: #38bdf8;
+  --color-grape: #7c6cf0;
+
+  --radius-xl2: 1.25rem;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    background: #ffffff;
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: var(--color-brand-200);
+    color: var(--color-brand-900);
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+}
+
+/* ---- decorative helpers ---- */
+.hand {
+  font-family: var(--font-hand);
+}
+
+.marker {
+  position: relative;
+  white-space: nowrap;
+}
+.marker::after {
+  content: "";
+  position: absolute;
+  left: -0.1em;
+  right: -0.1em;
+  bottom: 0.06em;
+  height: 0.42em;
+  background: var(--color-brand-200);
+  z-index: -1;
+  border-radius: 0.2em;
+  transform: rotate(-1deg);
+}
+
+.dotgrid {
+  background-image: radial-gradient(rgba(20, 168, 146, 0.16) 1.4px, transparent 1.4px);
+  background-size: 22px 22px;
+}
+
+.card-shadow {
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 12px 32px -12px rgba(16, 24, 40, 0.12);
+}
+
+.elevate {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.elevate:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 24px 48px -16px rgba(16, 24, 40, 0.22);
+}
+
+/* ---- animations ---- */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+  animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes floaty {
+  0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); }
+  50% { transform: translateY(-10px) rotate(var(--r, 0deg)); }
+}
+.animate-float {
+  animation: floaty 6s ease-in-out infinite;
+}
+
+@keyframes spinSlow {
+  to { transform: rotate(360deg); }
+}
+.animate-spin-slow {
+  animation: spinSlow 1.1s linear infinite;
+}
+
+@keyframes shimmer {
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, #f1f3f7 25%, #e7eaf0 37%, #f1f3f7 63%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up, .animate-float, .animate-spin-slow, .shimmer {
+    animation: none;
+  }
+}
+
+/* ---- print: only the printable area, paginated nicely ---- */
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; }
+  .printable { display: block !important; }
+  .print-page {
+    break-after: page;
+    page-break-after: always;
+  }
+  .print-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+  @page {
+    margin: 14mm;
+  }
+}
