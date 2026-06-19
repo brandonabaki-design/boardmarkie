@@ -1,0 +1,6 @@
+{
+  "name": "boardmarkie-image-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "US-region serverless proxy that forwards Boardmarkie image prompts to Google's Imagen API. Google geo-blocks Gemini in some countries; Vercel functions run in the US, so the request is accepted."
+}
