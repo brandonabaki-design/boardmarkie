@@ -3,7 +3,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NO_KEY_MESSAGE } from "./anthropic";
 import { getApiKey } from "./storage";
-import { lessonSchema, seriesSchema, worksheetSchema } from "./schemas";
+import { diagramSchema, lessonSchema, seriesSchema, worksheetSchema } from "./schemas";
 import {
   lessonSystemPrompt,
   lessonUserPrompt,
@@ -13,6 +13,8 @@ import {
   worksheetUserPrompt,
   editSystemPrompt,
   editUserPrompt,
+  diagramSystemPrompt,
+  diagramUserPrompt,
 } from "./prompts";
 import { runStructured, toLesson, toSeries, toWorksheet } from "./generate";
 import type { Artifact, EditRequest, GenerateRequest, Lesson } from "./types";
@@ -121,4 +123,58 @@ export async function editLesson(input: EditRequest): Promise<Lesson> {
   updated.id = lesson.id;
   updated.createdAt = lesson.createdAt;
   return updated;
+}
+
+export interface DiagramRequest {
+  topic: string;
+  subject: string;
+  yearGroup: string;
+  region: string;
+  slideTitle?: string;
+  instruction?: string;
+}
+
+/**
+ * Generate an accurate, labelled diagram as SVG via Claude (stays in the
+ * browser-only Claude flow — no image provider). Returns sanitized SVG markup.
+ */
+export async function generateDiagram(
+  input: DiagramRequest,
+): Promise<{ title: string; svg: string; alt: string }> {
+  const client = browserClient();
+  const raw = await runStructured<{ title?: string; svg?: string; alt?: string }>({
+    client,
+    system: diagramSystemPrompt(),
+    user: diagramUserPrompt(input),
+    schema: diagramSchema,
+    maxTokens: 8000,
+    effort: "low",
+  });
+
+  const svg = sanitizeSvg(typeof raw.svg === "string" ? raw.svg : "");
+  if (!svg) throw err("The diagram couldn't be generated. Try again.");
+
+  return {
+    title: typeof raw.title === "string" ? raw.title : "",
+    svg,
+    alt: typeof raw.alt === "string" ? raw.alt : "",
+  };
+}
+
+/**
+ * Minimal hardening for model-generated SVG that we render as HTML: keep only
+ * the <svg>…</svg> document and strip scripts, foreignObject, inline event
+ * handlers, and javascript: URLs.
+ */
+function sanitizeSvg(input: string): string {
+  const start = input.indexOf("<svg");
+  const end = input.lastIndexOf("</svg>");
+  if (start === -1 || end === -1 || end < start) return "";
+  let svg = input.slice(start, end + 6);
+  svg = svg.replace(/<script[\s\S]*?<\/script>/gi, "");
+  svg = svg.replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, "");
+  svg = svg.replace(/\son\w+\s*=\s*"[^"]*"/gi, "");
+  svg = svg.replace(/\son\w+\s*=\s*'[^']*'/gi, "");
+  svg = svg.replace(/(href|xlink:href)\s*=\s*("|')\s*javascript:[^"']*\2/gi, "");
+  return svg;
 }

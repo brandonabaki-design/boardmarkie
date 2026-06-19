@@ -259,6 +259,24 @@ export const seriesSchema: JSONSchema = {
   required: ["title", "summary", "lessons"],
 };
 
+// Accurate, labelled diagrams are produced by Claude as self-contained SVG —
+// this stays in the browser-only Claude flow (no image provider needed) and,
+// unlike raster models, gets the labels right.
+export const diagramSchema: JSONSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    title: { type: "string", description: "Short title for the diagram." },
+    svg: {
+      type: "string",
+      description:
+        "A complete, self-contained SVG document (starting with <svg ...> and ending with </svg>) for an accurate, clearly labelled educational diagram. Include a viewBox, legible <text> labels, and simple shapes. No external images, scripts, web fonts, or <foreignObject>.",
+    },
+    alt: { type: "string", description: "Concise alt text describing the diagram." },
+  },
+  required: ["title", "svg", "alt"],
+};
+
 export function jsonFormat(schema: JSONSchema) {
   return { type: "json_schema" as const, schema };
 }

@@ -1,16 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, KeyRound, ShieldCheck, ExternalLink, Check } from "lucide-react";
-import { getApiKey, setApiKey } from "@/lib/storage";
+import { X, KeyRound, ShieldCheck, ExternalLink, Check, ImagePlus } from "lucide-react";
+import { getApiKey, setApiKey, getImageConfig, setImageConfig } from "@/lib/storage";
 
 export function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [value, setValue] = useState("");
+  const [proxyUrl, setProxyUrl] = useState("");
+  const [imageKey, setImageKey] = useState("");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (open) {
       setValue(getApiKey());
+      const cfg = getImageConfig();
+      setProxyUrl(cfg.proxyUrl);
+      setImageKey(cfg.apiKey);
       setSaved(false);
     }
   }, [open]);
@@ -19,6 +24,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
   const save = () => {
     setApiKey(value);
+    setImageConfig({ proxyUrl, apiKey: imageKey });
     setSaved(true);
     setTimeout(onClose, 600);
   };
@@ -67,6 +73,53 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
         >
           Get an Anthropic API key <ExternalLink size={13} />
         </a>
+
+        <div className="mt-6 border-t border-line pt-5">
+          <h3 className="flex items-center gap-2 text-sm font-bold text-ink">
+            <ImagePlus size={16} className="text-brand-600" /> Image generation
+          </h3>
+          <p className="mt-1.5 text-xs text-muted">
+            Slide illustrations use Google Imagen via a small proxy you deploy
+            once (a Cloudflare Worker — see the <code className="rounded bg-paper px-1">worker/</code> folder).
+            Diagrams are drawn by Claude and need nothing extra here.
+          </p>
+
+          <label className="mt-3 block">
+            <span className="text-sm font-semibold text-ink">Image proxy URL</span>
+            <input
+              type="url"
+              value={proxyUrl}
+              onChange={(e) => setProxyUrl(e.target.value)}
+              placeholder="https://boardmarkie-image-proxy.…workers.dev"
+              autoComplete="off"
+              className="mt-1.5 w-full rounded-xl border border-line px-3.5 py-2.5 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+            />
+          </label>
+
+          <label className="mt-3 block">
+            <span className="text-sm font-semibold text-ink">
+              Gemini API key{" "}
+              <span className="font-normal text-muted">(blank if the proxy holds a shared key)</span>
+            </span>
+            <input
+              type="password"
+              value={imageKey}
+              onChange={(e) => setImageKey(e.target.value)}
+              placeholder="AIza…"
+              autoComplete="off"
+              className="mt-1.5 w-full rounded-xl border border-line px-3.5 py-2.5 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+            />
+          </label>
+
+          <a
+            href="https://aistudio.google.com/apikey"
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline"
+          >
+            Get a Gemini API key <ExternalLink size={13} />
+          </a>
+        </div>
 
         <div className="mt-6 flex gap-3">
           <button

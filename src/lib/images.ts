@@ -1,0 +1,62 @@
+"use client";
+
+// Client-side image generation. Boardmarkie is a static, bring-your-own-key
+// app, but image providers can't be called directly from the browser (no CORS),
+// so requests go through a small Cloudflare Worker proxy (see worker/). The
+// proxy URL and the teacher's Gemini key live in localStorage (Settings).
+
+import { getImageConfig } from "./storage";
+
+function err(message: string, status?: number): Error & { status?: number } {
+  const e = new Error(message) as Error & { status?: number };
+  if (status) e.status = status;
+  return e;
+}
+
+export const NO_IMAGE_PROXY_MESSAGE =
+  "Add your image proxy URL (and a Gemini key) in Settings to generate images.";
+
+export type AspectRatio = "1:1" | "3:4" | "4:3" | "9:16" | "16:9";
+
+export interface ImageOptions {
+  aspectRatio?: AspectRatio;
+}
+
+/**
+ * Generate an illustration from a text prompt via the Worker proxy (which
+ * forwards to Google's Imagen API). Resolves to a `data:` URL.
+ */
+export async function generateImage(prompt: string, opts: ImageOptions = {}): Promise<string> {
+  const { proxyUrl, apiKey } = getImageConfig();
+  if (!proxyUrl) throw err(NO_IMAGE_PROXY_MESSAGE, 401);
+
+  let res: Response;
+  try {
+    res = await fetch(proxyUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt,
+        apiKey: apiKey || undefined,
+        aspectRatio: opts.aspectRatio ?? "16:9",
+      }),
+    });
+  } catch {
+    throw err("Couldn't reach the image proxy. Check the URL in Settings.");
+  }
+
+  if (!res.ok) {
+    let message = `Image generation failed (${res.status}).`;
+    try {
+      const body = (await res.json()) as { error?: string };
+      if (body?.error) message = body.error;
+    } catch {
+      /* keep the generic message */
+    }
+    throw err(message, res.status);
+  }
+
+  const data = (await res.json()) as { image?: string };
+  if (!data.image) throw err("The image service returned no image.");
+  return data.image;
+}

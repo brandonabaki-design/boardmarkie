@@ -57,6 +57,8 @@ export interface Slide {
   quiz?: QuizQuestion[];
   imagePrompt?: string;
   imageAlt?: string;
+  imageUrl?: string; // generated illustration, stored as a data: URL
+  diagramSvg?: string; // Claude-generated, sanitized SVG diagram markup
   youtube?: { title: string; searchQuery: string };
 }
 

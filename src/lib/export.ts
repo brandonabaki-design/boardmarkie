@@ -52,11 +52,15 @@ export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
         x: 0.8, y: 6.4, w: 11.7, h: 0.5, fontSize: 14, color: BRAND, fontFace: "Arial",
       });
     } else {
+      // When a slide has a generated image, give it the right-hand column and
+      // narrow the text. (SVG diagrams still export via the PDF/print path.)
+      const hasImg = !!slide.imageUrl;
+      const textW = hasImg ? 7.1 : 11.9;
       s.addText(slide.title, {
-        x: 0.7, y: 0.4, w: 11.9, h: 0.9, fontSize: 28, bold: true, color: INK, fontFace: "Arial",
+        x: 0.7, y: 0.4, w: textW, h: 0.9, fontSize: 28, bold: true, color: INK, fontFace: "Arial",
       });
       if (slide.subtitle) {
-        s.addText(slide.subtitle, { x: 0.7, y: 1.2, w: 11.9, h: 0.5, fontSize: 16, color: MUTE, fontFace: "Arial" });
+        s.addText(slide.subtitle, { x: 0.7, y: 1.2, w: textW, h: 0.5, fontSize: 16, color: MUTE, fontFace: "Arial" });
       }
 
       const paras: Para[] = [];
@@ -92,7 +96,15 @@ export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
       }
 
       if (paras.length) {
-        s.addText(paras as never, { x: 0.7, y: 1.8, w: 11.9, h: 5.3, valign: "top" });
+        s.addText(paras as never, { x: 0.7, y: 1.8, w: textW, h: 5.3, valign: "top" });
+      }
+
+      if (hasImg && slide.imageUrl) {
+        s.addImage({
+          data: slide.imageUrl,
+          x: 8.1, y: 1.8, w: 4.5, h: 4.5,
+          sizing: { type: "contain", w: 4.5, h: 4.5 },
+        });
       }
     }
 

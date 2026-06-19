@@ -10,10 +10,16 @@ export function LessonView({
   lesson,
   busy,
   onEdit,
+  onGenerateImage,
+  onGenerateDiagram,
+  mediaBusy,
 }: {
   lesson: Lesson;
   busy: boolean;
   onEdit: (action: EditAction, instruction?: string, slideId?: string) => void;
+  onGenerateImage: (slideId: string) => void;
+  onGenerateDiagram: (slideId: string) => void;
+  mediaBusy: { slideId: string; kind: "image" | "diagram" } | null;
 }) {
   return (
     <div className="mx-auto max-w-3xl">
@@ -77,6 +83,9 @@ export function LessonView({
             total={lesson.slides.length}
             busy={busy}
             onEditSlide={(slideId, action, instruction) => onEdit(action, instruction, slideId)}
+            onGenerateImage={onGenerateImage}
+            onGenerateDiagram={onGenerateDiagram}
+            mediaBusy={mediaBusy && mediaBusy.slideId === slide.id ? mediaBusy.kind : null}
           />
         ))}
       </div>
