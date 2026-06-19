@@ -75,6 +75,42 @@ ${context(req)}
 Make the questions purposeful and progressively challenging.`;
 }
 
+export function diagramSystemPrompt(): string {
+  return `${PERSONA}
+
+You create clear, accurate, classroom-ready diagrams as inline SVG. The diagram must be factually correct and clearly labelled — that is its whole purpose. Requirements:
+- Output ONE self-contained <svg> document with a viewBox (e.g. "0 0 800 600").
+- Use simple shapes (rect, circle, ellipse, line, path, polygon) and <text> labels at a legible font-size. Label every important part, spelled correctly and positioned to read cleanly.
+- Use a clean, friendly palette. A teal accent (#0D9488) suits the Boardmarkie brand; use dark ink (#1B1B1F) for text on light fills.
+- Do NOT include <script>, <foreignObject>, external <image>, or web fonts — keep it dependency-free so it renders anywhere.
+- Prefer clarity over decoration. Pitch the complexity and labelling to the year group.`;
+}
+
+export function diagramUserPrompt(opts: {
+  topic: string;
+  subject: string;
+  yearGroup: string;
+  region: string;
+  slideTitle?: string;
+  instruction?: string;
+}): string {
+  const lines = [
+    `Subject: ${opts.subject}`,
+    `Year group / grade: ${opts.yearGroup}`,
+    `Curriculum / region: ${opts.region}`,
+    `Lesson topic: ${opts.topic}`,
+  ];
+  if (opts.slideTitle) lines.push(`This diagram is for the slide titled "${opts.slideTitle}".`);
+  const ask = opts.instruction?.trim()
+    ? `Draw this: ${opts.instruction.trim()}`
+    : "Draw the single most useful, accurate diagram for this slide.";
+  return `${ask}
+
+${lines.join("\n")}
+
+Return the SVG diagram.`;
+}
+
 const EDIT_INSTRUCTIONS: Record<EditAction, string> = {
   make_fun:
     "Make the content noticeably more fun and engaging — add playful framing, hooks, games, or relatable real-world examples — while keeping it accurate and age-appropriate.",

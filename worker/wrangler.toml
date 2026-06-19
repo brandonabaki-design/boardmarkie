@@ -1,0 +1,10 @@
+# Cloudflare Worker config for the Boardmarkie image proxy.
+# Deploy with:  npx wrangler deploy   (run from this worker/ directory)
+name = "boardmarkie-image-proxy"
+main = "image-proxy.js"
+compatibility_date = "2026-06-01"
+
+# Bring-your-own-key mode needs no secret — the teacher's Gemini key is sent
+# per request from the app. To host a SHARED key for everyone instead, run:
+#   npx wrangler secret put GEMINI_API_KEY
+# and leave the key field blank in the app's Settings.

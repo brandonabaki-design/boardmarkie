@@ -12,8 +12,10 @@ import type {
   GenerationMode,
   Lesson,
   SeriesLesson,
+  Slide,
 } from "@/lib/types";
-import { generateArtifact, editLesson } from "@/lib/client";
+import { generateArtifact, editLesson, generateDiagram } from "@/lib/client";
+import { generateImage } from "@/lib/images";
 import { deleteArtifact, getLibrary, saveArtifact } from "@/lib/storage";
 import { GeneratorForm } from "./GeneratorForm";
 import { GeneratingState } from "./GeneratingState";
@@ -26,6 +28,13 @@ import { ExportMenu } from "./ExportMenu";
 
 function isMode(v: string | null): v is GenerationMode {
   return v === "lesson" || v === "series" || v === "worksheet";
+}
+
+function patchSlide(lesson: Lesson, slideId: string, patch: Partial<Slide>): Lesson {
+  return {
+    ...lesson,
+    slides: lesson.slides.map((s) => (s.id === slideId ? { ...s, ...patch } : s)),
+  };
 }
 
 export function CreateApp() {
@@ -41,6 +50,9 @@ export function CreateApp() {
   const [error, setError] = useState<string | null>(null);
   const [libOpen, setLibOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [mediaBusy, setMediaBusy] = useState<{ slideId: string; kind: "image" | "diagram" } | null>(
+    null,
+  );
 
   useEffect(() => {
     setLibrary(getLibrary());
@@ -83,6 +95,57 @@ export function CreateApp() {
       handleError(err);
     } finally {
       setEditing(false);
+    }
+  };
+
+  const handleGenerateImage = async (slideId: string) => {
+    if (!current || current.kind !== "lesson") return;
+    const lesson = current;
+    const slide = lesson.slides.find((s) => s.id === slideId);
+    if (!slide?.imagePrompt) return;
+    setError(null);
+    setMediaBusy({ slideId, kind: "image" });
+    try {
+      const prompt = `${slide.imagePrompt}. Bright, friendly, age-appropriate educational illustration; clean flat style; no words or text in the image.`;
+      const image = await generateImage(prompt, { aspectRatio: "16:9" });
+      const updated = patchSlide(lesson, slideId, { imageUrl: image });
+      setCurrent(updated);
+      saveArtifact(updated);
+      refresh();
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setMediaBusy(null);
+    }
+  };
+
+  const handleGenerateDiagram = async (slideId: string) => {
+    if (!current || current.kind !== "lesson") return;
+    const lesson = current;
+    const slide = lesson.slides.find((s) => s.id === slideId);
+    if (!slide) return;
+    setError(null);
+    setMediaBusy({ slideId, kind: "diagram" });
+    try {
+      const { svg, alt } = await generateDiagram({
+        topic: lesson.meta.topic,
+        subject: lesson.meta.subject,
+        yearGroup: lesson.meta.yearGroup,
+        region: lesson.meta.region,
+        slideTitle: slide.title,
+        instruction: slide.imagePrompt,
+      });
+      const updated = patchSlide(lesson, slideId, {
+        diagramSvg: svg,
+        imageAlt: slide.imageAlt || alt,
+      });
+      setCurrent(updated);
+      saveArtifact(updated);
+      refresh();
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setMediaBusy(null);
     }
   };
 
@@ -130,7 +193,7 @@ export function CreateApp() {
     setError(null);
   };
 
-  const busy = loading || editing || expanding !== null;
+  const busy = loading || editing || expanding !== null || mediaBusy !== null;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -195,7 +258,14 @@ export function CreateApp() {
             </button>
 
             {current.kind === "lesson" && (
-              <LessonView lesson={current as Lesson} busy={editing} onEdit={handleEdit} />
+              <LessonView
+                lesson={current as Lesson}
+                busy={busy}
+                onEdit={handleEdit}
+                onGenerateImage={handleGenerateImage}
+                onGenerateDiagram={handleGenerateDiagram}
+                mediaBusy={mediaBusy}
+              />
             )}
             {current.kind === "worksheet" && <WorksheetView worksheet={current} />}
             {current.kind === "series" && (

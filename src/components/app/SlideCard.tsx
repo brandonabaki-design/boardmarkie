@@ -17,6 +17,8 @@ import {
   GraduationCap,
   X,
   ExternalLink,
+  Sparkles,
+  PenTool,
 } from "lucide-react";
 import type { EditAction, Slide, SlideLayout } from "@/lib/types";
 import { Spinner } from "./ui";
@@ -46,12 +48,18 @@ export function SlideCard({
   total,
   busy,
   onEditSlide,
+  onGenerateImage,
+  onGenerateDiagram,
+  mediaBusy,
 }: {
   slide: Slide;
   index: number;
   total: number;
   busy: boolean;
   onEditSlide: (slideId: string, action: EditAction, instruction?: string) => void;
+  onGenerateImage: (slideId: string) => void;
+  onGenerateDiagram: (slideId: string) => void;
+  mediaBusy: "image" | "diagram" | null;
 }) {
   const meta = LAYOUT_META[slide.layout] ?? LAYOUT_META.content;
   const Icon = meta.icon;
@@ -167,22 +175,66 @@ export function SlideCard({
           </ol>
         )}
 
-        {slide.imagePrompt && (
-          <a
-            href={imageSearchUrl(slide.imagePrompt)}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-start gap-3 rounded-xl border border-dashed border-line bg-paper/60 px-4 py-3 transition-colors hover:border-brand-300"
-          >
-            <ImageIcon size={18} className="mt-0.5 shrink-0 text-muted" />
-            <span className="text-sm text-muted">
-              <span className="font-semibold text-ink">Image idea: </span>
-              {slide.imagePrompt}
-              <span className="ml-1 inline-flex items-center gap-1 text-brand-700">
-                find one <ExternalLink size={12} />
-              </span>
-            </span>
-          </a>
+        {(slide.imagePrompt || slide.imageUrl || slide.diagramSvg) && (
+          <div className="space-y-3">
+            {slide.imageUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={slide.imageUrl}
+                alt={slide.imageAlt || slide.imagePrompt || "Lesson illustration"}
+                className="w-full rounded-xl border border-line"
+              />
+            )}
+
+            {slide.diagramSvg && (
+              <div
+                role="img"
+                aria-label={slide.imageAlt || "Diagram"}
+                className="overflow-hidden rounded-xl border border-line bg-white p-3 [&_svg]:mx-auto [&_svg]:h-auto [&_svg]:w-full"
+                // SVG is sanitized when generated (scripts / handlers stripped)
+                dangerouslySetInnerHTML={{ __html: slide.diagramSvg }}
+              />
+            )}
+
+            {slide.imagePrompt && !slide.imageUrl && !slide.diagramSvg && (
+              <p className="flex items-start gap-3 rounded-xl border border-dashed border-line bg-paper/60 px-4 py-3 text-sm text-muted">
+                <ImageIcon size={18} className="mt-0.5 shrink-0 text-muted" />
+                <span>
+                  <span className="font-semibold text-ink">Image idea: </span>
+                  {slide.imagePrompt}
+                </span>
+              </p>
+            )}
+
+            <div className="no-print flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => onGenerateImage(slide.id)}
+                disabled={busy || !slide.imagePrompt}
+                className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-brand-300 hover:text-brand-700 disabled:opacity-50"
+              >
+                {mediaBusy === "image" ? <Spinner /> : <Sparkles size={14} className="text-brand-600" />}
+                {slide.imageUrl ? "Regenerate image" : "Generate image"}
+              </button>
+              <button
+                onClick={() => onGenerateDiagram(slide.id)}
+                disabled={busy}
+                className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-brand-300 hover:text-brand-700 disabled:opacity-50"
+              >
+                {mediaBusy === "diagram" ? <Spinner /> : <PenTool size={14} className="text-brand-600" />}
+                {slide.diagramSvg ? "Redraw diagram" : "Draw diagram"}
+              </button>
+              {slide.imagePrompt && (
+                <a
+                  href={imageSearchUrl(slide.imagePrompt)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-medium text-muted transition-colors hover:text-brand-700"
+                >
+                  find a photo <ExternalLink size={12} />
+                </a>
+              )}
+            </div>
+          </div>
         )}
 
         {slide.youtube?.searchQuery && (
