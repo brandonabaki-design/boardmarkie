@@ -118,8 +118,13 @@ export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
         s.addText(slide.subtitle, { x: 0.8, y: 4.0, w: titleW, h: 1.2, fontSize: 20, color: MUTE, fontFace: "Arial" });
       }
       s.addText(`${lesson.meta.subject}  •  ${lesson.meta.yearGroup}`, {
-        x: 0.8, y: 6.4, w: titleW, h: 0.5, fontSize: 14, color: BRAND, fontFace: "Arial",
+        x: 0.8, y: 6.3, w: titleW, h: 0.4, fontSize: 14, color: BRAND, fontFace: "Arial",
       });
+      if (lesson.meta.standards && lesson.meta.standards.length) {
+        s.addText(`Aligned to: ${lesson.meta.standards.join("   •   ")}`, {
+          x: 0.8, y: 6.75, w: titleW, h: 0.6, fontSize: 11, color: MUTE, fontFace: "Arial",
+        });
+      }
       if (visual) placeVisual(visual, 7.2, 1.3, 5.5, 4.9);
     } else {
       const textW = visual ? 6.9 : 11.9;

@@ -98,6 +98,7 @@ export async function editLesson(input: EditRequest): Promise<Lesson> {
     summary: lesson.meta.summary,
     objectives: lesson.meta.objectives,
     vocabulary: lesson.meta.vocabulary,
+    standards: lesson.meta.standards ?? [],
     slides: lesson.slides.map(({ id: _id, ...rest }) => rest),
   };
 

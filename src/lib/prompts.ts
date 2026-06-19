@@ -32,15 +32,24 @@ Follow this structure:
 
 For most slides, suggest a vivid imagePrompt describing a helpful illustration, plus concise imageAlt.
 Always include practical teacherNotes on every slide.
+
+Curriculum standards (the "standards" field): identify the specific official standard(s) this lesson aligns to for the given subject, year group/grade and curriculum/region — each as its official code plus a short description (e.g. "NGSS 5-PS1-1: …", "CCSS.MATH.CONTENT.4.NF.B.3: …", "National Curriculum KS2 Science: …", "UAE MOE Science Gr.3: …"). Use the framework that matches the region. Only cite standards you are confident genuinely exist; if unsure of an exact code, give the standard's substance and framework without inventing a precise code. Give the 1-4 most relevant. If standards are not requested, leave the field as an empty array.
+
 Leave fields that don't apply to a slide as empty strings or empty arrays.`;
 }
 
 export function lessonUserPrompt(req: GenerateRequest): string {
   const slides = req.slideCount ?? 9;
   const duration = req.durationMinutes ?? 60;
+  const standards =
+    req.includeStandards === false
+      ? "Do not include curriculum standards — leave the standards field as an empty array."
+      : "Include the 1-4 most relevant official curriculum standards in the standards field, matched to the subject, year group and curriculum above.";
   return `Create a ${duration}-minute lesson with about ${slides} slides.
 
 ${context(req)}
+
+${standards}
 
 Make it accurate, well-paced and ready to teach.`;
 }

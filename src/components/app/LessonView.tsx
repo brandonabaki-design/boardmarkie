@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Smile, GraduationCap, Scissors, Plus, Wand2, BookOpen, Target } from "lucide-react";
+import { Smile, GraduationCap, Scissors, Plus, Wand2, BookOpen, Target, ClipboardCheck } from "lucide-react";
 import type { EditAction, Lesson } from "@/lib/types";
 import { SlideCard } from "./SlideCard";
 import { Spinner } from "./ui";
@@ -66,6 +66,22 @@ export function LessonView({
                 </span>
               ))}
             </div>
+          </div>
+        )}
+
+        {lesson.meta.standards && lesson.meta.standards.length > 0 && (
+          <div className="mt-5 rounded-xl border border-line bg-paper/50 p-5">
+            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-muted">
+              <ClipboardCheck size={14} /> Curriculum standards
+            </p>
+            <ul className="mt-3 space-y-2">
+              {lesson.meta.standards.map((st, i) => (
+                <li key={i} className="flex gap-2.5 text-sm leading-relaxed text-ink">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500" />
+                  {st}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </div>

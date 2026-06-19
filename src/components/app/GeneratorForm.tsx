@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Presentation, Layers, ClipboardList, Sparkles } from "lucide-react";
 import { REGIONS, SUBJECTS, TONES, regionById } from "@/lib/curricula";
 import type { GenerateRequest, GenerationMode } from "@/lib/types";
-import { Field, Segmented, Select, Spinner, TextArea } from "./ui";
+import { Field, Segmented, Select, Spinner, TextArea, Toggle } from "./ui";
 
 const EXAMPLES: Record<GenerationMode, string[]> = {
   lesson: ["The water cycle", "Fractions of amounts", "Causes of World War I", "Photosynthesis"],
@@ -32,6 +32,8 @@ export function GeneratorForm({
   const [slideCount, setSlideCount] = useState(9);
   const [lessonCount, setLessonCount] = useState(6);
   const [questionCount, setQuestionCount] = useState(10);
+  const [includeStandards, setIncludeStandards] = useState(true);
+  const [autoImages, setAutoImages] = useState(false);
 
   const region = useMemo(() => regionById(regionId), [regionId]);
 
@@ -57,6 +59,8 @@ export function GeneratorForm({
       slideCount,
       lessonCount,
       questionCount,
+      includeStandards,
+      autoImages,
     });
   };
 
@@ -163,6 +167,23 @@ export function GeneratorForm({
                   ))}
                 </Select>
               </Field>
+            </div>
+          )}
+
+          {mode === "lesson" && (
+            <div className="space-y-4 rounded-xl border border-line bg-paper/50 p-4">
+              <Toggle
+                label="Align to curriculum standards"
+                hint="Finds the matching standard for the subject, year & curriculum and adds it to the lesson"
+                checked={includeStandards}
+                onChange={setIncludeStandards}
+              />
+              <Toggle
+                label="Generate images while creating"
+                hint="Illustrates the slides automatically (needs your image proxy + key in Settings)"
+                checked={autoImages}
+                onChange={setAutoImages}
+              />
             </div>
           )}
 

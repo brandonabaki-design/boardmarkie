@@ -170,13 +170,19 @@ export const lessonSchema: JSONSchema = {
       items: vocabItem,
       description: "Key vocabulary for the whole lesson.",
     },
+    standards: {
+      type: "array",
+      items: { type: "string" },
+      description:
+        "Official curriculum standard(s) this lesson aligns to for the given subject, year group/grade and region — each as its code plus a short description (e.g. 'NGSS 5-PS1-1: …', 'CCSS.MATH.CONTENT.4.NF.B.3: …', 'National Curriculum KS2 Science: …'). Empty array if standards were not requested.",
+    },
     slides: {
       type: "array",
       items: slideSchema,
       description: "The ordered slides that make up the lesson.",
     },
   },
-  required: ["title", "summary", "objectives", "vocabulary", "slides"],
+  required: ["title", "summary", "objectives", "vocabulary", "standards", "slides"],
 };
 
 export const worksheetSchema: JSONSchema = {

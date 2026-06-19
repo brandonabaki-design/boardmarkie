@@ -16,7 +16,7 @@ import type {
 } from "@/lib/types";
 import { generateArtifact, editLesson, generateDiagram } from "@/lib/client";
 import { generateImage } from "@/lib/images";
-import { deleteArtifact, getLibrary, saveArtifact } from "@/lib/storage";
+import { deleteArtifact, getImageConfig, getLibrary, saveArtifact } from "@/lib/storage";
 import { GeneratorForm } from "./GeneratorForm";
 import { GeneratingState } from "./GeneratingState";
 import { LessonView } from "./LessonView";
@@ -25,6 +25,7 @@ import { SeriesView } from "./SeriesView";
 import { SettingsModal } from "./SettingsModal";
 import { LibraryDrawer } from "./LibraryDrawer";
 import { ExportMenu } from "./ExportMenu";
+import { Spinner } from "./ui";
 
 function isMode(v: string | null): v is GenerationMode {
   return v === "lesson" || v === "series" || v === "worksheet";
@@ -35,6 +36,12 @@ function patchSlide(lesson: Lesson, slideId: string, patch: Partial<Slide>): Les
     ...lesson,
     slides: lesson.slides.map((s) => (s.id === slideId ? { ...s, ...patch } : s)),
   };
+}
+
+// Shared illustration prompt — adds a classroom-friendly style and steers the
+// raster model away from rendering (usually garbled) text in the image.
+function imagePromptFor(slide: { imagePrompt?: string }): string {
+  return `${slide.imagePrompt}. Bright, friendly, age-appropriate educational illustration; clean flat style; no words or text in the image.`;
 }
 
 export function CreateApp() {
@@ -53,6 +60,7 @@ export function CreateApp() {
   const [mediaBusy, setMediaBusy] = useState<{ slideId: string; kind: "image" | "diagram" } | null>(
     null,
   );
+  const [imageProgress, setImageProgress] = useState<{ done: number; total: number } | null>(null);
 
   useEffect(() => {
     setLibrary(getLibrary());
@@ -70,16 +78,55 @@ export function CreateApp() {
     setError(null);
     setGenMode(req.mode);
     setLoading(true);
+    let artifact: Artifact;
     try {
-      const artifact = await generateArtifact(req);
-      saveArtifact(artifact);
-      setCurrent(artifact);
-      refresh();
+      artifact = await generateArtifact(req);
     } catch (err) {
       handleError(err);
-    } finally {
       setLoading(false);
+      return;
     }
+    saveArtifact(artifact);
+    setCurrent(artifact);
+    refresh();
+    setLoading(false);
+
+    // Optionally illustrate the slides right after creation.
+    if (req.autoImages && artifact.kind === "lesson") {
+      if (!getImageConfig().proxyUrl) {
+        setError(
+          "Lesson created. To auto-generate images, add your image proxy URL and Gemini key in Settings — then use “Generate image” on a slide.",
+        );
+        setSettingsOpen(true);
+      } else {
+        await autoGenerateImages(artifact);
+      }
+    }
+  };
+
+  const autoGenerateImages = async (lesson: Lesson) => {
+    const targets = lesson.slides.filter((s) => s.imagePrompt && !s.imageUrl);
+    if (!targets.length) return;
+    setImageProgress({ done: 0, total: targets.length });
+    let working = lesson;
+    for (let i = 0; i < targets.length; i++) {
+      try {
+        const image = await generateImage(imagePromptFor(targets[i]), { aspectRatio: "16:9" });
+        working = patchSlide(working, targets[i].id, { imageUrl: image });
+        setCurrent(working);
+        saveArtifact(working);
+      } catch (err) {
+        const e = err as Error & { status?: number };
+        if (e.status === 401) {
+          handleError(err); // misconfigured proxy/key — stop early
+          break;
+        }
+        // otherwise skip this slide and keep going
+      }
+      setImageProgress({ done: i + 1, total: targets.length });
+    }
+    refresh();
+    setImageProgress(null);
   };
 
   const handleEdit = async (action: EditAction, instruction?: string, slideId?: string) => {
@@ -106,8 +153,7 @@ export function CreateApp() {
     setError(null);
     setMediaBusy({ slideId, kind: "image" });
     try {
-      const prompt = `${slide.imagePrompt}. Bright, friendly, age-appropriate educational illustration; clean flat style; no words or text in the image.`;
-      const image = await generateImage(prompt, { aspectRatio: "16:9" });
+      const image = await generateImage(imagePromptFor(slide), { aspectRatio: "16:9" });
       const updated = patchSlide(lesson, slideId, { imageUrl: image });
       setCurrent(updated);
       saveArtifact(updated);
@@ -193,7 +239,7 @@ export function CreateApp() {
     setError(null);
   };
 
-  const busy = loading || editing || expanding !== null || mediaBusy !== null;
+  const busy = loading || editing || expanding !== null || mediaBusy !== null || imageProgress !== null;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -241,6 +287,13 @@ export function CreateApp() {
             <button onClick={() => setError(null)} className="text-muted hover:text-ink">
               <X size={16} />
             </button>
+          </div>
+        )}
+
+        {imageProgress && (
+          <div className="no-print mx-auto mb-6 flex max-w-2xl items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-2.5 text-sm font-medium text-brand-800">
+            <Spinner className="h-4 w-4 text-brand-600" /> Generating images… {imageProgress.done}/
+            {imageProgress.total}
           </div>
         )}
 

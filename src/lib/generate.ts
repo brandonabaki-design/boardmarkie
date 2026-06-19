@@ -166,6 +166,7 @@ interface RawLesson {
   summary?: unknown;
   objectives?: unknown;
   vocabulary?: unknown;
+  standards?: unknown;
   slides?: unknown;
 }
 
@@ -185,6 +186,7 @@ export function toLesson(raw: RawLesson, req: GenerateRequest): Lesson {
       summary: str(raw.summary),
       objectives: arr<unknown>(raw.objectives).map(str).filter(Boolean),
       vocabulary: cleanVocab(raw.vocabulary),
+      standards: arr<unknown>(raw.standards).map(str).filter(Boolean),
     },
     slides: slides.length ? slides : [{ id: rid("sl"), layout: "title", title: req.topic }],
   };

@@ -12,6 +12,7 @@ export interface LessonMeta {
   summary: string;
   objectives: string[];
   vocabulary: VocabItem[];
+  standards?: string[]; // curriculum standards this lesson aligns to
 }
 
 export interface VocabItem {
@@ -156,6 +157,8 @@ export interface GenerateRequest {
   includeAnswers?: boolean;
   tone?: string;
   notes?: string;
+  includeStandards?: boolean; // find & include curriculum standards (lessons)
+  autoImages?: boolean; // generate slide illustrations during creation
 }
 
 export type EditAction =
