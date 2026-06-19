@@ -88,6 +88,30 @@ export function SlideCard({
       </h3>
       {slide.subtitle && <p className="mt-1.5 text-base text-muted">{slide.subtitle}</p>}
 
+      {(slide.imageUrl || slide.diagramSvg) && (
+        <figure className="mt-5 overflow-hidden rounded-2xl border border-line bg-paper/40">
+          {slide.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={slide.imageUrl}
+              alt={slide.imageAlt || slide.imagePrompt || "Lesson illustration"}
+              className="aspect-video w-full object-cover"
+            />
+          ) : (
+            <div
+              role="img"
+              aria-label={slide.imageAlt || "Diagram"}
+              className="bg-white p-4 [&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-h-[440px] [&_svg]:w-full"
+              // SVG is sanitized when generated (scripts / handlers stripped)
+              dangerouslySetInnerHTML={{ __html: slide.diagramSvg || "" }}
+            />
+          )}
+          {slide.imageAlt && (
+            <figcaption className="px-4 py-2 text-xs text-muted">{slide.imageAlt}</figcaption>
+          )}
+        </figure>
+      )}
+
       <div className="mt-5 space-y-4">
         {slide.body && <p className="text-[15px] leading-relaxed text-ink">{slide.body}</p>}
 
@@ -176,26 +200,7 @@ export function SlideCard({
         )}
 
         {(slide.imagePrompt || slide.imageUrl || slide.diagramSvg) && (
-          <div className="space-y-3">
-            {slide.imageUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={slide.imageUrl}
-                alt={slide.imageAlt || slide.imagePrompt || "Lesson illustration"}
-                className="w-full rounded-xl border border-line"
-              />
-            )}
-
-            {slide.diagramSvg && (
-              <div
-                role="img"
-                aria-label={slide.imageAlt || "Diagram"}
-                className="overflow-hidden rounded-xl border border-line bg-white p-3 [&_svg]:mx-auto [&_svg]:h-auto [&_svg]:w-full"
-                // SVG is sanitized when generated (scripts / handlers stripped)
-                dangerouslySetInnerHTML={{ __html: slide.diagramSvg }}
-              />
-            )}
-
+          <div className="space-y-2">
             {slide.imagePrompt && !slide.imageUrl && !slide.diagramSvg && (
               <p className="flex items-start gap-3 rounded-xl border border-dashed border-line bg-paper/60 px-4 py-3 text-sm text-muted">
                 <ImageIcon size={18} className="mt-0.5 shrink-0 text-muted" />

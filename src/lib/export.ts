@@ -1,6 +1,6 @@
 "use client";
 
-import type { Artifact, Lesson } from "./types";
+import type { Artifact, Lesson, Slide } from "./types";
 
 const BRAND = "0D9488"; // teal-600
 const INK = "1B1B1F";
@@ -26,6 +26,66 @@ export function printDocument(): void {
   window.print();
 }
 
+// ---- visual helpers (export runs client-side, so DOM APIs are available) ----
+
+interface VisualData {
+  dataUrl: string; // a raster (PNG/JPEG) data URL, embeddable by pptxgenjs
+  w: number; // natural pixel width  (used only for aspect ratio)
+  h: number; // natural pixel height
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Image failed to load"));
+    img.src = src;
+  });
+}
+
+/**
+ * Rasterise model-generated SVG to a PNG data URL. pptxgenjs's native SVG
+ * support is unreliable, whereas a PNG embeds cleanly in PowerPoint, Keynote
+ * and Google Slides. Aspect ratio comes from the SVG's viewBox.
+ */
+async function svgToPng(svg: string, targetW = 1600): Promise<VisualData> {
+  const m = svg.match(/viewBox\s*=\s*["']\s*[-\d.]+\s+[-\d.]+\s+([\d.]+)\s+([\d.]+)/i);
+  const aspect = m ? Number(m[2]) / Number(m[1]) : 0.75;
+  const safeAspect = Number.isFinite(aspect) && aspect > 0 ? aspect : 0.75;
+  const w = targetW;
+  const h = Math.max(1, Math.round(targetW * safeAspect));
+  const img = await loadImage(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas unavailable");
+  ctx.fillStyle = "#FFFFFF"; // flatten any transparency to white
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0, w, h);
+  return { dataUrl: canvas.toDataURL("image/png"), w, h };
+}
+
+/** A slide's visual as an embeddable raster + natural size, or null if none. */
+async function slideVisual(slide: Slide): Promise<VisualData | null> {
+  try {
+    if (slide.imageUrl) {
+      const img = await loadImage(slide.imageUrl);
+      return { dataUrl: slide.imageUrl, w: img.naturalWidth || 1600, h: img.naturalHeight || 900 };
+    }
+    if (slide.diagramSvg) return await svgToPng(slide.diagramSvg);
+  } catch {
+    /* Skip the visual rather than failing the whole export. */
+  }
+  return null;
+}
+
+/** Scale natural px (w0,h0) to fit within a box (inches), preserving aspect. */
+function fitBox(w0: number, h0: number, maxW: number, maxH: number) {
+  const scale = Math.min(maxW / w0, maxH / h0);
+  return { w: w0 * scale, h: h0 * scale };
+}
+
 type Para = { text: string; options?: Record<string, unknown> };
 
 export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
@@ -41,21 +101,28 @@ export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
     // accent bar
     s.addShape("rect" as never, { x: 0, y: 0, w: 0.22, h: 7.5, fill: { color: BRAND } });
 
+    const visual = await slideVisual(slide);
+
+    // Drop a visual into a box, centered and aspect-fit (no stretching).
+    const placeVisual = (v: VisualData, boxX: number, boxY: number, boxW: number, boxH: number) => {
+      const { w, h } = fitBox(v.w, v.h, boxW, boxH);
+      s.addImage({ data: v.dataUrl, x: boxX + (boxW - w) / 2, y: boxY + (boxH - h) / 2, w, h });
+    };
+
     if (slide.layout === "title") {
+      const titleW = visual ? 6.2 : 11.7;
       s.addText(slide.title, {
-        x: 0.8, y: 2.6, w: 11.7, h: 1.6, fontSize: 40, bold: true, color: INK, fontFace: "Arial",
+        x: 0.8, y: 2.4, w: titleW, h: 1.6, fontSize: 40, bold: true, color: INK, fontFace: "Arial",
       });
       if (slide.subtitle) {
-        s.addText(slide.subtitle, { x: 0.8, y: 4.2, w: 11.7, h: 1, fontSize: 20, color: MUTE, fontFace: "Arial" });
+        s.addText(slide.subtitle, { x: 0.8, y: 4.0, w: titleW, h: 1.2, fontSize: 20, color: MUTE, fontFace: "Arial" });
       }
       s.addText(`${lesson.meta.subject}  •  ${lesson.meta.yearGroup}`, {
-        x: 0.8, y: 6.4, w: 11.7, h: 0.5, fontSize: 14, color: BRAND, fontFace: "Arial",
+        x: 0.8, y: 6.4, w: titleW, h: 0.5, fontSize: 14, color: BRAND, fontFace: "Arial",
       });
+      if (visual) placeVisual(visual, 7.2, 1.3, 5.5, 4.9);
     } else {
-      // When a slide has a generated image, give it the right-hand column and
-      // narrow the text. (SVG diagrams still export via the PDF/print path.)
-      const hasImg = !!slide.imageUrl;
-      const textW = hasImg ? 7.1 : 11.9;
+      const textW = visual ? 6.9 : 11.9;
       s.addText(slide.title, {
         x: 0.7, y: 0.4, w: textW, h: 0.9, fontSize: 28, bold: true, color: INK, fontFace: "Arial",
       });
@@ -99,12 +166,10 @@ export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
         s.addText(paras as never, { x: 0.7, y: 1.8, w: textW, h: 5.3, valign: "top" });
       }
 
-      if (hasImg && slide.imageUrl) {
-        s.addImage({
-          data: slide.imageUrl,
-          x: 8.1, y: 1.8, w: 4.5, h: 4.5,
-          sizing: { type: "contain", w: 4.5, h: 4.5 },
-        });
+      if (visual) {
+        // Visual-only slide → big and centered; otherwise the right column.
+        if (paras.length === 0) placeVisual(visual, 0.7, 1.8, 11.9, 5.3);
+        else placeVisual(visual, 7.7, 1.7, 5.0, 5.3);
       }
     }
 
