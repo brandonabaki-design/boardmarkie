@@ -6,6 +6,11 @@ JS). This ~90-line Worker is the only server-side piece: it adds CORS and
 forwards prompts to Google's **Imagen** image API. It does **not** touch the
 Claude/lesson flow — that still runs in the browser with the teacher's key.
 
+> ⚠️ **Geo-blocked region?** Google restricts the Gemini API by country, and a
+> Cloudflare Worker runs *near you*, so from a blocked region it fails with
+> *"User location is not supported."* In that case use [`../vercel-proxy/`](../vercel-proxy)
+> instead — Vercel functions run in the US, which Google accepts.
+
 ## What you'll need
 
 - A free [Cloudflare account](https://dash.cloudflare.com/sign-up)
