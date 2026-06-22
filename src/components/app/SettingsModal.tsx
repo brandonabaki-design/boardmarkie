@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { X, KeyRound, ShieldCheck, ExternalLink, Check, ImagePlus, Search } from "lucide-react";
-import { getApiKey, setApiKey, getImageConfig, setImageConfig } from "@/lib/storage";
+import { getApiKey, setApiKey, getImageConfig, setImageConfig, getSearchKey, setSearchKey } from "@/lib/storage";
 
 export function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [value, setValue] = useState("");
   const [proxyUrl, setProxyUrl] = useState("");
   const [imageKey, setImageKey] = useState("");
+  const [pixabayKey, setPixabayKey] = useState("");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -16,6 +17,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
       const cfg = getImageConfig();
       setProxyUrl(cfg.proxyUrl);
       setImageKey(cfg.apiKey);
+      setPixabayKey(getSearchKey());
       setSaved(false);
     }
   }, [open]);
@@ -25,6 +27,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   const save = () => {
     setApiKey(value);
     setImageConfig({ proxyUrl, apiKey: imageKey });
+    setSearchKey(pixabayKey);
     setSaved(true);
     setTimeout(onClose, 600);
   };
@@ -126,18 +129,40 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
             <Search size={16} className="text-brand-600" /> Image search
           </h3>
           <p className="mt-1.5 text-xs text-muted">
-            Built in — no setup or key needed. The editor’s <span className="font-semibold text-ink">Swap → Search</span>{" "}
-            uses{" "}
+            The editor’s <span className="font-semibold text-ink">Swap → Search</span> finds high-quality,
+            classroom-safe photos and illustrations via{" "}
             <a
-              href="https://openverse.org"
+              href="https://pixabay.com"
               target="_blank"
               rel="noreferrer"
               className="font-medium text-brand-700 hover:underline"
             >
-              Openverse
-            </a>{" "}
-            (openly-licensed, classroom-safe images). You can also upload a file or paste an image URL.
+              Pixabay
+            </a>
+            . Add your free API key below (email signup — no cloud project or billing). You can always upload
+            a file or paste an image URL instead.
           </p>
+
+          <label className="mt-3 block">
+            <span className="text-sm font-semibold text-ink">Pixabay API key</span>
+            <input
+              type="password"
+              value={pixabayKey}
+              onChange={(e) => setPixabayKey(e.target.value)}
+              placeholder="e.g. 12345678-abcdef…"
+              autoComplete="off"
+              className="mt-1.5 w-full rounded-xl border border-line px-3.5 py-2.5 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+            />
+          </label>
+
+          <a
+            href="https://pixabay.com/api/docs/"
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline"
+          >
+            Get a free Pixabay API key <ExternalLink size={13} />
+          </a>
         </div>
 
         <div className="mt-6 flex gap-3">

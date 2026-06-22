@@ -1,38 +1,57 @@
 "use client";
 
-// In-app image search via Openverse (https://openverse.org) — openly-licensed
-// and public-domain images, which are ideal for classroom use. No API key, no
-// cloud project: the API is public and CORS-friendly, so it works straight from
-// the browser. Click a result to swap it into a slide.
+// In-app image search via Pixabay — large catalog of high-quality, license-free
+// photos, illustrations and vectors (good across all year groups). Needs a free
+// Pixabay API key (simple email signup, no cloud project / billing), stored in
+// Settings. The API is CORS-friendly, so search runs straight from the browser.
+
+import { getSearchKey } from "./storage";
 
 export interface ImageResult {
   title: string;
-  url: string; // full-size image URL
-  thumb: string; // thumbnail URL
+  url: string; // best-quality image URL
+  thumb: string; // smaller URL for the results grid
 }
 
+export const NO_SEARCH_KEY = "Add your free Pixabay API key in Settings to search images.";
+
 export async function searchImages(query: string): Promise<ImageResult[]> {
-  const u = new URL("https://api.openverse.org/v1/images/");
+  const key = getSearchKey();
+  if (!key) {
+    const e = new Error(NO_SEARCH_KEY) as Error & { status?: number };
+    e.status = 401;
+    throw e;
+  }
+
+  const u = new URL("https://pixabay.com/api/");
+  u.searchParams.set("key", key);
   u.searchParams.set("q", query);
-  u.searchParams.set("page_size", "12");
-  u.searchParams.set("mature", "false"); // keep results classroom-safe
+  u.searchParams.set("per_page", "15");
+  u.searchParams.set("safesearch", "true");
+  u.searchParams.set("image_type", "all");
 
   let res: Response;
   try {
-    res = await fetch(u.toString(), { headers: { Accept: "application/json" } });
+    res = await fetch(u.toString());
   } catch {
     throw new Error("Couldn't reach the image search service.");
   }
 
   if (!res.ok) {
-    throw new Error(`Image search failed (${res.status}). Please try again.`);
+    if (res.status === 400) throw new Error("Pixabay rejected the request — double-check your API key in Settings.");
+    if (res.status === 429) throw new Error("Pixabay rate limit hit — wait a moment and try again.");
+    throw new Error(`Image search failed (${res.status}).`);
   }
 
   const data = (await res.json()) as {
-    results?: Array<{ title?: string; url?: string; thumbnail?: string }>;
+    hits?: Array<{ tags?: string; webformatURL?: string; largeImageURL?: string; previewURL?: string }>;
   };
-  return (data.results ?? [])
-    .map((r) => ({ title: r.title ?? "", url: r.url ?? "", thumb: r.thumbnail || r.url || "" }))
+  return (data.hits ?? [])
+    .map((h) => ({
+      title: h.tags ?? "",
+      url: h.largeImageURL || h.webformatURL || "",
+      thumb: h.webformatURL || h.previewURL || "",
+    }))
     .filter((r) => r.url);
 }
 

@@ -4,20 +4,42 @@ import { useState } from "react";
 import { X, Search, Upload, Link2, Trash2, ExternalLink } from "lucide-react";
 import type { Slide } from "@/lib/types";
 import { searchImages, googleImagesUrl, type ImageResult } from "@/lib/imageSearch";
+import { getImageConfig } from "@/lib/storage";
 import { Spinner } from "./ui";
 
-/** Fetch an image and encode it as a data URL (so it renders instantly, works
- *  even if the host blocks hotlinking, and embeds cleanly into exports). */
-async function toDataUrl(src: string): Promise<string> {
-  const res = await fetch(src);
-  if (!res.ok) throw new Error("fetch failed");
-  const blob = await res.blob();
-  return await new Promise<string>((resolve, reject) => {
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
     reader.onerror = () => reject(new Error("read failed"));
     reader.readAsDataURL(blob);
   });
+}
+
+/** Encode an image URL as a data URL so it renders instantly, survives hotlink
+ *  blocking, and embeds cleanly into PowerPoint/PDF exports. Tries a direct
+ *  browser fetch first (fast when CORS allows it), then falls back to the Vercel
+ *  proxy's /fetch-image endpoint, which fetches server-side (no CORS limits). */
+async function toDataUrl(src: string): Promise<string> {
+  try {
+    const res = await fetch(src);
+    if (res.ok) return await blobToDataUrl(await res.blob());
+  } catch {
+    /* fall through to the proxy */
+  }
+
+  const { proxyUrl } = getImageConfig();
+  if (!proxyUrl) throw new Error("fetch failed");
+  const fetchUrl = proxyUrl.replace(/\/image\/?$/, "/fetch-image");
+  const res = await fetch(fetchUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url: src }),
+  });
+  if (!res.ok) throw new Error("proxy fetch failed");
+  const data = (await res.json()) as { image?: string };
+  if (!data.image) throw new Error("no image returned");
+  return data.image;
 }
 
 export function ImageSwap({
@@ -59,17 +81,17 @@ export function ImageSwap({
     reader.readAsDataURL(file);
   };
 
-  // Prefer the small CORS-friendly thumbnail (fast + reliable + embeddable);
-  // fall back to the full image, then to the raw URL (display-only).
+  // Prefer the full-resolution image (best quality for the board + exports);
+  // fall back to the thumbnail, then to the raw URL (display-only).
   const pickResult = async (r: ImageResult) => {
     setPicking(true);
     try {
-      onPick(await toDataUrl(r.thumb || r.url));
+      onPick(await toDataUrl(r.url || r.thumb));
     } catch {
       try {
-        onPick(await toDataUrl(r.url));
+        onPick(await toDataUrl(r.thumb));
       } catch {
-        onPick(r.url);
+        onPick(r.url || r.thumb);
       }
     } finally {
       setPicking(false);
@@ -105,7 +127,7 @@ export function ImageSwap({
             onKeyDown={(e) => {
               if (e.key === "Enter") runSearch();
             }}
-            placeholder="Search free images (Openverse)…"
+            placeholder="Search high-quality images (Pixabay)…"
             className="flex-1 rounded-xl border border-line px-3.5 py-2.5 text-sm outline-none focus:border-brand-400"
           />
           <button
