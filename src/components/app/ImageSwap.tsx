@@ -62,7 +62,7 @@ export function ImageSwap({
             onKeyDown={(e) => {
               if (e.key === "Enter") runSearch();
             }}
-            placeholder="Search images on Google…"
+            placeholder="Search free images (Openverse)…"
             className="flex-1 rounded-xl border border-line px-3.5 py-2.5 text-sm outline-none focus:border-brand-400"
           />
           <button

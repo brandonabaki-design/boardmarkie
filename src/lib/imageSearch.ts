@@ -1,10 +1,9 @@
 "use client";
 
-// Embedded image search via Google's Programmable Search (Custom Search JSON
-// API). Bring-your-own key + engine ID, stored in Settings. Returns image
-// results we render inline so the user can click one to swap a slide's image.
-
-import { getSearchConfig } from "./storage";
+// In-app image search via Openverse (https://openverse.org) — openly-licensed
+// and public-domain images, which are ideal for classroom use. No API key, no
+// cloud project: the API is public and CORS-friendly, so it works straight from
+// the browser. Click a result to swap it into a slide.
 
 export interface ImageResult {
   title: string;
@@ -12,61 +11,32 @@ export interface ImageResult {
   thumb: string; // thumbnail URL
 }
 
-export const NO_SEARCH_CONFIG =
-  "Add a Google image-search API key and engine ID in Settings to search images in-app.";
-
-export function searchConfigured(): boolean {
-  const { apiKey, cx } = getSearchConfig();
-  return Boolean(apiKey && cx);
-}
-
 export async function searchImages(query: string): Promise<ImageResult[]> {
-  const { apiKey, cx } = getSearchConfig();
-  if (!apiKey || !cx) {
-    const e = new Error(NO_SEARCH_CONFIG) as Error & { status?: number };
-    e.status = 401;
-    throw e;
-  }
-
-  const u = new URL("https://www.googleapis.com/customsearch/v1");
-  u.searchParams.set("key", apiKey);
-  u.searchParams.set("cx", cx);
+  const u = new URL("https://api.openverse.org/v1/images/");
   u.searchParams.set("q", query);
-  u.searchParams.set("searchType", "image");
-  u.searchParams.set("num", "9");
-  u.searchParams.set("safe", "active");
+  u.searchParams.set("page_size", "12");
+  u.searchParams.set("mature", "false"); // keep results classroom-safe
 
   let res: Response;
   try {
-    res = await fetch(u.toString());
+    res = await fetch(u.toString(), { headers: { Accept: "application/json" } });
   } catch {
-    throw new Error("Couldn't reach Google image search.");
+    throw new Error("Couldn't reach the image search service.");
   }
 
   if (!res.ok) {
-    let message = `Image search failed (${res.status}).`;
-    try {
-      const body = (await res.json()) as { error?: { message?: string } };
-      if (body?.error?.message) message = body.error.message;
-    } catch {
-      /* keep the generic message */
-    }
-    throw new Error(message);
+    throw new Error(`Image search failed (${res.status}). Please try again.`);
   }
 
   const data = (await res.json()) as {
-    items?: Array<{ title?: string; link?: string; image?: { thumbnailLink?: string } }>;
+    results?: Array<{ title?: string; url?: string; thumbnail?: string }>;
   };
-  return (data.items ?? [])
-    .map((it) => ({
-      title: it.title ?? "",
-      url: it.link ?? "",
-      thumb: it.image?.thumbnailLink || it.link || "",
-    }))
+  return (data.results ?? [])
+    .map((r) => ({ title: r.title ?? "", url: r.url ?? "", thumb: r.thumbnail || r.url || "" }))
     .filter((r) => r.url);
 }
 
-/** Fallback when in-app search isn't configured: open Google Images in a tab. */
+/** Fallback link when a search fails: open Google Images in a new tab. */
 export function googleImagesUrl(query: string): string {
   return `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query)}`;
 }
