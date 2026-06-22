@@ -73,6 +73,13 @@ export function CanvasEditor({
   const clip = useRef<CanvasElement | null>(null);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const note = (msg: string) => {
+    setFlash(msg);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlash(null), 1200);
+  };
 
   const safeIdx = Math.min(idx, lesson.slides.length - 1);
   const slide = ensureElements(lesson.slides[safeIdx]);
@@ -193,6 +200,7 @@ export function CanvasEditor({
           setElements(els.filter((x) => x.id !== el.id));
           setSelectedId(null);
         }
+        note(k === "x" ? "Cut" : "Copied");
       } else if (k === "v" && !typing && clip.current) {
         e.preventDefault();
         const src = clip.current;
@@ -203,6 +211,7 @@ export function CanvasEditor({
           y: clamp(src.y + 3, 0, 92),
           z: topZ(els),
         } as CanvasElement);
+        note("Pasted");
       }
     };
     window.addEventListener("keydown", onKey);
@@ -495,6 +504,12 @@ export function CanvasEditor({
       >
         <Plus size={15} /> Add slide
       </button>
+
+      {flash && (
+        <div className="no-print pointer-events-none fixed bottom-6 left-1/2 z-[80] -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white shadow-lg">
+          {flash}
+        </div>
+      )}
 
       {swapOpen && (
         <ImageSwap
