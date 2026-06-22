@@ -5,7 +5,20 @@
 // so requests go through a small Cloudflare Worker proxy (see worker/). The
 // proxy URL and the teacher's Gemini key live in localStorage (Settings).
 
-import { getImageConfig } from "./storage";
+import { getImageConfig, getImageStyle } from "./storage";
+
+/**
+ * Wrap a plain subject into a full illustration prompt in the user's chosen
+ * style. Line art (default) renders cleanly, compresses small (fast to load),
+ * and prints well; both styles forbid in-image text, which raster models garble.
+ */
+export function illustrationPrompt(subject: string): string {
+  const base = subject.trim();
+  if (getImageStyle() === "color") {
+    return `${base}. Bright, friendly, age-appropriate educational illustration; clean flat style; no words or text in the image.`;
+  }
+  return `${base}. Black-and-white line art in a clean coloring-book style: bold, even black outlines on a plain white background, no shading, no grey fills, no colour. Simple, friendly and age-appropriate. Absolutely no words, letters, numbers, or text anywhere in the image.`;
+}
 
 function err(message: string, status?: number): Error & { status?: number } {
   const e = new Error(message) as Error & { status?: number };

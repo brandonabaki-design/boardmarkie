@@ -11,6 +11,9 @@ import {
   setSearchKey,
   getModel,
   setModel,
+  getImageStyle,
+  setImageStyle,
+  type ImageStyle,
 } from "@/lib/storage";
 import { MODEL_OPTIONS } from "@/lib/anthropic";
 
@@ -20,6 +23,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   const [imageKey, setImageKey] = useState("");
   const [pixabayKey, setPixabayKey] = useState("");
   const [model, setModelState] = useState<string>("");
+  const [imgStyle, setImgStyle] = useState<ImageStyle>("line");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -30,6 +34,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
       setImageKey(cfg.apiKey);
       setPixabayKey(getSearchKey());
       setModelState(getModel());
+      setImgStyle(getImageStyle());
       setSaved(false);
     }
   }, [open]);
@@ -41,6 +46,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
     setImageConfig({ proxyUrl, apiKey: imageKey });
     setSearchKey(pixabayKey);
     setModel(model);
+    setImageStyle(imgStyle);
     setSaved(true);
     setTimeout(onClose, 600);
   };
@@ -163,6 +169,32 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
           >
             Get a Gemini API key <ExternalLink size={13} />
           </a>
+
+          <div className="mt-4">
+            <span className="text-sm font-semibold text-ink">Illustration style</span>
+            <div className="mt-1.5 grid grid-cols-2 gap-1.5 rounded-2xl border border-line bg-paper p-1.5">
+              {(
+                [
+                  ["line", "Line art (B&W)"],
+                  ["color", "Colour"],
+                ] as const
+              ).map(([v, label]) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setImgStyle(v)}
+                  className={`rounded-xl px-2 py-2 text-sm font-semibold transition-all ${
+                    imgStyle === v ? "bg-white text-brand-700 card-shadow" : "text-muted hover:text-ink"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-xs text-muted">
+              Black-and-white line art looks clean, loads fast, and is printer-friendly.
+            </p>
+          </div>
         </div>
 
         <div className="mt-5 border-t border-line pt-5">

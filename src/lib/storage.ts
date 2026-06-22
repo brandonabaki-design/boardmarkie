@@ -68,6 +68,21 @@ export function setModel(value: string): void {
   else window.localStorage.removeItem(KEY_MODEL);
 }
 
+const KEY_IMG_STYLE = "boardmarkie.imageStyle";
+export type ImageStyle = "line" | "color";
+
+// Illustration look for AI-generated images. Black-and-white line art is the
+// default — clean, fast to load, printer-friendly (a Chalkie-style look).
+export function getImageStyle(): ImageStyle {
+  if (typeof window === "undefined") return "line";
+  return window.localStorage.getItem(KEY_IMG_STYLE) === "color" ? "color" : "line";
+}
+
+export function setImageStyle(value: ImageStyle): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(KEY_IMG_STYLE, value);
+}
+
 export function getLibrary(): Artifact[] {
   if (typeof window === "undefined") return [];
   try {

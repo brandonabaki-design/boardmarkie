@@ -15,7 +15,7 @@ import type {
   Slide,
 } from "@/lib/types";
 import { generateArtifact, editLesson } from "@/lib/client";
-import { generateImage } from "@/lib/images";
+import { generateImage, illustrationPrompt } from "@/lib/images";
 import { ensureElements, placeImageOnSlide } from "@/lib/canvas";
 import { deleteArtifact, getImageConfig, getLibrary, saveArtifact } from "@/lib/storage";
 import { GeneratorForm } from "./GeneratorForm";
@@ -49,10 +49,10 @@ function seedLesson(lesson: Lesson, fresh = false): Lesson {
   };
 }
 
-// Shared illustration prompt — classroom-friendly style; steers the raster model
-// away from rendering (usually garbled) text in the image.
+// Shared illustration prompt — applies the teacher's chosen style (line art by
+// default) and steers the raster model away from rendering (garbled) text.
 function imagePromptFor(slide: { imagePrompt?: string }): string {
-  return `${slide.imagePrompt}. Bright, friendly, age-appropriate educational illustration; clean flat style; no words or text in the image.`;
+  return illustrationPrompt(slide.imagePrompt ?? "");
 }
 
 export function CreateApp() {

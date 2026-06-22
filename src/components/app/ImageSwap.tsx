@@ -4,7 +4,7 @@ import { useState } from "react";
 import { X, Search, Upload, Link2, Sparkles, PenTool, ImageIcon, ExternalLink } from "lucide-react";
 import { searchImages, googleImagesUrl, type ImageResult } from "@/lib/imageSearch";
 import { getImageConfig } from "@/lib/storage";
-import { generateImage } from "@/lib/images";
+import { generateImage, illustrationPrompt } from "@/lib/images";
 import { generateDiagram } from "@/lib/client";
 import { Spinner } from "./ui";
 
@@ -104,8 +104,7 @@ export function ImageSwap({
         });
         finish({ svg, alt });
       } else {
-        const styled = `${prompt.trim()}. Bright, friendly, age-appropriate educational illustration; clean flat style; no words or text in the image.`;
-        const src = await generateImage(styled, { aspectRatio: "16:9" });
+        const src = await generateImage(illustrationPrompt(prompt.trim()), { aspectRatio: "16:9" });
         finish({ src });
       }
     } catch (e) {
