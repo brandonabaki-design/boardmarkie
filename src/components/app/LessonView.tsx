@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Smile, GraduationCap, Scissors, Plus, Wand2, BookOpen, Target, ClipboardCheck } from "lucide-react";
-import type { EditAction, Lesson } from "@/lib/types";
+import type { EditAction, Lesson, Slide } from "@/lib/types";
 import { SlideCard } from "./SlideCard";
 import { Spinner } from "./ui";
 
@@ -13,6 +13,12 @@ export function LessonView({
   onGenerateImage,
   onGenerateDiagram,
   mediaBusy,
+  onPatch,
+  onSetImage,
+  onRemoveImage,
+  onMove,
+  onAdd,
+  onDelete,
 }: {
   lesson: Lesson;
   busy: boolean;
@@ -20,6 +26,12 @@ export function LessonView({
   onGenerateImage: (slideId: string) => void;
   onGenerateDiagram: (slideId: string) => void;
   mediaBusy: { slideId: string; kind: "image" | "diagram" } | null;
+  onPatch: (slideId: string, patch: Partial<Slide>) => void;
+  onSetImage: (slideId: string, url: string) => void;
+  onRemoveImage: (slideId: string) => void;
+  onMove: (slideId: string, dir: -1 | 1) => void;
+  onAdd: (slideId: string) => void;
+  onDelete: (slideId: string) => void;
 }) {
   return (
     <div className="mx-auto max-w-3xl">
@@ -102,6 +114,12 @@ export function LessonView({
             onGenerateImage={onGenerateImage}
             onGenerateDiagram={onGenerateDiagram}
             mediaBusy={mediaBusy && mediaBusy.slideId === slide.id ? mediaBusy.kind : null}
+            onPatch={onPatch}
+            onSetImage={onSetImage}
+            onRemoveImage={onRemoveImage}
+            onMove={onMove}
+            onAdd={onAdd}
+            onDelete={onDelete}
           />
         ))}
       </div>

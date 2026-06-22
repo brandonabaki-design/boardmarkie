@@ -39,6 +39,30 @@ export function setImageConfig(cfg: ImageConfig): void {
   set(KEY_IMG_KEY, cfg.apiKey);
 }
 
+const KEY_SEARCH_KEY = "boardmarkie.searchKey";
+const KEY_SEARCH_CX = "boardmarkie.searchCx";
+
+export interface SearchConfig {
+  apiKey: string; // Google Custom Search API key
+  cx: string; // Programmable Search Engine ID
+}
+
+export function getSearchConfig(): SearchConfig {
+  if (typeof window === "undefined") return { apiKey: "", cx: "" };
+  return {
+    apiKey: window.localStorage.getItem(KEY_SEARCH_KEY) ?? "",
+    cx: window.localStorage.getItem(KEY_SEARCH_CX) ?? "",
+  };
+}
+
+export function setSearchConfig(cfg: SearchConfig): void {
+  if (typeof window === "undefined") return;
+  const set = (k: string, v: string) =>
+    v.trim() ? window.localStorage.setItem(k, v.trim()) : window.localStorage.removeItem(k);
+  set(KEY_SEARCH_KEY, cfg.apiKey);
+  set(KEY_SEARCH_CX, cfg.cx);
+}
+
 export function getLibrary(): Artifact[] {
   if (typeof window === "undefined") return [];
   try {

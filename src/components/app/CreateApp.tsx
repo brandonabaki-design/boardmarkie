@@ -15,6 +15,7 @@ import type {
   Slide,
 } from "@/lib/types";
 import { generateArtifact, editLesson, generateDiagram } from "@/lib/client";
+import { rid } from "@/lib/generate";
 import { generateImage } from "@/lib/images";
 import { deleteArtifact, getImageConfig, getLibrary, saveArtifact } from "@/lib/storage";
 import { GeneratorForm } from "./GeneratorForm";
@@ -197,6 +198,53 @@ export function CreateApp() {
     }
   };
 
+  // ---- direct slide editing (browser-local) ----
+
+  const persistLesson = (lesson: Lesson) => {
+    setCurrent(lesson);
+    saveArtifact(lesson);
+    refresh();
+  };
+
+  const handlePatchSlide = (slideId: string, patch: Partial<Slide>) => {
+    if (!current || current.kind !== "lesson") return;
+    persistLesson(patchSlide(current, slideId, patch));
+  };
+
+  const handleSetImage = (slideId: string, url: string) => {
+    if (!current || current.kind !== "lesson") return;
+    persistLesson(patchSlide(current, slideId, { imageUrl: url, diagramSvg: undefined }));
+  };
+
+  const handleRemoveImage = (slideId: string) => {
+    if (!current || current.kind !== "lesson") return;
+    persistLesson(patchSlide(current, slideId, { imageUrl: undefined, diagramSvg: undefined }));
+  };
+
+  const handleMoveSlide = (slideId: string, dir: -1 | 1) => {
+    if (!current || current.kind !== "lesson") return;
+    const slides = [...current.slides];
+    const i = slides.findIndex((s) => s.id === slideId);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= slides.length) return;
+    [slides[i], slides[j]] = [slides[j], slides[i]];
+    persistLesson({ ...current, slides });
+  };
+
+  const handleAddSlide = (afterId: string) => {
+    if (!current || current.kind !== "lesson") return;
+    const slides = [...current.slides];
+    const i = slides.findIndex((s) => s.id === afterId);
+    const blank: Slide = { id: rid("sl"), layout: "content", title: "New slide", bullets: [""] };
+    slides.splice(i < 0 ? slides.length : i + 1, 0, blank);
+    persistLesson({ ...current, slides });
+  };
+
+  const handleDeleteSlide = (slideId: string) => {
+    if (!current || current.kind !== "lesson" || current.slides.length <= 1) return;
+    persistLesson({ ...current, slides: current.slides.filter((s) => s.id !== slideId) });
+  };
+
   const handleExpand = async (seriesLesson: SeriesLesson) => {
     if (!current || current.kind !== "series") return;
     setError(null);
@@ -328,6 +376,12 @@ export function CreateApp() {
                 onGenerateImage={handleGenerateImage}
                 onGenerateDiagram={handleGenerateDiagram}
                 mediaBusy={mediaBusy}
+                onPatch={handlePatchSlide}
+                onSetImage={handleSetImage}
+                onRemoveImage={handleRemoveImage}
+                onMove={handleMoveSlide}
+                onAdd={handleAddSlide}
+                onDelete={handleDeleteSlide}
               />
             )}
             {current.kind === "worksheet" && <WorksheetView worksheet={current} />}

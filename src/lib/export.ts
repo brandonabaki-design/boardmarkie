@@ -71,14 +71,47 @@ async function svgToPng(svg: string, targetW = 1600): Promise<VisualData> {
 async function slideVisual(slide: Slide): Promise<VisualData | null> {
   try {
     if (slide.imageUrl) {
-      const img = await loadImage(slide.imageUrl);
-      return { dataUrl: slide.imageUrl, w: img.naturalWidth || 1600, h: img.naturalHeight || 900 };
+      if (slide.imageUrl.startsWith("data:")) {
+        const img = await loadImage(slide.imageUrl);
+        return { dataUrl: slide.imageUrl, w: img.naturalWidth || 1600, h: img.naturalHeight || 900 };
+      }
+      // Remote image (pasted URL / web search): re-encode to a data URL so it
+      // embeds. Needs CORS; if the host blocks it we skip it in the deck rather
+      // than failing the export (it still shows on screen and in PDF/print).
+      return await encodeRemote(slide.imageUrl);
     }
     if (slide.diagramSvg) return await svgToPng(slide.diagramSvg);
   } catch {
     /* Skip the visual rather than failing the whole export. */
   }
   return null;
+}
+
+function loadImageCors(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Image failed to load"));
+    img.src = src;
+  });
+}
+
+async function encodeRemote(url: string): Promise<VisualData | null> {
+  try {
+    const img = await loadImageCors(url);
+    const w = img.naturalWidth || 1600;
+    const h = img.naturalHeight || 900;
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0);
+    return { dataUrl: canvas.toDataURL("image/png"), w, h };
+  } catch {
+    return null;
+  }
 }
 
 /** Scale natural px (w0,h0) to fit within a box (inches), preserving aspect. */

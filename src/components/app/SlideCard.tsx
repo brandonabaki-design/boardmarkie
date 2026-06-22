@@ -19,9 +19,15 @@ import {
   ExternalLink,
   Sparkles,
   PenTool,
+  Replace,
+  ArrowUp,
+  ArrowDown,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import type { EditAction, Slide, SlideLayout } from "@/lib/types";
-import { Spinner } from "./ui";
+import { Editable, Spinner } from "./ui";
+import { ImageSwap } from "./ImageSwap";
 
 const LAYOUT_META: Record<SlideLayout, { label: string; icon: typeof FileText; tint: string }> = {
   title: { label: "Title", icon: Presentation, tint: "bg-brand-50 text-brand-700" },
@@ -38,9 +44,6 @@ const LAYOUT_META: Record<SlideLayout, { label: string; icon: typeof FileText; t
 function youtubeUrl(q: string) {
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
 }
-function imageSearchUrl(q: string) {
-  return `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(q)}`;
-}
 
 export function SlideCard({
   slide,
@@ -51,6 +54,12 @@ export function SlideCard({
   onGenerateImage,
   onGenerateDiagram,
   mediaBusy,
+  onPatch,
+  onSetImage,
+  onRemoveImage,
+  onMove,
+  onAdd,
+  onDelete,
 }: {
   slide: Slide;
   index: number;
@@ -60,16 +69,31 @@ export function SlideCard({
   onGenerateImage: (slideId: string) => void;
   onGenerateDiagram: (slideId: string) => void;
   mediaBusy: "image" | "diagram" | null;
+  onPatch: (slideId: string, patch: Partial<Slide>) => void;
+  onSetImage: (slideId: string, url: string) => void;
+  onRemoveImage: (slideId: string) => void;
+  onMove: (slideId: string, dir: -1 | 1) => void;
+  onAdd: (slideId: string) => void;
+  onDelete: (slideId: string) => void;
 }) {
   const meta = LAYOUT_META[slide.layout] ?? LAYOUT_META.content;
   const Icon = meta.icon;
   const [menuOpen, setMenuOpen] = useState(false);
   const [instruction, setInstruction] = useState("");
+  const [swapOpen, setSwapOpen] = useState(false);
 
   const act = (action: EditAction, ins?: string) => {
     setMenuOpen(false);
     setInstruction("");
     onEditSlide(slide.id, action, ins);
+  };
+
+  const bullets = slide.bullets ?? [];
+  const commitBullet = (i: number, val: string) => {
+    const next = [...bullets];
+    if (!val.trim()) next.splice(i, 1);
+    else next[i] = val;
+    onPatch(slide.id, { bullets: next.length ? next : undefined });
   };
 
   return (
@@ -83,13 +107,25 @@ export function SlideCard({
         </span>
       </header>
 
-      <h3 className={`mt-4 font-display font-extrabold tracking-tight text-ink ${slide.layout === "title" ? "text-3xl sm:text-4xl" : "text-2xl"}`}>
-        {slide.title}
-      </h3>
-      {slide.subtitle && <p className="mt-1.5 text-base text-muted">{slide.subtitle}</p>}
+      <Editable
+        value={slide.title}
+        onCommit={(v) => onPatch(slide.id, { title: v || "Untitled slide" })}
+        multiline={false}
+        placeholder="Slide title"
+        className={`mt-4 font-display font-extrabold tracking-tight text-ink ${slide.layout === "title" ? "text-3xl sm:text-4xl" : "text-2xl"}`}
+      />
+      {slide.subtitle !== undefined && slide.subtitle !== "" && (
+        <Editable
+          value={slide.subtitle}
+          onCommit={(v) => onPatch(slide.id, { subtitle: v || undefined })}
+          multiline={false}
+          placeholder="Subtitle"
+          className="mt-1.5 text-base text-muted"
+        />
+      )}
 
       {(slide.imageUrl || slide.diagramSvg) && (
-        <figure className="mt-5 overflow-hidden rounded-2xl border border-line bg-paper/40">
+        <figure className="group/img relative mt-5 overflow-hidden rounded-2xl border border-line bg-paper/40">
           {slide.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -102,10 +138,16 @@ export function SlideCard({
               role="img"
               aria-label={slide.imageAlt || "Diagram"}
               className="bg-white p-4 [&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-h-[440px] [&_svg]:w-full"
-              // SVG is sanitized when generated (scripts / handlers stripped)
               dangerouslySetInnerHTML={{ __html: slide.diagramSvg || "" }}
             />
           )}
+          <button
+            onClick={() => setSwapOpen(true)}
+            disabled={busy}
+            className="no-print absolute right-2 top-2 inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-ink opacity-0 shadow-sm backdrop-blur transition-all hover:text-brand-700 group-hover/img:opacity-100 disabled:opacity-50"
+          >
+            <Replace size={13} className="text-brand-600" /> Swap
+          </button>
           {slide.imageAlt && (
             <figcaption className="px-4 py-2 text-xs text-muted">{slide.imageAlt}</figcaption>
           )}
@@ -113,17 +155,38 @@ export function SlideCard({
       )}
 
       <div className="mt-5 space-y-4">
-        {slide.body && <p className="text-[15px] leading-relaxed text-ink">{slide.body}</p>}
+        {slide.body && (
+          <Editable
+            value={slide.body}
+            onCommit={(v) => onPatch(slide.id, { body: v || undefined })}
+            placeholder="Body text"
+            className="text-[15px] leading-relaxed text-ink"
+          />
+        )}
 
-        {slide.bullets && slide.bullets.length > 0 && (
-          <ul className="space-y-2">
-            {slide.bullets.map((b, i) => (
-              <li key={i} className="flex gap-2.5 text-[15px] leading-relaxed text-ink">
-                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500" />
-                {b}
+        {bullets.length > 0 && (
+          <ul className="space-y-1">
+            {bullets.map((b, i) => (
+              <li key={i} className="group/li flex items-start gap-2.5">
+                <span className="mt-3 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500" />
+                <Editable
+                  value={b}
+                  onCommit={(v) => commitBullet(i, v)}
+                  placeholder="Teaching point"
+                  className="flex-1 py-1 text-[15px] leading-relaxed text-ink"
+                />
               </li>
             ))}
           </ul>
+        )}
+
+        {!busy && (
+          <button
+            onClick={() => onPatch(slide.id, { bullets: [...bullets, ""] })}
+            className="no-print inline-flex items-center gap-1 text-xs font-medium text-muted transition-colors hover:text-brand-700"
+          >
+            <Plus size={13} /> Add point
+          </button>
         )}
 
         {slide.vocabulary && slide.vocabulary.length > 0 && (
@@ -199,48 +262,42 @@ export function SlideCard({
           </ol>
         )}
 
-        {(slide.imagePrompt || slide.imageUrl || slide.diagramSvg) && (
-          <div className="space-y-2">
-            {slide.imagePrompt && !slide.imageUrl && !slide.diagramSvg && (
-              <p className="flex items-start gap-3 rounded-xl border border-dashed border-line bg-paper/60 px-4 py-3 text-sm text-muted">
-                <ImageIcon size={18} className="mt-0.5 shrink-0 text-muted" />
-                <span>
-                  <span className="font-semibold text-ink">Image idea: </span>
-                  {slide.imagePrompt}
-                </span>
-              </p>
-            )}
-
-            <div className="no-print flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => onGenerateImage(slide.id)}
-                disabled={busy || !slide.imagePrompt}
-                className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-brand-300 hover:text-brand-700 disabled:opacity-50"
-              >
-                {mediaBusy === "image" ? <Spinner /> : <Sparkles size={14} className="text-brand-600" />}
-                {slide.imageUrl ? "Regenerate image" : "Generate image"}
-              </button>
-              <button
-                onClick={() => onGenerateDiagram(slide.id)}
-                disabled={busy}
-                className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-brand-300 hover:text-brand-700 disabled:opacity-50"
-              >
-                {mediaBusy === "diagram" ? <Spinner /> : <PenTool size={14} className="text-brand-600" />}
-                {slide.diagramSvg ? "Redraw diagram" : "Draw diagram"}
-              </button>
-              {slide.imagePrompt && (
-                <a
-                  href={imageSearchUrl(slide.imagePrompt)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-xs font-medium text-muted transition-colors hover:text-brand-700"
-                >
-                  find a photo <ExternalLink size={12} />
-                </a>
-              )}
-            </div>
-          </div>
+        {slide.imagePrompt && !slide.imageUrl && !slide.diagramSvg && (
+          <p className="flex items-start gap-3 rounded-xl border border-dashed border-line bg-paper/60 px-4 py-3 text-sm text-muted">
+            <ImageIcon size={18} className="mt-0.5 shrink-0 text-muted" />
+            <span>
+              <span className="font-semibold text-ink">Image idea: </span>
+              {slide.imagePrompt}
+            </span>
+          </p>
         )}
+
+        {/* media controls */}
+        <div className="no-print flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => onGenerateImage(slide.id)}
+            disabled={busy || !slide.imagePrompt}
+            className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-brand-300 hover:text-brand-700 disabled:opacity-50"
+          >
+            {mediaBusy === "image" ? <Spinner /> : <Sparkles size={14} className="text-brand-600" />}
+            {slide.imageUrl ? "Regenerate" : "Generate image"}
+          </button>
+          <button
+            onClick={() => onGenerateDiagram(slide.id)}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-brand-300 hover:text-brand-700 disabled:opacity-50"
+          >
+            {mediaBusy === "diagram" ? <Spinner /> : <PenTool size={14} className="text-brand-600" />}
+            {slide.diagramSvg ? "Redraw diagram" : "Draw diagram"}
+          </button>
+          <button
+            onClick={() => setSwapOpen(true)}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-brand-300 hover:text-brand-700 disabled:opacity-50"
+          >
+            <Replace size={14} className="text-brand-600" /> Swap / search
+          </button>
+        </div>
 
         {slide.youtube?.searchQuery && (
           <a
@@ -259,11 +316,32 @@ export function SlideCard({
       {slide.teacherNotes && (
         <div className="mt-5 rounded-xl border-l-4 border-brand-300 bg-brand-50/60 px-4 py-3">
           <p className="text-xs font-bold uppercase tracking-wide text-brand-700">Teacher notes</p>
-          <p className="mt-1 text-sm leading-relaxed text-ink">{slide.teacherNotes}</p>
+          <Editable
+            value={slide.teacherNotes}
+            onCommit={(v) => onPatch(slide.id, { teacherNotes: v || undefined })}
+            placeholder="Teacher notes"
+            className="mt-1 text-sm leading-relaxed text-ink"
+          />
         </div>
       )}
 
-      {/* per-slide edit control */}
+      {/* slide operations */}
+      <div className="no-print mt-5 flex items-center gap-1 border-t border-line pt-4 text-muted">
+        <IconBtn title="Move up" disabled={index === 0 || busy} onClick={() => onMove(slide.id, -1)}>
+          <ArrowUp size={15} />
+        </IconBtn>
+        <IconBtn title="Move down" disabled={index === total - 1 || busy} onClick={() => onMove(slide.id, 1)}>
+          <ArrowDown size={15} />
+        </IconBtn>
+        <IconBtn title="Add slide below" disabled={busy} onClick={() => onAdd(slide.id)}>
+          <Plus size={15} />
+        </IconBtn>
+        <IconBtn title="Delete slide" disabled={busy || total <= 1} onClick={() => onDelete(slide.id)}>
+          <Trash2 size={15} />
+        </IconBtn>
+      </div>
+
+      {/* per-slide AI edit control */}
       <div className="no-print absolute right-4 top-4">
         <button
           onClick={() => setMenuOpen((v) => !v)}
@@ -306,7 +384,47 @@ export function SlideCard({
           </div>
         )}
       </div>
+
+      {swapOpen && (
+        <ImageSwap
+          slide={slide}
+          onPick={(url) => {
+            onSetImage(slide.id, url);
+            setSwapOpen(false);
+          }}
+          onRemove={() => {
+            onRemoveImage(slide.id);
+            setSwapOpen(false);
+          }}
+          onClose={() => setSwapOpen(false)}
+        />
+      )}
     </article>
+  );
+}
+
+function IconBtn({
+  title,
+  disabled,
+  onClick,
+  children,
+}: {
+  title: string;
+  disabled?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      onClick={onClick}
+      disabled={disabled}
+      className="grid h-8 w-8 place-items-center rounded-lg transition-colors hover:bg-paper hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent"
+    >
+      {children}
+    </button>
   );
 }
 
