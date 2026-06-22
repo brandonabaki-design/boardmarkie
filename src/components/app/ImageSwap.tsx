@@ -6,6 +6,20 @@ import type { Slide } from "@/lib/types";
 import { searchImages, googleImagesUrl, type ImageResult } from "@/lib/imageSearch";
 import { Spinner } from "./ui";
 
+/** Fetch an image and encode it as a data URL (so it renders instantly, works
+ *  even if the host blocks hotlinking, and embeds cleanly into exports). */
+async function toDataUrl(src: string): Promise<string> {
+  const res = await fetch(src);
+  if (!res.ok) throw new Error("fetch failed");
+  const blob = await res.blob();
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("read failed"));
+    reader.readAsDataURL(blob);
+  });
+}
+
 export function ImageSwap({
   slide,
   onPick,
@@ -22,6 +36,7 @@ export function ImageSwap({
   const [searching, setSearching] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [url, setUrl] = useState("");
+  const [picking, setPicking] = useState(false);
 
   const runSearch = async () => {
     if (!q.trim()) return;
@@ -42,6 +57,34 @@ export function ImageSwap({
     const reader = new FileReader();
     reader.onload = () => onPick(String(reader.result));
     reader.readAsDataURL(file);
+  };
+
+  // Prefer the small CORS-friendly thumbnail (fast + reliable + embeddable);
+  // fall back to the full image, then to the raw URL (display-only).
+  const pickResult = async (r: ImageResult) => {
+    setPicking(true);
+    try {
+      onPick(await toDataUrl(r.thumb || r.url));
+    } catch {
+      try {
+        onPick(await toDataUrl(r.url));
+      } catch {
+        onPick(r.url);
+      }
+    } finally {
+      setPicking(false);
+    }
+  };
+
+  const pickUrl = async (raw: string) => {
+    setPicking(true);
+    try {
+      onPick(await toDataUrl(raw));
+    } catch {
+      onPick(raw);
+    } finally {
+      setPicking(false);
+    }
   };
 
   return (
@@ -89,15 +132,22 @@ export function ImageSwap({
           </p>
         )}
 
+        {picking && (
+          <p className="mt-2 flex items-center gap-2 text-xs font-medium text-brand-700">
+            <Spinner /> Adding image…
+          </p>
+        )}
+
         <div className="mt-3 min-h-[4rem] flex-1 overflow-auto">
           {results.length > 0 ? (
             <div className="grid grid-cols-3 gap-2">
               {results.map((r, i) => (
                 <button
                   key={i}
-                  onClick={() => onPick(r.url)}
+                  onClick={() => pickResult(r)}
+                  disabled={picking}
                   title={r.title}
-                  className="aspect-square overflow-hidden rounded-lg border border-line transition-colors hover:border-brand-400"
+                  className="aspect-square overflow-hidden rounded-lg border border-line transition-colors hover:border-brand-400 disabled:opacity-50"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={r.thumb} alt={r.title} className="h-full w-full object-cover" />
@@ -132,8 +182,8 @@ export function ImageSwap({
               className="flex-1 rounded-xl border border-line px-3.5 py-2.5 text-sm outline-none focus:border-brand-400"
             />
             <button
-              onClick={() => url.trim() && onPick(url.trim())}
-              disabled={!url.trim()}
+              onClick={() => url.trim() && pickUrl(url.trim())}
+              disabled={!url.trim() || picking}
               aria-label="Use pasted URL"
               className="rounded-xl border border-line px-4 py-2.5 text-ink transition-colors hover:border-brand-300 disabled:opacity-50"
             >
