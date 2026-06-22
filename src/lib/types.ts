@@ -61,7 +61,60 @@ export interface Slide {
   imageUrl?: string; // generated illustration, stored as a data: URL
   diagramSvg?: string; // Claude-generated, sanitized SVG diagram markup
   youtube?: { title: string; searchQuery: string };
+  elements?: CanvasElement[]; // freeform canvas layout (Canva/PPT-style editor)
+  background?: string; // slide background colour (hex)
 }
+
+// ---- Freeform canvas elements (Canva / PowerPoint-style editor) ----
+// Positions and sizes are PERCENTAGES of the slide canvas (0–100) so they scale
+// responsively across the editor, thumbnails, Present mode, and exports.
+
+export type CanvasElementType = "text" | "image" | "shape" | "youtube";
+
+interface CanvasElementBase {
+  id: string;
+  type: CanvasElementType;
+  x: number; // % from left of canvas
+  y: number; // % from top of canvas
+  w: number; // % width
+  h: number; // % height
+  z: number; // stacking order (higher = front)
+}
+
+export interface TextElement extends CanvasElementBase {
+  type: "text";
+  text: string;
+  fontSize: number; // % of canvas height (rendered via cqh units)
+  bold?: boolean;
+  italic?: boolean;
+  align?: "left" | "center" | "right";
+  color?: string; // hex
+  font?: "display" | "body";
+}
+
+export interface ImageElement extends CanvasElementBase {
+  type: "image";
+  src?: string; // data: or remote URL (raster)
+  svg?: string; // sanitized SVG diagram markup (alternative to src)
+  alt?: string;
+  radius?: number; // corner rounding %
+  opacity?: number; // 0–100
+}
+
+export interface ShapeElement extends CanvasElementBase {
+  type: "shape";
+  shape: "rect" | "ellipse";
+  fill: string; // hex
+  opacity?: number; // 0–100
+}
+
+export interface YoutubeElement extends CanvasElementBase {
+  type: "youtube";
+  videoId: string;
+  title?: string;
+}
+
+export type CanvasElement = TextElement | ImageElement | ShapeElement | YoutubeElement;
 
 export interface Lesson {
   id: string;

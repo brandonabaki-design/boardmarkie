@@ -14,13 +14,13 @@ import type {
   SeriesLesson,
   Slide,
 } from "@/lib/types";
-import { generateArtifact, editLesson, generateDiagram } from "@/lib/client";
-import { rid } from "@/lib/generate";
+import { generateArtifact, editLesson } from "@/lib/client";
 import { generateImage } from "@/lib/images";
+import { ensureElements, placeImageOnSlide } from "@/lib/canvas";
 import { deleteArtifact, getImageConfig, getLibrary, saveArtifact } from "@/lib/storage";
 import { GeneratorForm } from "./GeneratorForm";
 import { GeneratingState } from "./GeneratingState";
-import { LessonView } from "./LessonView";
+import { CanvasEditor } from "./CanvasEditor";
 import { WorksheetView } from "./WorksheetView";
 import { SeriesView } from "./SeriesView";
 import { SettingsModal } from "./SettingsModal";
@@ -40,8 +40,17 @@ function patchSlide(lesson: Lesson, slideId: string, patch: Partial<Slide>): Les
   };
 }
 
-// Shared illustration prompt — adds a classroom-friendly style and steers the
-// raster model away from rendering (usually garbled) text in the image.
+// Give every slide a canvas layout. `fresh` rebuilds it from the (re)generated
+// content — used after an AI edit, which rewrites the structured fields.
+function seedLesson(lesson: Lesson, fresh = false): Lesson {
+  return {
+    ...lesson,
+    slides: lesson.slides.map((s) => ensureElements(fresh ? { ...s, elements: undefined } : s)),
+  };
+}
+
+// Shared illustration prompt — classroom-friendly style; steers the raster model
+// away from rendering (usually garbled) text in the image.
 function imagePromptFor(slide: { imagePrompt?: string }): string {
   return `${slide.imagePrompt}. Bright, friendly, age-appropriate educational illustration; clean flat style; no words or text in the image.`;
 }
@@ -60,9 +69,6 @@ export function CreateApp() {
   const [libOpen, setLibOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [presenting, setPresenting] = useState(false);
-  const [mediaBusy, setMediaBusy] = useState<{ slideId: string; kind: "image" | "diagram" } | null>(
-    null,
-  );
   const [imageProgress, setImageProgress] = useState<{ done: number; total: number } | null>(null);
 
   useEffect(() => {
@@ -89,27 +95,26 @@ export function CreateApp() {
       setLoading(false);
       return;
     }
-    saveArtifact(artifact);
-    setCurrent(artifact);
+    const seeded = artifact.kind === "lesson" ? seedLesson(artifact) : artifact;
+    saveArtifact(seeded);
+    setCurrent(seeded);
     refresh();
     setLoading(false);
 
-    // Optionally illustrate the slides right after creation.
-    if (req.autoImages && artifact.kind === "lesson") {
+    if (req.autoImages && seeded.kind === "lesson") {
       if (!getImageConfig().proxyUrl) {
         setError(
-          "Lesson created. To auto-generate images, add your image proxy URL and Gemini key in Settings — then use “Generate image” on a slide.",
+          "Lesson created. To auto-generate images, add your image proxy URL and Gemini key in Settings — then use Swap → AI create on a slide.",
         );
         setSettingsOpen(true);
       } else {
-        await autoGenerateImages(artifact);
+        await autoGenerateImages(seeded);
       }
     }
   };
 
-  // Generate the slide illustrations concurrently (a small pool keeps it fast
-  // without hammering the proxy / hitting rate limits). Each finished image is
-  // persisted as it lands, so the deck fills in progressively.
+  // Generate slide illustrations concurrently (a small pool keeps it fast
+  // without hammering the proxy), placing each onto the slide's canvas as it lands.
   const autoGenerateImages = async (lesson: Lesson) => {
     const targets = lesson.slides.filter((s) => s.imagePrompt && !s.imageUrl);
     if (!targets.length) return;
@@ -127,17 +132,20 @@ export function CreateApp() {
         if (i >= targets.length) break;
         try {
           const image = await generateImage(imagePromptFor(targets[i]), { aspectRatio: "16:9" });
-          working = patchSlide(working, targets[i].id, { imageUrl: image });
+          const cur = working.slides.find((s) => s.id === targets[i].id);
+          const elements = cur
+            ? placeImageOnSlide(cur, { src: image, alt: cur.imageAlt || cur.imagePrompt })
+            : undefined;
+          working = patchSlide(working, targets[i].id, { imageUrl: image, ...(elements ? { elements } : {}) });
           setCurrent(working);
           saveArtifact(working);
         } catch (err) {
           const e = err as Error & { status?: number };
           if (e.status === 401) {
-            stop = true; // misconfigured proxy/key — stop the whole run
+            stop = true;
             handleError(err);
             break;
           }
-          // otherwise skip this slide and keep going
         } finally {
           done++;
           setImageProgress({ done, total: targets.length });
@@ -155,7 +163,7 @@ export function CreateApp() {
     setError(null);
     setEditing(true);
     try {
-      const updated = await editLesson({ lesson: current, action, instruction, slideId });
+      const updated = seedLesson(await editLesson({ lesson: current, action, instruction, slideId }), true);
       saveArtifact(updated);
       setCurrent(updated);
       refresh();
@@ -166,101 +174,10 @@ export function CreateApp() {
     }
   };
 
-  const handleGenerateImage = async (slideId: string) => {
-    if (!current || current.kind !== "lesson") return;
-    const lesson = current;
-    const slide = lesson.slides.find((s) => s.id === slideId);
-    if (!slide?.imagePrompt) return;
-    setError(null);
-    setMediaBusy({ slideId, kind: "image" });
-    try {
-      const image = await generateImage(imagePromptFor(slide), { aspectRatio: "16:9" });
-      const updated = patchSlide(lesson, slideId, { imageUrl: image });
-      setCurrent(updated);
-      saveArtifact(updated);
-      refresh();
-    } catch (err) {
-      handleError(err);
-    } finally {
-      setMediaBusy(null);
-    }
-  };
-
-  const handleGenerateDiagram = async (slideId: string) => {
-    if (!current || current.kind !== "lesson") return;
-    const lesson = current;
-    const slide = lesson.slides.find((s) => s.id === slideId);
-    if (!slide) return;
-    setError(null);
-    setMediaBusy({ slideId, kind: "diagram" });
-    try {
-      const { svg, alt } = await generateDiagram({
-        topic: lesson.meta.topic,
-        subject: lesson.meta.subject,
-        yearGroup: lesson.meta.yearGroup,
-        region: lesson.meta.region,
-        slideTitle: slide.title,
-        instruction: slide.imagePrompt,
-      });
-      const updated = patchSlide(lesson, slideId, {
-        diagramSvg: svg,
-        imageAlt: slide.imageAlt || alt,
-      });
-      setCurrent(updated);
-      saveArtifact(updated);
-      refresh();
-    } catch (err) {
-      handleError(err);
-    } finally {
-      setMediaBusy(null);
-    }
-  };
-
-  // ---- direct slide editing (browser-local) ----
-
   const persistLesson = (lesson: Lesson) => {
     setCurrent(lesson);
     saveArtifact(lesson);
     refresh();
-  };
-
-  const handlePatchSlide = (slideId: string, patch: Partial<Slide>) => {
-    if (!current || current.kind !== "lesson") return;
-    persistLesson(patchSlide(current, slideId, patch));
-  };
-
-  const handleSetImage = (slideId: string, url: string) => {
-    if (!current || current.kind !== "lesson") return;
-    persistLesson(patchSlide(current, slideId, { imageUrl: url, diagramSvg: undefined }));
-  };
-
-  const handleRemoveImage = (slideId: string) => {
-    if (!current || current.kind !== "lesson") return;
-    persistLesson(patchSlide(current, slideId, { imageUrl: undefined, diagramSvg: undefined }));
-  };
-
-  const handleMoveSlide = (slideId: string, dir: -1 | 1) => {
-    if (!current || current.kind !== "lesson") return;
-    const slides = [...current.slides];
-    const i = slides.findIndex((s) => s.id === slideId);
-    const j = i + dir;
-    if (i < 0 || j < 0 || j >= slides.length) return;
-    [slides[i], slides[j]] = [slides[j], slides[i]];
-    persistLesson({ ...current, slides });
-  };
-
-  const handleAddSlide = (afterId: string) => {
-    if (!current || current.kind !== "lesson") return;
-    const slides = [...current.slides];
-    const i = slides.findIndex((s) => s.id === afterId);
-    const blank: Slide = { id: rid("sl"), layout: "content", title: "New slide", bullets: [""] };
-    slides.splice(i < 0 ? slides.length : i + 1, 0, blank);
-    persistLesson({ ...current, slides });
-  };
-
-  const handleDeleteSlide = (slideId: string) => {
-    if (!current || current.kind !== "lesson" || current.slides.length <= 1) return;
-    persistLesson({ ...current, slides: current.slides.filter((s) => s.id !== slideId) });
   };
 
   const handleExpand = async (seriesLesson: SeriesLesson) => {
@@ -278,8 +195,9 @@ export function CreateApp() {
     };
     try {
       const artifact = await generateArtifact(req);
-      saveArtifact(artifact);
-      setCurrent(artifact);
+      const seeded = artifact.kind === "lesson" ? seedLesson(artifact) : artifact;
+      saveArtifact(seeded);
+      setCurrent(seeded);
       refresh();
       window.scrollTo({ top: 0 });
     } catch (err) {
@@ -290,7 +208,7 @@ export function CreateApp() {
   };
 
   const openArtifact = (a: Artifact) => {
-    setCurrent(a);
+    setCurrent(a.kind === "lesson" ? seedLesson(a) : a);
     setLibOpen(false);
     setError(null);
     window.scrollTo({ top: 0 });
@@ -307,13 +225,12 @@ export function CreateApp() {
     setError(null);
   };
 
-  const busy = loading || editing || expanding !== null || mediaBusy !== null || imageProgress !== null;
+  const busy = loading || editing || expanding !== null || imageProgress !== null;
 
   return (
     <div className="flex min-h-screen flex-col">
-      {/* app header */}
       <header className="no-print sticky top-0 z-40 border-b border-line bg-white/85 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
           <Logo />
           <div className="flex items-center gap-2">
             {current && (
@@ -355,7 +272,7 @@ export function CreateApp() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
         {error && (
           <div className="no-print mx-auto mb-6 flex max-w-2xl items-start gap-3 rounded-xl border border-coral/30 bg-coral/[0.06] px-4 py-3 text-sm text-ink">
             <AlertCircle size={18} className="mt-0.5 shrink-0 text-coral" />
@@ -368,8 +285,7 @@ export function CreateApp() {
 
         {imageProgress && (
           <div className="no-print mx-auto mb-6 flex max-w-2xl items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-2.5 text-sm font-medium text-brand-800">
-            <Spinner className="h-4 w-4 text-brand-600" /> Generating images… {imageProgress.done}/
-            {imageProgress.total}
+            <Spinner className="h-4 w-4 text-brand-600" /> Generating images… {imageProgress.done}/{imageProgress.total}
           </div>
         )}
 
@@ -387,25 +303,10 @@ export function CreateApp() {
             </button>
 
             {current.kind === "lesson" && (
-              <LessonView
-                lesson={current as Lesson}
-                busy={busy}
-                onEdit={handleEdit}
-                onGenerateImage={handleGenerateImage}
-                onGenerateDiagram={handleGenerateDiagram}
-                mediaBusy={mediaBusy}
-                onPatch={handlePatchSlide}
-                onSetImage={handleSetImage}
-                onRemoveImage={handleRemoveImage}
-                onMove={handleMoveSlide}
-                onAdd={handleAddSlide}
-                onDelete={handleDeleteSlide}
-              />
+              <CanvasEditor lesson={current as Lesson} busy={busy} onEdit={handleEdit} onChange={persistLesson} />
             )}
             {current.kind === "worksheet" && <WorksheetView worksheet={current} />}
-            {current.kind === "series" && (
-              <SeriesView series={current} busyLesson={expanding} onExpand={handleExpand} />
-            )}
+            {current.kind === "series" && <SeriesView series={current} busyLesson={expanding} onExpand={handleExpand} />}
           </div>
         )}
       </main>

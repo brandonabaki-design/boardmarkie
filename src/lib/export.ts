@@ -1,11 +1,8 @@
 "use client";
 
-import type { Artifact, Lesson, LessonSeries, Slide, Worksheet } from "./types";
+import type { Artifact, ImageElement, Lesson, LessonSeries, Worksheet } from "./types";
 import type * as Docx from "docx";
-
-const BRAND = "0D9488"; // teal-600
-const INK = "1B1B1F";
-const MUTE = "5B6472";
+import { ensureElements } from "./canvas";
 
 function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "boardmarkie";
@@ -31,8 +28,8 @@ export function printDocument(): void {
 
 interface VisualData {
   dataUrl: string; // a raster (PNG/JPEG) data URL, embeddable by pptxgenjs
-  w: number; // natural pixel width  (used only for aspect ratio)
-  h: number; // natural pixel height
+  w: number;
+  h: number;
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -44,11 +41,17 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-/**
- * Rasterise model-generated SVG to a PNG data URL. pptxgenjs's native SVG
- * support is unreliable, whereas a PNG embeds cleanly in PowerPoint, Keynote
- * and Google Slides. Aspect ratio comes from the SVG's viewBox.
- */
+function loadImageCors(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Image failed to load"));
+    img.src = src;
+  });
+}
+
+/** Rasterise model-generated SVG to a PNG data URL (pptx SVG support is flaky). */
 async function svgToPng(svg: string, targetW = 1600): Promise<VisualData> {
   const m = svg.match(/viewBox\s*=\s*["']\s*[-\d.]+\s+[-\d.]+\s+([\d.]+)\s+([\d.]+)/i);
   const aspect = m ? Number(m[2]) / Number(m[1]) : 0.75;
@@ -61,40 +64,10 @@ async function svgToPng(svg: string, targetW = 1600): Promise<VisualData> {
   canvas.height = h;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas unavailable");
-  ctx.fillStyle = "#FFFFFF"; // flatten any transparency to white
+  ctx.fillStyle = "#FFFFFF";
   ctx.fillRect(0, 0, w, h);
   ctx.drawImage(img, 0, 0, w, h);
   return { dataUrl: canvas.toDataURL("image/png"), w, h };
-}
-
-/** A slide's visual as an embeddable raster + natural size, or null if none. */
-async function slideVisual(slide: Slide): Promise<VisualData | null> {
-  try {
-    if (slide.imageUrl) {
-      if (slide.imageUrl.startsWith("data:")) {
-        const img = await loadImage(slide.imageUrl);
-        return { dataUrl: slide.imageUrl, w: img.naturalWidth || 1600, h: img.naturalHeight || 900 };
-      }
-      // Remote image (pasted URL / web search): re-encode to a data URL so it
-      // embeds. Needs CORS; if the host blocks it we skip it in the deck rather
-      // than failing the export (it still shows on screen and in PDF/print).
-      return await encodeRemote(slide.imageUrl);
-    }
-    if (slide.diagramSvg) return await svgToPng(slide.diagramSvg);
-  } catch {
-    /* Skip the visual rather than failing the whole export. */
-  }
-  return null;
-}
-
-function loadImageCors(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("Image failed to load"));
-    img.src = src;
-  });
 }
 
 async function encodeRemote(url: string): Promise<VisualData | null> {
@@ -114,13 +87,29 @@ async function encodeRemote(url: string): Promise<VisualData | null> {
   }
 }
 
-/** Scale natural px (w0,h0) to fit within a box (inches), preserving aspect. */
-function fitBox(w0: number, h0: number, maxW: number, maxH: number) {
-  const scale = Math.min(maxW / w0, maxH / h0);
-  return { w: w0 * scale, h: h0 * scale };
+/** Embeddable data URL for an image element (data:/remote raster or SVG diagram). */
+async function imageData(el: ImageElement): Promise<string | null> {
+  try {
+    if (el.svg) return (await svgToPng(el.svg)).dataUrl;
+    if (el.src) {
+      if (el.src.startsWith("data:")) return el.src;
+      const v = await encodeRemote(el.src);
+      return v?.dataUrl ?? null;
+    }
+  } catch {
+    /* skip the visual rather than failing the whole export */
+  }
+  return null;
 }
 
-type Para = { text: string; options?: Record<string, unknown> };
+async function ytThumb(id: string): Promise<string | null> {
+  const v = await encodeRemote(`https://img.youtube.com/vi/${id}/hqdefault.jpg`);
+  return v?.dataUrl ?? null;
+}
+
+const hex = (c?: string, fallback = "16181d") => (c ?? `#${fallback}`).replace("#", "");
+
+// ---- PowerPoint: render the slide canvas (elements) natively ----
 
 export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
   const PptxGen = (await import("pptxgenjs")).default;
@@ -129,86 +118,58 @@ export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
   pptx.author = "Boardmarkie";
   pptx.title = lesson.meta.title;
 
-  for (const slide of lesson.slides) {
+  const W = 13.33;
+  const H = 7.5;
+  const inX = (p: number) => (p / 100) * W;
+  const inY = (p: number) => (p / 100) * H;
+
+  for (const raw of lesson.slides) {
+    const slide = ensureElements(raw);
     const s = pptx.addSlide();
-    s.background = { color: "FFFFFF" };
-    // accent bar
-    s.addShape("rect" as never, { x: 0, y: 0, w: 0.22, h: 7.5, fill: { color: BRAND } });
+    s.background = { color: hex(slide.background, "ffffff") };
 
-    const visual = await slideVisual(slide);
+    const els = [...(slide.elements ?? [])].sort((a, b) => a.z - b.z);
+    for (const el of els) {
+      const box = { x: inX(el.x), y: inY(el.y), w: inX(el.w), h: inY(el.h) };
 
-    // Drop a visual into a box, centered and aspect-fit (no stretching).
-    const placeVisual = (v: VisualData, boxX: number, boxY: number, boxW: number, boxH: number) => {
-      const { w, h } = fitBox(v.w, v.h, boxW, boxH);
-      s.addImage({ data: v.dataUrl, x: boxX + (boxW - w) / 2, y: boxY + (boxH - h) / 2, w, h });
-    };
-
-    if (slide.layout === "title") {
-      const titleW = visual ? 6.2 : 11.7;
-      s.addText(slide.title, {
-        x: 0.8, y: 2.4, w: titleW, h: 1.6, fontSize: 40, bold: true, color: INK, fontFace: "Arial",
-      });
-      if (slide.subtitle) {
-        s.addText(slide.subtitle, { x: 0.8, y: 4.0, w: titleW, h: 1.2, fontSize: 20, color: MUTE, fontFace: "Arial" });
-      }
-      s.addText(`${lesson.meta.subject}  •  ${lesson.meta.yearGroup}`, {
-        x: 0.8, y: 6.3, w: titleW, h: 0.4, fontSize: 14, color: BRAND, fontFace: "Arial",
-      });
-      if (lesson.meta.standards && lesson.meta.standards.length) {
-        s.addText(`Aligned to: ${lesson.meta.standards.join("   •   ")}`, {
-          x: 0.8, y: 6.75, w: titleW, h: 0.6, fontSize: 11, color: MUTE, fontFace: "Arial",
+      if (el.type === "text") {
+        if (!el.text.trim()) continue;
+        s.addText(el.text, {
+          ...box,
+          fontSize: Math.max(6, Math.round((el.fontSize / 100) * 540)), // cqh → pt (7.5in = 540pt)
+          bold: !!el.bold,
+          italic: !!el.italic,
+          align: el.align ?? "left",
+          valign: "top",
+          color: hex(el.color),
+          fontFace: "Arial",
         });
-      }
-      if (visual) placeVisual(visual, 7.2, 1.3, 5.5, 4.9);
-    } else {
-      const textW = visual ? 6.9 : 11.9;
-      s.addText(slide.title, {
-        x: 0.7, y: 0.4, w: textW, h: 0.9, fontSize: 28, bold: true, color: INK, fontFace: "Arial",
-      });
-      if (slide.subtitle) {
-        s.addText(slide.subtitle, { x: 0.7, y: 1.2, w: textW, h: 0.5, fontSize: 16, color: MUTE, fontFace: "Arial" });
-      }
-
-      const paras: Para[] = [];
-      const push = (text: string, opts: Record<string, unknown> = {}) =>
-        paras.push({ text, options: { fontSize: 18, color: INK, fontFace: "Arial", breakLine: true, paraSpaceAfter: 6, ...opts } });
-
-      if (slide.body) push(slide.body);
-      for (const b of slide.bullets ?? []) push(b, { bullet: { code: "2022" }, indentLevel: 0 });
-
-      for (const v of slide.vocabulary ?? []) {
-        push(`${v.term}: `, { bold: true, color: BRAND, breakLine: false });
-        push(v.definition, { breakLine: true });
-      }
-
-      if (slide.activity) {
-        push(`Activity — ${slide.activity.title}`, { bold: true, color: BRAND });
-        push(slide.activity.instructions);
-        const meta = [slide.activity.grouping, slide.activity.durationMinutes ? `${slide.activity.durationMinutes} min` : ""]
-          .filter(Boolean)
-          .join("  •  ");
-        if (meta) push(meta, { italic: true, color: MUTE, fontSize: 14 });
-      }
-
-      for (const q of slide.discussionQuestions ?? []) push(q, { bullet: { code: "2022" } });
-
-      for (const q of slide.quiz ?? []) {
-        push(q.question, { bold: true });
-        for (const o of q.options) push(o, { bullet: { code: "25CB" }, indentLevel: 1, fontSize: 16 });
-      }
-
-      if (slide.youtube?.searchQuery) {
-        push(`📺 Video: ${slide.youtube.title || slide.youtube.searchQuery}`, { color: BRAND, fontSize: 15 });
-      }
-
-      if (paras.length) {
-        s.addText(paras as never, { x: 0.7, y: 1.8, w: textW, h: 5.3, valign: "top" });
-      }
-
-      if (visual) {
-        // Visual-only slide → big and centered; otherwise the right column.
-        if (paras.length === 0) placeVisual(visual, 0.7, 1.8, 11.9, 5.3);
-        else placeVisual(visual, 7.7, 1.7, 5.0, 5.3);
+      } else if (el.type === "shape") {
+        s.addShape((el.shape === "ellipse" ? "ellipse" : "rect") as never, {
+          ...box,
+          fill: { color: hex(el.fill, "d2f6ec"), transparency: 100 - (el.opacity ?? 100) },
+          line: { type: "none" } as never,
+        });
+      } else if (el.type === "image") {
+        const data = await imageData(el);
+        if (data) {
+          s.addImage({ data, ...box, sizing: { type: el.svg ? "contain" : "cover", w: box.w, h: box.h } });
+        }
+      } else if (el.type === "youtube") {
+        const url = `https://www.youtube.com/watch?v=${el.videoId}`;
+        const thumb = await ytThumb(el.videoId);
+        if (thumb) {
+          s.addImage({ data: thumb, ...box, sizing: { type: "cover", w: box.w, h: box.h }, hyperlink: { url } });
+        } else {
+          s.addText(`▶ ${el.title || "Watch video"}`, {
+            ...box,
+            fontSize: 16,
+            color: "0c8a78",
+            align: "center",
+            valign: "middle",
+            hyperlink: { url },
+          });
+        }
       }
     }
 
@@ -313,7 +274,6 @@ export async function exportWorksheetToDocx(ws: Worksheet): Promise<void> {
     });
   });
 
-  // Teacher answer key on its own page.
   kids.push(new Paragraph({ text: "Answer Key", heading: HeadingLevel.HEADING_1, pageBreakBefore: true }));
   ws.sections.forEach((sec) => {
     sec.questions.forEach((q) => {

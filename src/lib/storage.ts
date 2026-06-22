@@ -86,7 +86,18 @@ export function getLibrary(): Artifact[] {
 function dropRasterImages(items: Artifact[]): Artifact[] {
   return items.map((a) =>
     a.kind === "lesson"
-      ? { ...a, slides: a.slides.map((s) => (s.imageUrl ? { ...s, imageUrl: undefined } : s)) }
+      ? {
+          ...a,
+          slides: a.slides.map((s) => ({
+            ...s,
+            imageUrl: s.imageUrl?.startsWith("data:") ? undefined : s.imageUrl,
+            // Heavy base64 image elements are the usual quota culprit; drop their
+            // data only (keep text, shapes, SVG diagrams, YouTube, and layout).
+            elements: s.elements?.map((el) =>
+              el.type === "image" && el.src?.startsWith("data:") ? { ...el, src: undefined } : el,
+            ),
+          })),
+        }
       : a,
   );
 }
