@@ -16,10 +16,12 @@ import type {
 } from "@/lib/types";
 import { generateArtifact, editLesson } from "@/lib/client";
 import { generateImage, illustrationPrompt } from "@/lib/images";
-import { ensureElements, placeImageOnSlide } from "@/lib/canvas";
+import { resolveYoutube } from "@/lib/youtube";
+import { ensureElements, placeImageOnSlide, placeYoutubeOnSlide } from "@/lib/canvas";
 import { deleteArtifact, getImageConfig, getLibrary, saveArtifact } from "@/lib/storage";
 import { GeneratorForm } from "./GeneratorForm";
 import { GeneratingState } from "./GeneratingState";
+import { LessonSkeleton } from "./LessonSkeleton";
 import { CanvasEditor } from "./CanvasEditor";
 import { WorksheetView } from "./WorksheetView";
 import { SeriesView } from "./SeriesView";
@@ -105,14 +107,16 @@ export function CreateApp() {
     refresh();
     setLoading(false);
 
-    if (req.autoImages && seeded.kind === "lesson") {
-      if (!getImageConfig().proxyUrl) {
+    if (seeded.kind === "lesson") {
+      const hasProxy = !!getImageConfig().proxyUrl;
+      if (req.autoImages && !hasProxy) {
         setError(
           "Lesson created. To auto-generate images, add your image proxy URL and Gemini key in Settings — then use Swap → AI create on a slide.",
         );
         setSettingsOpen(true);
-      } else {
-        await autoGenerateImages(seeded);
+      } else if (hasProxy) {
+        const working = req.autoImages ? await autoGenerateImages(seeded) : seeded;
+        await autoEmbedYoutube(working);
       }
     }
   };
@@ -121,7 +125,7 @@ export function CreateApp() {
   // without hammering the proxy), placing each onto the slide's canvas as it lands.
   const autoGenerateImages = async (lesson: Lesson) => {
     const targets = lesson.slides.filter((s) => s.imagePrompt && !s.imageUrl);
-    if (!targets.length) return;
+    if (!targets.length) return lesson;
     setImageProgress({ done: 0, total: targets.length });
 
     let working = lesson;
@@ -160,6 +164,29 @@ export function CreateApp() {
     await Promise.all(Array.from({ length: Math.min(CONCURRENCY, targets.length) }, () => worker()));
     refresh();
     setImageProgress(null);
+    return working;
+  };
+
+  // Resolve each slide's suggested video to a real embeddable id (via the proxy)
+  // and drop it onto the slide. No-ops gracefully if the proxy / YouTube key is absent.
+  const autoEmbedYoutube = async (lesson: Lesson) => {
+    const targets = lesson.slides.filter((s) => s.youtube?.searchQuery);
+    if (!targets.length) return;
+    let working = lesson;
+    for (const t of targets) {
+      try {
+        const r = await resolveYoutube(t.youtube!.searchQuery);
+        if (!r?.videoId) continue;
+        const cur = working.slides.find((s) => s.id === t.id);
+        if (!cur) continue;
+        working = patchSlide(working, t.id, { elements: placeYoutubeOnSlide(cur, r) });
+        setCurrent(working);
+        saveArtifact(working);
+      } catch {
+        /* skip this one */
+      }
+    }
+    refresh();
   };
 
   const handleEdit = async (action: EditAction, instruction?: string, slideId?: string) => {
@@ -321,7 +348,7 @@ export function CreateApp() {
         )}
 
         {loading && !current ? (
-          <GeneratingState mode={genMode} />
+          genMode === "lesson" ? <LessonSkeleton /> : <GeneratingState mode={genMode} />
         ) : !current ? (
           <GeneratorForm initialMode={initialMode} loading={loading} onSubmit={handleGenerate} />
         ) : (

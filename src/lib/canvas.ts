@@ -319,3 +319,21 @@ export function placeImageOnSlide(
   );
   return els;
 }
+
+/**
+ * Embed a YouTube video onto a slide's canvas (right column). Skips slides that
+ * already have a video or an image, to avoid overlap.
+ */
+export function placeYoutubeOnSlide(slide: Slide, video: { videoId: string; title?: string }): CanvasElement[] {
+  const els = (slide.elements && slide.elements.length ? slide.elements : slideToElements(slide)).map((e) => ({
+    ...e,
+  }));
+  if (els.some((e) => e.type === "youtube" || e.type === "image")) return els;
+  for (const e of els) {
+    if (e.type === "text" && e.x < 10 && e.w > 70) e.w = 50;
+  }
+  els.push(
+    youtubeElement({ x: 57, y: 24, w: 38, h: 50, z: topZ(els), videoId: video.videoId, title: video.title }),
+  );
+  return els;
+}
