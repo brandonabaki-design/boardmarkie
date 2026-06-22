@@ -3,37 +3,52 @@
 // Boardmarkie's generator suggests a video per relevant slide (a title + search
 // query). This endpoint turns that query into a real, embeddable video id using
 // the YouTube Data API, so the lesson can embed it automatically. Set the env
-// var YOUTUBE_API_KEY in the Vercel project. If it's missing, the endpoint
-// returns { videoId: null } so the app simply skips auto-embedding.
+// var YOUTUBE_API_KEY in the Vercel project.
+//
+// Debug: you can hit this directly in a browser, e.g.
+//   https://<your-proxy>.vercel.app/api/youtube?q=photosynthesis
+// The JSON response tells you exactly what's wrong (missing key, restricted
+// key, API not enabled, etc.). If the key is missing it returns videoId:null
+// with a note; if YouTube rejects the key it returns the upstream error detail.
 
 const ALLOW_ORIGIN = "*";
 
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Origin", ALLOW_ORIGIN);
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === "OPTIONS") return res.status(204).end();
-  if (req.method !== "POST") return res.status(405).json({ error: "Use POST." });
 
-  let payload = req.body;
-  if (typeof payload === "string") {
-    try {
-      payload = JSON.parse(payload);
-    } catch {
-      return res.status(400).json({ error: "Invalid JSON body." });
+  let q = "";
+  if (req.method === "GET") {
+    q = String((req.query && req.query.q) || "").trim();
+  } else if (req.method === "POST") {
+    let payload = req.body;
+    if (typeof payload === "string") {
+      try {
+        payload = JSON.parse(payload);
+      } catch {
+        return res.status(400).json({ error: "Invalid JSON body." });
+      }
     }
+    q = String((payload || {}).q || "").trim();
+  } else {
+    return res.status(405).json({ error: "Use GET ?q= or POST {q}." });
   }
-  payload = payload || {};
 
-  const q = String(payload.q || "").trim();
   if (!q) return res.status(400).json({ error: "Missing 'q'." });
 
   const key = process.env.YOUTUBE_API_KEY;
-  if (!key) return res.status(200).json({ videoId: null }); // not configured — degrade gracefully
+  if (!key) {
+    return res.status(200).json({
+      videoId: null,
+      note: "YOUTUBE_API_KEY is not set on this Vercel project (check the variable NAME is exactly YOUTUBE_API_KEY, then redeploy).",
+    });
+  }
 
   const url =
     "https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=1" +
@@ -46,10 +61,17 @@ export default async function handler(req, res) {
   try {
     upstream = await fetch(url);
   } catch {
-    return res.status(502).json({ error: "Could not reach YouTube." });
+    return res.status(502).json({ videoId: null, error: "Could not reach YouTube." });
   }
+
   if (!upstream.ok) {
-    return res.status(upstream.status).json({ error: `YouTube search failed (${upstream.status}).` });
+    const detail = await upstream.text();
+    // Surface YouTube's reason (e.g. referer-restricted key, API not enabled).
+    return res.status(upstream.status).json({
+      videoId: null,
+      error: `YouTube error (${upstream.status}).`,
+      detail: detail.slice(0, 400),
+    });
   }
 
   const data = await upstream.json();

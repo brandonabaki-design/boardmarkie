@@ -17,10 +17,18 @@ export async function resolveYoutube(query: string): Promise<{ videoId: string; 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ q }),
     });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { videoId?: string | null; title?: string };
-    return data?.videoId ? { videoId: data.videoId, title: data.title } : null;
-  } catch {
+    if (!res.ok) {
+      console.warn("[youtube] proxy returned", res.status, await res.text().catch(() => ""));
+      return null;
+    }
+    const data = (await res.json()) as { videoId?: string | null; title?: string; note?: string; error?: string };
+    if (!data?.videoId) {
+      console.warn("[youtube] no video for query:", q, "— proxy said:", data?.note || data?.error || data);
+      return null;
+    }
+    return { videoId: data.videoId, title: data.title };
+  } catch (e) {
+    console.warn("[youtube] request failed:", e);
     return null;
   }
 }
