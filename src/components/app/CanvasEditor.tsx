@@ -22,6 +22,7 @@ import {
   Undo2,
   Redo2,
   GripVertical,
+  LayoutGrid,
 } from "lucide-react";
 import type { CanvasElement, EditAction, Lesson, Slide } from "@/lib/types";
 import {
@@ -30,6 +31,7 @@ import {
   ensureElements,
   imageElement,
   shapeElement,
+  slideToElements,
   textElement,
   topZ,
   youtubeElement,
@@ -145,6 +147,9 @@ export function CanvasEditor({
     onChange({ ...lesson, slides: lesson.slides.filter((_, i) => i !== safeIdx) });
     goTo(Math.max(0, safeIdx - 1));
   };
+
+  // Rebuild the layout from the slide's content (auto-fit + columns); no AI call.
+  const autoArrange = () => writeSlide({ elements: slideToElements(slide) });
 
   const moveSlide = (dir: -1 | 1) => {
     const j = safeIdx + dir;
@@ -363,6 +368,10 @@ export function CanvasEditor({
             </IconBtn>
             <IconBtn title="Delete slide" disabled={lesson.slides.length <= 1} onClick={deleteSlide}>
               <Trash2 size={15} />
+            </IconBtn>
+            <span className="mx-1 h-5 w-px bg-line" />
+            <IconBtn title="Auto-arrange (reset layout from content)" onClick={autoArrange}>
+              <LayoutGrid size={15} />
             </IconBtn>
 
             <div className="relative ml-auto">
