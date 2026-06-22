@@ -2,7 +2,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { NO_KEY_MESSAGE } from "./anthropic";
-import { getApiKey } from "./storage";
+import { getApiKey, getModel } from "./storage";
 import { diagramSchema, lessonSchema, seriesSchema, worksheetSchema } from "./schemas";
 import {
   lessonSystemPrompt,
@@ -62,6 +62,7 @@ export async function generateArtifact(input: GenerateRequest): Promise<Artifact
       user: worksheetUserPrompt(req),
       schema: worksheetSchema,
       maxTokens: 12000,
+      model: getModel(),
     });
     return toWorksheet(raw as never, req);
   }
@@ -73,6 +74,7 @@ export async function generateArtifact(input: GenerateRequest): Promise<Artifact
       user: seriesUserPrompt(req),
       schema: seriesSchema,
       maxTokens: 10000,
+      model: getModel(),
     });
     return toSeries(raw as never, req);
   }
@@ -83,6 +85,7 @@ export async function generateArtifact(input: GenerateRequest): Promise<Artifact
     user: lessonUserPrompt(req),
     schema: lessonSchema,
     maxTokens: 24000,
+    model: getModel(),
   });
   return toLesson(raw as never, req);
 }
@@ -118,6 +121,7 @@ export async function editLesson(input: EditRequest): Promise<Lesson> {
     schema: lessonSchema,
     maxTokens: 24000,
     effort: "low",
+    model: getModel(),
   });
 
   const updated = toLesson(raw as never, req);
@@ -150,6 +154,7 @@ export async function generateDiagram(
     schema: diagramSchema,
     maxTokens: 8000,
     effort: "low",
+    model: getModel(),
   });
 
   const svg = sanitizeSvg(typeof raw.svg === "string" ? raw.svg : "");

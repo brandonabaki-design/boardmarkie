@@ -107,27 +107,45 @@ export function CreateApp() {
     }
   };
 
+  // Generate the slide illustrations concurrently (a small pool keeps it fast
+  // without hammering the proxy / hitting rate limits). Each finished image is
+  // persisted as it lands, so the deck fills in progressively.
   const autoGenerateImages = async (lesson: Lesson) => {
     const targets = lesson.slides.filter((s) => s.imagePrompt && !s.imageUrl);
     if (!targets.length) return;
     setImageProgress({ done: 0, total: targets.length });
+
     let working = lesson;
-    for (let i = 0; i < targets.length; i++) {
-      try {
-        const image = await generateImage(imagePromptFor(targets[i]), { aspectRatio: "16:9" });
-        working = patchSlide(working, targets[i].id, { imageUrl: image });
-        setCurrent(working);
-        saveArtifact(working);
-      } catch (err) {
-        const e = err as Error & { status?: number };
-        if (e.status === 401) {
-          handleError(err); // misconfigured proxy/key — stop early
-          break;
+    let done = 0;
+    let next = 0;
+    let stop = false;
+    const CONCURRENCY = 3;
+
+    const worker = async () => {
+      while (!stop) {
+        const i = next++;
+        if (i >= targets.length) break;
+        try {
+          const image = await generateImage(imagePromptFor(targets[i]), { aspectRatio: "16:9" });
+          working = patchSlide(working, targets[i].id, { imageUrl: image });
+          setCurrent(working);
+          saveArtifact(working);
+        } catch (err) {
+          const e = err as Error & { status?: number };
+          if (e.status === 401) {
+            stop = true; // misconfigured proxy/key — stop the whole run
+            handleError(err);
+            break;
+          }
+          // otherwise skip this slide and keep going
+        } finally {
+          done++;
+          setImageProgress({ done, total: targets.length });
         }
-        // otherwise skip this slide and keep going
       }
-      setImageProgress({ done: i + 1, total: targets.length });
-    }
+    };
+
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, targets.length) }, () => worker()));
     refresh();
     setImageProgress(null);
   };

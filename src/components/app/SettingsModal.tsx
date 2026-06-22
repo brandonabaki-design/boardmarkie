@@ -1,14 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, KeyRound, ShieldCheck, ExternalLink, Check, ImagePlus, Search } from "lucide-react";
-import { getApiKey, setApiKey, getImageConfig, setImageConfig, getSearchKey, setSearchKey } from "@/lib/storage";
+import { X, KeyRound, ShieldCheck, ExternalLink, Check, ImagePlus, Search, Zap } from "lucide-react";
+import {
+  getApiKey,
+  setApiKey,
+  getImageConfig,
+  setImageConfig,
+  getSearchKey,
+  setSearchKey,
+  getModel,
+  setModel,
+} from "@/lib/storage";
+import { MODEL_OPTIONS } from "@/lib/anthropic";
 
 export function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [value, setValue] = useState("");
   const [proxyUrl, setProxyUrl] = useState("");
   const [imageKey, setImageKey] = useState("");
   const [pixabayKey, setPixabayKey] = useState("");
+  const [model, setModelState] = useState<string>("");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -18,6 +29,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
       setProxyUrl(cfg.proxyUrl);
       setImageKey(cfg.apiKey);
       setPixabayKey(getSearchKey());
+      setModelState(getModel());
       setSaved(false);
     }
   }, [open]);
@@ -28,6 +40,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
     setApiKey(value);
     setImageConfig({ proxyUrl, apiKey: imageKey });
     setSearchKey(pixabayKey);
+    setModel(model);
     setSaved(true);
     setTimeout(onClose, 600);
   };
@@ -76,6 +89,34 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
         >
           Get an Anthropic API key <ExternalLink size={13} />
         </a>
+
+        <div className="mt-6 border-t border-line pt-5">
+          <h3 className="flex items-center gap-2 text-sm font-bold text-ink">
+            <Zap size={16} className="text-brand-600" /> Speed vs. quality
+          </h3>
+          <p className="mt-1.5 text-xs text-muted">
+            Which Claude model writes your lessons. Faster tiers generate in less time and cost less;
+            higher tiers add depth on complex topics.
+          </p>
+          <div className="mt-3 grid grid-cols-3 gap-1.5 rounded-2xl border border-line bg-paper p-1.5">
+            {MODEL_OPTIONS.map((o) => {
+              const active = o.id === model;
+              return (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => setModelState(o.id)}
+                  className={`rounded-xl px-2 py-2.5 text-center text-sm font-semibold transition-all ${
+                    active ? "bg-white text-brand-700 card-shadow" : "text-muted hover:text-ink"
+                  }`}
+                >
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-xs text-muted">{MODEL_OPTIONS.find((o) => o.id === model)?.blurb}</p>
+        </div>
 
         <div className="mt-6 border-t border-line pt-5">
           <h3 className="flex items-center gap-2 text-sm font-bold text-ink">

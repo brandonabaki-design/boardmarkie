@@ -1,6 +1,7 @@
 "use client";
 
 import type { Artifact } from "./types";
+import { DEFAULT_MODEL } from "./anthropic";
 
 const KEY_API = "boardmarkie.apiKey";
 const KEY_LIB = "boardmarkie.library";
@@ -50,6 +51,21 @@ export function setSearchKey(value: string): void {
   if (typeof window === "undefined") return;
   if (value.trim()) window.localStorage.setItem(KEY_SEARCH_KEY, value.trim());
   else window.localStorage.removeItem(KEY_SEARCH_KEY);
+}
+
+const KEY_MODEL = "boardmarkie.model";
+
+// Which Claude model generates lessons (speed vs. quality). Defaults to the
+// fast tier; changeable in Settings.
+export function getModel(): string {
+  if (typeof window === "undefined") return DEFAULT_MODEL;
+  return window.localStorage.getItem(KEY_MODEL) || DEFAULT_MODEL;
+}
+
+export function setModel(value: string): void {
+  if (typeof window === "undefined") return;
+  if (value.trim()) window.localStorage.setItem(KEY_MODEL, value.trim());
+  else window.localStorage.removeItem(KEY_MODEL);
 }
 
 export function getLibrary(): Artifact[] {

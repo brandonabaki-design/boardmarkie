@@ -1,5 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { MODEL } from "./anthropic";
+import { MODEL, supportsEffort } from "./anthropic";
 import { jsonFormat } from "./schemas";
 import type {
   GenerateRequest,
@@ -21,6 +21,7 @@ interface RunArgs {
   schema: Record<string, unknown>;
   maxTokens?: number;
   effort?: "low" | "medium" | "high";
+  model?: string;
 }
 
 /**
@@ -34,12 +35,16 @@ export async function runStructured<T = unknown>({
   schema,
   maxTokens = 16000,
   effort = "medium",
+  model = MODEL,
 }: RunArgs): Promise<T> {
   const stream = client.messages.stream({
-    model: MODEL,
+    model,
     max_tokens: maxTokens,
     system,
-    output_config: { effort, format: jsonFormat(schema) },
+    // `effort` is rejected by Haiku; only send it to models that support it.
+    output_config: supportsEffort(model)
+      ? { effort, format: jsonFormat(schema) }
+      : { format: jsonFormat(schema) },
     messages: [{ role: "user", content: user }],
   });
 
