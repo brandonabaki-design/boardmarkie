@@ -23,12 +23,14 @@ Follow this structure:
 1. A title slide (layout "title") with an inviting subtitle.
 2. A learning objectives slide (layout "objectives").
 3. A starter/hook, then a sequence of content slides that build understanding step by step. Use clear, age-appropriate bullets — never walls of text.
-4. At least one vocabulary slide (layout "vocabulary") with key terms and student-friendly definitions.
+4. At least one vocabulary slide (layout "vocabulary") with up to 5 key terms and short, student-friendly definitions. If there are more terms, use a second vocabulary slide rather than crowding one.
 5. At least one activity slide (layout "activity") with concrete, doable instructions, a grouping, and a time.
 6. A discussion slide (layout "discussion") with thought-provoking questions.
 7. Where it genuinely helps, suggest one relevant YouTube clip (give a title + a search query) on an appropriate slide.
 8. A short check-for-understanding (layout "quiz") with a few questions and answers.
 9. A plenary/exit slide (layout "plenary") that consolidates learning.
+
+Keep every slide uncluttered and skimmable — it must fit on screen without crowding. Hard limits per slide: at most ~5 short bullet points OR ~5 vocabulary terms, and keep each point/definition to roughly 12 words. If there is more to cover, split it across additional slides rather than overfilling one. Put extension/differentiation ideas, stretch tasks, model answers, and extra detail in teacherNotes — never in the on-slide body. One idea per slide; prefer more slides over dense ones.
 
 For most slides, suggest a vivid imagePrompt describing a helpful illustration, plus concise imageAlt.
 Always include practical teacherNotes on every slide.

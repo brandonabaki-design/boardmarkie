@@ -159,21 +159,40 @@ function visualElement(slide: Slide, box: { x: number; y: number; w: number; h: 
   });
 }
 
-/** Build a sensible canvas layout from a generated/template slide. */
+/**
+ * Pick the largest font size (in cqh = % of canvas height) at which `text` fits
+ * inside a box of the given width/height (percent of the 16:9 canvas), so slide
+ * content never overflows or gets clipped. Approximate but conservative.
+ */
+export function fitFontSize(text: string, wPct: number, hPct: number, max = 4, min = 1.7): number {
+  const W = Math.max(4, wPct - 3); // allow for padding
+  const H = Math.max(4, hPct - 3);
+  const lines = text.split("\n");
+  for (let f = max; f >= min; f -= 0.1) {
+    const charsPerLine = Math.max(1, Math.floor(W / (0.3 * f)));
+    let rows = 0;
+    for (const ln of lines) rows += Math.max(1, Math.ceil((ln.trim().length || 1) / charsPerLine));
+    if (rows * (1.3 * f) <= H) return Math.round(f * 10) / 10;
+  }
+  return min;
+}
+
+/** Build a sensible, non-overflowing canvas layout from a generated slide. */
 export function slideToElements(slide: Slide): CanvasElement[] {
   const els: CanvasElement[] = [];
   let z = 1;
   const visual = hasVisual(slide);
 
   if (slide.layout === "title") {
+    const title = slide.title || "Title";
     els.push(
       textElement({
-        text: slide.title || "Title",
+        text: title,
         x: 8,
         y: 30,
         w: 84,
         h: 24,
-        fontSize: 9,
+        fontSize: fitFontSize(title, 84, 24, 9, 4),
         bold: true,
         align: "center",
         font: "display",
@@ -184,11 +203,11 @@ export function slideToElements(slide: Slide): CanvasElement[] {
       els.push(
         textElement({
           text: slide.subtitle,
-          x: 14,
+          x: 12,
           y: 56,
-          w: 72,
+          w: 76,
           h: 12,
-          fontSize: 4.4,
+          fontSize: fitFontSize(slide.subtitle, 76, 12, 4.4, 2.4),
           align: "center",
           color: MUTED,
           z: z++,
@@ -200,35 +219,58 @@ export function slideToElements(slide: Slide): CanvasElement[] {
   }
 
   // Title
+  const title = slide.title || "Title";
   els.push(
     textElement({
-      text: slide.title || "Title",
+      text: title,
       x: 5,
       y: 5,
       w: 90,
-      h: 12,
-      fontSize: 6,
+      h: 13,
+      fontSize: fitFontSize(title, 90, 13, 6, 3.4),
       bold: true,
       font: "display",
       z: z++,
     }),
   );
-  let textY = 20;
+  let top = 20;
   if (slide.subtitle) {
     els.push(
-      textElement({ text: slide.subtitle, x: 5, y: 17, w: 90, h: 7, fontSize: 3.4, color: MUTED, z: z++ }),
+      textElement({
+        text: slide.subtitle,
+        x: 5,
+        y: 17,
+        w: 90,
+        h: 7,
+        fontSize: fitFontSize(slide.subtitle, 90, 7, 3.4, 2.2),
+        color: MUTED,
+        z: z++,
+      }),
     );
-    textY = 26;
+    top = 27;
   }
 
   const body = bodyText(slide);
+  const h = 95 - top;
   if (visual) {
     if (body) {
-      els.push(textElement({ text: body, x: 5, y: textY, w: 50, h: 94 - textY, fontSize: 3.4, z: z++ }));
+      els.push(textElement({ text: body, x: 5, y: top, w: 50, h, fontSize: fitFontSize(body, 50, h, 3.4, 1.7), z: z++ }));
     }
-    els.push(visualElement(slide, { x: 58, y: textY, w: 37, h: Math.min(62, 94 - textY), z: z++ }));
+    els.push(visualElement(slide, { x: 57, y: top, w: 38, h: Math.min(64, h), z: z++ }));
   } else if (body) {
-    els.push(textElement({ text: body, x: 5, y: textY, w: 90, h: 94 - textY, fontSize: 3.6, z: z++ }));
+    const lines = body.split("\n");
+    const dense = lines.length > 6 || body.length > 360;
+    if (dense) {
+      // Two balanced columns use the horizontal space and avoid a tall, clipped block.
+      const mid = Math.ceil(lines.length / 2);
+      const left = lines.slice(0, mid).join("\n");
+      const right = lines.slice(mid).join("\n");
+      const f = Math.min(fitFontSize(left, 43, h, 3.4, 1.7), fitFontSize(right, 43, h, 3.4, 1.7));
+      els.push(textElement({ text: left, x: 5, y: top, w: 43, h, fontSize: f, z: z++ }));
+      els.push(textElement({ text: right, x: 52, y: top, w: 43, h, fontSize: f, z: z++ }));
+    } else {
+      els.push(textElement({ text: body, x: 5, y: top, w: 90, h, fontSize: fitFontSize(body, 90, h, 3.8, 1.8), z: z++ }));
+    }
   }
 
   return els;

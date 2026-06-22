@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Type,
   ImagePlus,
@@ -19,10 +19,14 @@ import {
   ClipboardCheck,
   ArrowUp,
   ArrowDown,
+  Undo2,
+  Redo2,
+  GripVertical,
 } from "lucide-react";
 import type { CanvasElement, EditAction, Lesson, Slide } from "@/lib/types";
 import {
   cid,
+  clamp,
   ensureElements,
   imageElement,
   shapeElement,
@@ -40,11 +44,19 @@ export function CanvasEditor({
   busy,
   onEdit,
   onChange,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
 }: {
   lesson: Lesson;
   busy: boolean;
   onEdit: (action: EditAction, instruction?: string, slideId?: string) => void;
   onChange: (lesson: Lesson) => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
 }) {
   const [idx, setIdx] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -56,6 +68,9 @@ export function CanvasEditor({
   const [infoOpen, setInfoOpen] = useState(false);
   const [improveOpen, setImproveOpen] = useState(false);
   const [instruction, setInstruction] = useState("");
+  const clip = useRef<CanvasElement | null>(null);
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
 
   const safeIdx = Math.min(idx, lesson.slides.length - 1);
   const slide = ensureElements(lesson.slides[safeIdx]);
@@ -139,6 +154,56 @@ export function CanvasEditor({
     onChange({ ...lesson, slides });
     goTo(j);
   };
+
+  const reorder = (from: number, to: number) => {
+    if (from === to || from < 0 || to < 0 || from >= lesson.slides.length || to >= lesson.slides.length) return;
+    const slides = [...lesson.slides];
+    const [m] = slides.splice(from, 1);
+    slides.splice(to, 0, m);
+    onChange({ ...lesson, slides });
+    setIdx(to);
+    setSelectedId(null);
+  };
+
+  // Keyboard: undo/redo, and copy/cut/paste of the selected element (when not typing).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const typing = !!(document.activeElement as HTMLElement | null)?.isContentEditable;
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+      const k = e.key.toLowerCase();
+      if (k === "z" && !typing) {
+        e.preventDefault();
+        if (e.shiftKey) onRedo();
+        else onUndo();
+      } else if (k === "y" && !typing) {
+        e.preventDefault();
+        onRedo();
+      } else if ((k === "c" || k === "x") && !typing && selectedId) {
+        const el = els.find((x) => x.id === selectedId);
+        if (!el) return;
+        clip.current = el;
+        if (k === "x") {
+          e.preventDefault();
+          setElements(els.filter((x) => x.id !== el.id));
+          setSelectedId(null);
+        }
+      } else if (k === "v" && !typing && clip.current) {
+        e.preventDefault();
+        const src = clip.current;
+        addAndSelect({
+          ...src,
+          id: cid(src.type),
+          x: clamp(src.x + 3, 0, 92),
+          y: clamp(src.y + 3, 0, 92),
+          z: topZ(els),
+        } as CanvasElement);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [els, selectedId, onUndo, onRedo]);
 
   const context = {
     topic: lesson.meta.topic,
@@ -273,6 +338,13 @@ export function CanvasEditor({
           </div>
 
           <div className="no-print mt-2 flex flex-wrap items-center gap-1.5">
+            <IconBtn title="Undo (⌘Z)" disabled={!canUndo} onClick={onUndo}>
+              <Undo2 size={16} />
+            </IconBtn>
+            <IconBtn title="Redo (⌘⇧Z)" disabled={!canRedo} onClick={onRedo}>
+              <Redo2 size={16} />
+            </IconBtn>
+            <span className="mx-1 h-5 w-px bg-line" />
             <IconBtn title="Previous slide" disabled={safeIdx === 0} onClick={() => goTo(safeIdx - 1)}>
               <ChevronUp size={16} className="-rotate-90" />
             </IconBtn>
@@ -345,27 +417,56 @@ export function CanvasEditor({
             </div>
           </div>
           <p className="no-print mt-2 text-xs text-muted">
-            Click an element to select, drag to move, drag the handles to resize. Double-click text to edit.
+            Click to select · drag to move · handles to resize · double-click text to edit ·{" "}
+            <span className="whitespace-nowrap">⌘C/⌘X/⌘V copy/cut/paste</span> ·{" "}
+            <span className="whitespace-nowrap">⌘Z undo</span>
           </p>
         </div>
 
         {/* slide thumbnail rail */}
-        <div className="no-print hidden w-40 shrink-0 lg:block">
+        <div className="no-print hidden w-44 shrink-0 lg:block">
+          <p className="mb-2 px-1 text-xs font-semibold text-muted">Slides · drag to reorder</p>
           <div className="max-h-[70vh] space-y-2 overflow-auto pr-1">
             {lesson.slides.map((s, i) => {
               const thumb = ensureElements(s);
               return (
-                <button
+                <div
                   key={s.id}
+                  draggable
+                  onDragStart={() => setDragFrom(i)}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOver(i);
+                  }}
+                  onDragLeave={() => setDragOver((v) => (v === i ? null : v))}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (dragFrom !== null) reorder(dragFrom, i);
+                    setDragFrom(null);
+                    setDragOver(null);
+                  }}
+                  onDragEnd={() => {
+                    setDragFrom(null);
+                    setDragOver(null);
+                  }}
                   onClick={() => goTo(i)}
-                  className={`block w-full overflow-hidden rounded-lg border-2 text-left transition-colors ${
+                  title="Drag to reorder"
+                  className={`group relative flex cursor-grab items-stretch gap-1 rounded-lg border-2 transition-colors active:cursor-grabbing ${
                     i === safeIdx ? "border-brand-500" : "border-line hover:border-brand-300"
+                  } ${dragOver === i && dragFrom !== null && dragFrom !== i ? "ring-2 ring-brand-400" : ""} ${
+                    dragFrom === i ? "opacity-50" : ""
                   }`}
                 >
-                  <div className="pointer-events-none">
+                  <span className="flex w-5 shrink-0 items-center justify-center rounded-l-md bg-paper text-muted group-hover:text-brand-600">
+                    <GripVertical size={13} />
+                  </span>
+                  <span className="absolute left-6 top-1 z-10 rounded bg-white/85 px-1 text-[10px] font-semibold text-muted">
+                    {i + 1}
+                  </span>
+                  <div className="pointer-events-none min-w-0 flex-1 overflow-hidden rounded-r-md">
                     <SlideCanvas elements={thumb.elements ?? []} background={s.background} />
                   </div>
-                </button>
+                </div>
               );
             })}
             <button

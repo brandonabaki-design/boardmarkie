@@ -70,6 +70,8 @@ export function CreateApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [imageProgress, setImageProgress] = useState<{ done: number; total: number } | null>(null);
+  const [past, setPast] = useState<Lesson[]>([]);
+  const [future, setFuture] = useState<Lesson[]>([]);
 
   useEffect(() => {
     setLibrary(getLibrary());
@@ -98,6 +100,8 @@ export function CreateApp() {
     const seeded = artifact.kind === "lesson" ? seedLesson(artifact) : artifact;
     saveArtifact(seeded);
     setCurrent(seeded);
+    setPast([]);
+    setFuture([]);
     refresh();
     setLoading(false);
 
@@ -164,9 +168,7 @@ export function CreateApp() {
     setEditing(true);
     try {
       const updated = seedLesson(await editLesson({ lesson: current, action, instruction, slideId }), true);
-      saveArtifact(updated);
-      setCurrent(updated);
-      refresh();
+      commitLesson(updated);
     } catch (err) {
       handleError(err);
     } finally {
@@ -174,9 +176,32 @@ export function CreateApp() {
     }
   };
 
-  const persistLesson = (lesson: Lesson) => {
-    setCurrent(lesson);
-    saveArtifact(lesson);
+  // History-recording lesson setter (every canvas/AI edit becomes an undo step).
+  const commitLesson = (next: Lesson) => {
+    setPast((p) => (current && current.kind === "lesson" ? [...p, current].slice(-60) : p));
+    setFuture([]);
+    setCurrent(next);
+    saveArtifact(next);
+    refresh();
+  };
+
+  const undo = () => {
+    if (!current || current.kind !== "lesson" || !past.length) return;
+    const prev = past[past.length - 1];
+    setPast((p) => p.slice(0, -1));
+    setFuture((f) => [current, ...f].slice(0, 60));
+    setCurrent(prev);
+    saveArtifact(prev);
+    refresh();
+  };
+
+  const redo = () => {
+    if (!current || current.kind !== "lesson" || !future.length) return;
+    const nxt = future[0];
+    setFuture((f) => f.slice(1));
+    setPast((p) => [...p, current].slice(-60));
+    setCurrent(nxt);
+    saveArtifact(nxt);
     refresh();
   };
 
@@ -198,6 +223,8 @@ export function CreateApp() {
       const seeded = artifact.kind === "lesson" ? seedLesson(artifact) : artifact;
       saveArtifact(seeded);
       setCurrent(seeded);
+      setPast([]);
+      setFuture([]);
       refresh();
       window.scrollTo({ top: 0 });
     } catch (err) {
@@ -209,6 +236,8 @@ export function CreateApp() {
 
   const openArtifact = (a: Artifact) => {
     setCurrent(a.kind === "lesson" ? seedLesson(a) : a);
+    setPast([]);
+    setFuture([]);
     setLibOpen(false);
     setError(null);
     window.scrollTo({ top: 0 });
@@ -222,6 +251,8 @@ export function CreateApp() {
 
   const startNew = () => {
     setCurrent(null);
+    setPast([]);
+    setFuture([]);
     setError(null);
   };
 
@@ -303,7 +334,16 @@ export function CreateApp() {
             </button>
 
             {current.kind === "lesson" && (
-              <CanvasEditor lesson={current as Lesson} busy={busy} onEdit={handleEdit} onChange={persistLesson} />
+              <CanvasEditor
+                lesson={current as Lesson}
+                busy={busy}
+                onEdit={handleEdit}
+                onChange={commitLesson}
+                onUndo={undo}
+                onRedo={redo}
+                canUndo={past.length > 0}
+                canRedo={future.length > 0}
+              />
             )}
             {current.kind === "worksheet" && <WorksheetView worksheet={current} />}
             {current.kind === "series" && <SeriesView series={current} busyLesson={expanding} onExpand={handleExpand} />}
