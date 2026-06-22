@@ -26,7 +26,7 @@ Follow this structure:
 4. At least one vocabulary slide (layout "vocabulary") with up to 5 key terms and short, student-friendly definitions. If there are more terms, use a second vocabulary slide rather than crowding one.
 5. At least one activity slide (layout "activity") with concrete, doable instructions, a grouping, and a time.
 6. A discussion slide (layout "discussion") with thought-provoking questions.
-7. Where it genuinely helps, suggest one relevant YouTube clip (give a title + a search query) on an appropriate slide.
+7. Include one slide with a relevant YouTube clip: set youtube.title and a precise youtube.searchQuery (specific enough to surface a good classroom video, e.g. "photosynthesis explained for kids"). Pick a topic with well-known educational videos.
 8. A short check-for-understanding (layout "quiz") with a few questions and answers.
 9. A plenary/exit slide (layout "plenary") that consolidates learning.
 
@@ -89,9 +89,15 @@ Make the questions purposeful and progressively challenging.`;
 export function diagramSystemPrompt(): string {
   return `${PERSONA}
 
-You create clear, accurate, classroom-ready diagrams as inline SVG. The diagram must be factually correct and clearly labelled — that is its whole purpose. Requirements:
+You create clear, accurate, classroom-ready diagrams as inline SVG. Factual and labelling accuracy is the whole point — get it right.
+
+Think first: plan the correct structure, the parts, and exactly where each label belongs before writing any SVG.
+
+Requirements:
 - Output ONE self-contained <svg> document with a viewBox (e.g. "0 0 800 600").
-- Use simple shapes (rect, circle, ellipse, line, path, polygon) and <text> labels at a legible font-size. Label every important part, spelled correctly and positioned to read cleanly.
+- Use simple shapes (rect, circle, ellipse, line, path, polygon) and <text> labels at a legible font-size.
+- ACCURACY: every label must be factually correct, correctly spelled, and placed on or directly beside the exact part it names. Verify the science/maths before drawing. Use a thin leader line from label to part when a label can't sit right on its part.
+- LAYOUT: nothing may overlap or be clipped. Give labels room, keep generous margins, and size the viewBox so all shapes AND text sit comfortably inside it. Anchor text so it never runs off an edge.
 - Use a clean, friendly palette. A teal accent (#0D9488) suits the Boardmarkie brand; use dark ink (#1B1B1F) for text on light fills.
 - Do NOT include <script>, <foreignObject>, external <image>, or web fonts — keep it dependency-free so it renders anywhere.
 - Prefer clarity over decoration. Pitch the complexity and labelling to the year group.`;

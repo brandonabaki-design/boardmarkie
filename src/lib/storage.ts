@@ -83,6 +83,22 @@ export function setImageStyle(value: ImageStyle): void {
   window.localStorage.setItem(KEY_IMG_STYLE, value);
 }
 
+const KEY_IMG_QUALITY = "boardmarkie.imageQuality";
+export type ImageQuality = "fast" | "standard" | "ultra";
+
+// AI illustration quality (maps to an Imagen tier). Standard balances accuracy
+// and speed; Ultra is the most accurate (slowest/priciest); Fast is quickest.
+export function getImageQuality(): ImageQuality {
+  if (typeof window === "undefined") return "standard";
+  const v = window.localStorage.getItem(KEY_IMG_QUALITY);
+  return v === "fast" || v === "ultra" ? v : "standard";
+}
+
+export function setImageQuality(value: ImageQuality): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(KEY_IMG_QUALITY, value);
+}
+
 export function getLibrary(): Artifact[] {
   if (typeof window === "undefined") return [];
   try {

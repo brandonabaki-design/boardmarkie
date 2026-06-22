@@ -24,5 +24,10 @@ export function supportsEffort(model: string): boolean {
   return model.startsWith("claude-opus") || model === "claude-sonnet-4-6";
 }
 
+// Diagrams are accuracy-critical (vector SVG with exact labels), so they always
+// use the strongest model with high effort + thinking, regardless of the user's
+// speed setting.
+export const DIAGRAM_MODEL: ModelId = "claude-opus-4-8";
+
 export const NO_KEY_MESSAGE =
   "Add your Anthropic API key in Settings to start generating. It's stored only in your browser.";

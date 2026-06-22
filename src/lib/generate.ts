@@ -22,6 +22,7 @@ interface RunArgs {
   maxTokens?: number;
   effort?: "low" | "medium" | "high";
   model?: string;
+  think?: boolean;
 }
 
 /**
@@ -36,6 +37,7 @@ export async function runStructured<T = unknown>({
   maxTokens = 16000,
   effort = "medium",
   model = MODEL,
+  think = false,
 }: RunArgs): Promise<T> {
   const stream = client.messages.stream({
     model,
@@ -45,6 +47,9 @@ export async function runStructured<T = unknown>({
     output_config: supportsEffort(model)
       ? { effort, format: jsonFormat(schema) }
       : { format: jsonFormat(schema) },
+    // Adaptive thinking sharply improves accuracy-critical output (diagrams);
+    // it's supported on the Opus/Sonnet tiers (same gate as effort).
+    ...(think && supportsEffort(model) ? { thinking: { type: "adaptive" as const } } : {}),
     messages: [{ role: "user", content: user }],
   });
 

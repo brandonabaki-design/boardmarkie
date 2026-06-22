@@ -5,7 +5,14 @@
 // so requests go through a small Cloudflare Worker proxy (see worker/). The
 // proxy URL and the teacher's Gemini key live in localStorage (Settings).
 
-import { getImageConfig, getImageStyle } from "./storage";
+import { getImageConfig, getImageStyle, getImageQuality } from "./storage";
+
+// AI illustration quality → Imagen tier. Ultra has the best prompt alignment.
+const QUALITY_MODEL: Record<string, string> = {
+  fast: "imagen-4.0-fast-generate-001",
+  standard: "imagen-4.0-generate-001",
+  ultra: "imagen-4.0-ultra-generate-001",
+};
 
 /**
  * Wrap a plain subject into a full illustration prompt in the user's chosen
@@ -51,6 +58,7 @@ export async function generateImage(prompt: string, opts: ImageOptions = {}): Pr
       body: JSON.stringify({
         prompt,
         apiKey: apiKey || undefined,
+        model: QUALITY_MODEL[getImageQuality()],
         aspectRatio: opts.aspectRatio ?? "16:9",
       }),
     });

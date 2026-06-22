@@ -14,6 +14,9 @@ import {
   getImageStyle,
   setImageStyle,
   type ImageStyle,
+  getImageQuality,
+  setImageQuality,
+  type ImageQuality,
 } from "@/lib/storage";
 import { MODEL_OPTIONS } from "@/lib/anthropic";
 
@@ -27,6 +30,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   const [pixabayKey, setPixabayKey] = useState("");
   const [model, setModelState] = useState<string>("");
   const [imgStyle, setImgStyle] = useState<ImageStyle>("line");
+  const [imgQuality, setImgQuality] = useState<ImageQuality>("standard");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -39,6 +43,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
       setPixabayKey(getSearchKey());
       setModelState(getModel());
       setImgStyle(getImageStyle());
+      setImgQuality(getImageQuality());
       setSaved(false);
     }
   }, [open]);
@@ -51,6 +56,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
     setSearchKey(pixabayKey);
     setModel(model);
     setImageStyle(imgStyle);
+    setImageQuality(imgQuality);
     setSaved(true);
     setTimeout(onClose, 600);
   };
@@ -231,6 +237,34 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                 </div>
                 <p className="mt-1.5 text-xs text-muted">
                   Black-and-white line art looks clean, loads fast, and is printer-friendly.
+                </p>
+              </div>
+
+              <div className="mt-4">
+                <span className="text-sm font-semibold text-ink">Image quality</span>
+                <div className="mt-1.5 grid grid-cols-3 gap-1.5 rounded-2xl border border-line bg-paper p-1.5">
+                  {(
+                    [
+                      ["fast", "Fast"],
+                      ["standard", "Standard"],
+                      ["ultra", "Ultra"],
+                    ] as const
+                  ).map(([v, label]) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setImgQuality(v)}
+                      className={`rounded-xl px-2 py-2 text-sm font-semibold transition-all ${
+                        imgQuality === v ? "bg-white text-brand-700 card-shadow" : "text-muted hover:text-ink"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-xs text-muted">
+                  Higher tiers follow the prompt more accurately — Ultra is best (slower &amp; pricier). Note:
+                  raster images can&apos;t render reliable text; use a Diagram for anything with labels.
                 </p>
               </div>
 

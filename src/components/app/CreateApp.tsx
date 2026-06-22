@@ -124,7 +124,8 @@ export function CreateApp() {
   // Generate slide illustrations concurrently (a small pool keeps it fast
   // without hammering the proxy), placing each onto the slide's canvas as it lands.
   const autoGenerateImages = async (lesson: Lesson) => {
-    const targets = lesson.slides.filter((s) => s.imagePrompt && !s.imageUrl);
+    // Skip slides that will get a video — don't fill them with an image.
+    const targets = lesson.slides.filter((s) => s.imagePrompt && !s.imageUrl && !s.youtube?.searchQuery);
     if (!targets.length) return lesson;
     setImageProgress({ done: 0, total: targets.length });
 

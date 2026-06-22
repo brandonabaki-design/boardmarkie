@@ -10,7 +10,10 @@
 // SHARED key instead, set a GEMINI_API_KEY env var on the Vercel project and
 // leave the key field blank in the app's Settings.
 
-const DEFAULT_MODEL = "imagen-4.0-fast-generate-001"; // fast + cheapest text-to-image
+// Standard Imagen 4 is the fallback; the app sends an explicit tier per request
+// (fast / standard / ultra). NB: the imagen-4.0-* endpoints are slated for
+// shutdown on 2026-08-17 — swap to the successor model when it lands.
+const DEFAULT_MODEL = "imagen-4.0-generate-001";
 const ALLOWED_ASPECTS = new Set(["1:1", "3:4", "4:3", "9:16", "16:9"]);
 
 // Lock this to your site's origin in production, e.g.

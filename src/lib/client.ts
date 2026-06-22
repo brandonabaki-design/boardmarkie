@@ -1,7 +1,7 @@
 "use client";
 
 import Anthropic from "@anthropic-ai/sdk";
-import { NO_KEY_MESSAGE } from "./anthropic";
+import { DIAGRAM_MODEL, NO_KEY_MESSAGE } from "./anthropic";
 import { getApiKey, getModel } from "./storage";
 import { diagramSchema, lessonSchema, seriesSchema, worksheetSchema } from "./schemas";
 import {
@@ -152,9 +152,10 @@ export async function generateDiagram(
     system: diagramSystemPrompt(),
     user: diagramUserPrompt(input),
     schema: diagramSchema,
-    maxTokens: 8000,
-    effort: "low",
-    model: getModel(),
+    maxTokens: 16000,
+    effort: "high",
+    think: true,
+    model: DIAGRAM_MODEL,
   });
 
   const svg = sanitizeSvg(typeof raw.svg === "string" ? raw.svg : "");
