@@ -17,7 +17,7 @@ import type {
 import { generateArtifact, editLesson } from "@/lib/client";
 import { generateImage, illustrationPrompt } from "@/lib/images";
 import { resolveYoutube } from "@/lib/youtube";
-import { ensureElements, placeImageOnSlide, placeYoutubeOnSlide } from "@/lib/canvas";
+import { ensureElements, slideToElements } from "@/lib/canvas";
 import { deleteArtifact, getImageConfig, getLibrary, saveArtifact } from "@/lib/storage";
 import { GeneratorForm } from "./GeneratorForm";
 import { GeneratingState } from "./GeneratingState";
@@ -141,11 +141,9 @@ export function CreateApp() {
         if (i >= targets.length) break;
         try {
           const image = await generateImage(imagePromptFor(targets[i]), { aspectRatio: "16:9" });
-          const cur = working.slides.find((s) => s.id === targets[i].id);
-          const elements = cur
-            ? placeImageOnSlide(cur, { src: image, alt: cur.imageAlt || cur.imagePrompt })
-            : undefined;
-          working = patchSlide(working, targets[i].id, { imageUrl: image, ...(elements ? { elements } : {}) });
+          const cur = working.slides.find((s) => s.id === targets[i].id) ?? targets[i];
+          const withImage = { ...cur, imageUrl: image };
+          working = patchSlide(working, targets[i].id, { imageUrl: image, elements: slideToElements(withImage) });
           setCurrent(working);
           saveArtifact(working);
         } catch (err) {
@@ -180,7 +178,9 @@ export function CreateApp() {
         if (!r?.videoId) continue;
         const cur = working.slides.find((s) => s.id === t.id);
         if (!cur) continue;
-        working = patchSlide(working, t.id, { elements: placeYoutubeOnSlide(cur, r) });
+        working = patchSlide(working, t.id, {
+          elements: slideToElements(cur, { kind: "youtube", videoId: r.videoId, title: r.title }),
+        });
         setCurrent(working);
         saveArtifact(working);
       } catch {

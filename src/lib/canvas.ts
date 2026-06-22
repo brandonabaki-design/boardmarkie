@@ -146,17 +146,27 @@ function bodyText(slide: Slide): string {
   return lines.join("\n");
 }
 
-function hasVisual(slide: Slide): boolean {
-  return !!(slide.imageUrl || slide.diagramSvg);
+const ACCENT = "#14a892"; // brand-500
+
+/** A slide's visual: an image/diagram from its own fields, or one supplied
+ *  directly (e.g. a just-resolved YouTube video) by the generation pipeline. */
+export type SlideVisual =
+  | { kind: "image"; src: string; alt?: string }
+  | { kind: "svg"; svg: string; alt?: string }
+  | { kind: "youtube"; videoId: string; title?: string };
+
+function readVisual(slide: Slide): SlideVisual | null {
+  if (slide.imageUrl) return { kind: "image", src: slide.imageUrl, alt: slide.imageAlt || slide.imagePrompt };
+  if (slide.diagramSvg) return { kind: "svg", svg: slide.diagramSvg, alt: slide.imageAlt };
+  return null;
 }
 
-function visualElement(slide: Slide, box: { x: number; y: number; w: number; h: number; z: number }): ImageElement {
-  return imageElement({
-    ...box,
-    src: slide.imageUrl,
-    svg: slide.imageUrl ? undefined : slide.diagramSvg,
-    alt: slide.imageAlt || slide.imagePrompt,
-  });
+type Box = { x: number; y: number; w: number; h: number; z: number };
+
+function visualElementFrom(v: SlideVisual, box: Box): CanvasElement {
+  if (v.kind === "image") return imageElement({ ...box, src: v.src, alt: v.alt });
+  if (v.kind === "svg") return imageElement({ ...box, svg: v.svg, alt: v.alt });
+  return youtubeElement({ ...box, videoId: v.videoId, title: v.title });
 }
 
 /**
@@ -177,86 +187,122 @@ export function fitFontSize(text: string, wPct: number, hPct: number, max = 4, m
   return min;
 }
 
-/** Build a sensible, non-overflowing canvas layout from a generated slide. */
-export function slideToElements(slide: Slide): CanvasElement[] {
+/**
+ * Build a clean, non-overflowing layout for a slide. An optional `extraVisual`
+ * (e.g. a just-resolved YouTube video) fills the visual slot. This is recomputed
+ * whenever a slide's visual changes, so text is always sized for its real box —
+ * the title never gets squeezed into a narrow column after the fact.
+ */
+export function slideToElements(slide: Slide, extraVisual?: SlideVisual): CanvasElement[] {
   const els: CanvasElement[] = [];
   let z = 1;
-  const visual = hasVisual(slide);
+  const visual = readVisual(slide) ?? extraVisual ?? null;
+  const title = slide.title || "Title";
 
   if (slide.layout === "title") {
-    const title = slide.title || "Title";
-    els.push(
-      textElement({
-        text: title,
-        x: 8,
-        y: 30,
-        w: 84,
-        h: 24,
-        fontSize: fitFontSize(title, 84, 24, 9, 4),
-        bold: true,
-        align: "center",
-        font: "display",
-        z: z++,
-      }),
-    );
-    if (slide.subtitle) {
+    if (visual) {
+      // Title block on the left, hero visual on the right.
+      els.push(shapeElement({ x: 6, y: 27, w: 9, h: 1.4, z: z++, shape: "rect", fill: ACCENT }));
       els.push(
         textElement({
-          text: slide.subtitle,
-          x: 12,
-          y: 56,
-          w: 76,
-          h: 12,
-          fontSize: fitFontSize(slide.subtitle, 76, 12, 4.4, 2.4),
-          align: "center",
-          color: MUTED,
+          text: title,
+          x: 6,
+          y: 31,
+          w: 45,
+          h: 26,
+          fontSize: fitFontSize(title, 45, 26, 7.5, 4),
+          bold: true,
+          font: "display",
           z: z++,
         }),
       );
+      if (slide.subtitle) {
+        els.push(
+          textElement({
+            text: slide.subtitle,
+            x: 6,
+            y: 59,
+            w: 45,
+            h: 14,
+            fontSize: fitFontSize(slide.subtitle, 45, 14, 4, 2.4),
+            color: MUTED,
+            z: z++,
+          }),
+        );
+      }
+      els.push(visualElementFrom(visual, { x: 54, y: 8, w: 40, h: 84, z: z++ }));
+    } else {
+      els.push(
+        textElement({
+          text: title,
+          x: 8,
+          y: 30,
+          w: 84,
+          h: 24,
+          fontSize: fitFontSize(title, 84, 24, 9, 4),
+          bold: true,
+          align: "center",
+          font: "display",
+          z: z++,
+        }),
+      );
+      if (slide.subtitle) {
+        els.push(
+          textElement({
+            text: slide.subtitle,
+            x: 12,
+            y: 56,
+            w: 76,
+            h: 12,
+            fontSize: fitFontSize(slide.subtitle, 76, 12, 4.4, 2.4),
+            align: "center",
+            color: MUTED,
+            z: z++,
+          }),
+        );
+      }
     }
-    if (visual) els.push(visualElement(slide, { x: 34, y: 72, w: 32, h: 22, z: z++ }));
     return els;
   }
 
-  // Title
-  const title = slide.title || "Title";
+  // Content slide — the title always spans the full width across the top.
   els.push(
     textElement({
       text: title,
-      x: 5,
+      x: 6,
       y: 5,
-      w: 90,
-      h: 13,
-      fontSize: fitFontSize(title, 90, 13, 6, 3.4),
+      w: 88,
+      h: 14,
+      fontSize: fitFontSize(title, 88, 14, 6, 3.2),
       bold: true,
       font: "display",
       z: z++,
     }),
   );
-  let top = 20;
+  let top = 21;
   if (slide.subtitle) {
     els.push(
       textElement({
         text: slide.subtitle,
-        x: 5,
-        y: 17,
-        w: 90,
+        x: 6,
+        y: 19,
+        w: 88,
         h: 7,
-        fontSize: fitFontSize(slide.subtitle, 90, 7, 3.4, 2.2),
+        fontSize: fitFontSize(slide.subtitle, 88, 7, 3.4, 2.2),
         color: MUTED,
         z: z++,
       }),
     );
-    top = 27;
+    top = 28;
   }
 
   const body = bodyText(slide);
-  const h = 95 - top;
+  const h = 94 - top;
   if (visual) {
     if (body) {
-      els.push(textElement({ text: body, x: 5, y: top, w: 50, h, fontSize: fitFontSize(body, 50, h, 3.4, 1.7), z: z++ }));
+      els.push(textElement({ text: body, x: 6, y: top, w: 48, h, fontSize: fitFontSize(body, 48, h, 3.4, 1.7), z: z++ }));
     }
-    els.push(visualElement(slide, { x: 57, y: top, w: 38, h: Math.min(64, h), z: z++ }));
+    els.push(visualElementFrom(visual, { x: 57, y: top, w: 37, h: Math.min(62, h), z: z++ }));
   } else if (body) {
     const lines = body.split("\n");
     const dense = lines.length > 6 || body.length > 360;
@@ -265,11 +311,11 @@ export function slideToElements(slide: Slide): CanvasElement[] {
       const mid = Math.ceil(lines.length / 2);
       const left = lines.slice(0, mid).join("\n");
       const right = lines.slice(mid).join("\n");
-      const f = Math.min(fitFontSize(left, 43, h, 3.4, 1.7), fitFontSize(right, 43, h, 3.4, 1.7));
-      els.push(textElement({ text: left, x: 5, y: top, w: 43, h, fontSize: f, z: z++ }));
-      els.push(textElement({ text: right, x: 52, y: top, w: 43, h, fontSize: f, z: z++ }));
+      const f = Math.min(fitFontSize(left, 42, h, 3.4, 1.7), fitFontSize(right, 42, h, 3.4, 1.7));
+      els.push(textElement({ text: left, x: 6, y: top, w: 42, h, fontSize: f, z: z++ }));
+      els.push(textElement({ text: right, x: 52, y: top, w: 42, h, fontSize: f, z: z++ }));
     } else {
-      els.push(textElement({ text: body, x: 5, y: top, w: 90, h, fontSize: fitFontSize(body, 90, h, 3.8, 1.8), z: z++ }));
+      els.push(textElement({ text: body, x: 6, y: top, w: 88, h, fontSize: fitFontSize(body, 88, h, 3.8, 1.8), z: z++ }));
     }
   }
 
@@ -280,60 +326,4 @@ export function slideToElements(slide: Slide): CanvasElement[] {
 export function ensureElements(slide: Slide): Slide {
   if (slide.elements && slide.elements.length) return slide;
   return { ...slide, elements: slideToElements(slide) };
-}
-
-/**
- * Put a generated/swapped image onto a slide's canvas: reuse the first image
- * element if there is one (replace its src/svg), otherwise add one in the right
- * column and narrow any full-width text so they don't overlap.
- */
-export function placeImageOnSlide(
-  slide: Slide,
-  media: { src?: string; svg?: string; alt?: string },
-): CanvasElement[] {
-  const els = (slide.elements && slide.elements.length ? slide.elements : slideToElements(slide)).map(
-    (e) => ({ ...e }),
-  );
-  const existing = els.find((e) => e.type === "image") as ImageElement | undefined;
-  if (existing) {
-    existing.src = media.src;
-    existing.svg = media.svg;
-    if (media.alt) existing.alt = media.alt;
-    return els;
-  }
-  // Make room: pull wide text boxes into the left column.
-  for (const e of els) {
-    if (e.type === "text" && e.x < 10 && e.w > 70) e.w = 50;
-  }
-  els.push(
-    imageElement({
-      x: 58,
-      y: 24,
-      w: 37,
-      h: 56,
-      z: topZ(els),
-      src: media.src,
-      svg: media.svg,
-      alt: media.alt,
-    }),
-  );
-  return els;
-}
-
-/**
- * Embed a YouTube video onto a slide's canvas (right column). Skips slides that
- * already have a video or an image, to avoid overlap.
- */
-export function placeYoutubeOnSlide(slide: Slide, video: { videoId: string; title?: string }): CanvasElement[] {
-  const els = (slide.elements && slide.elements.length ? slide.elements : slideToElements(slide)).map((e) => ({
-    ...e,
-  }));
-  if (els.some((e) => e.type === "youtube" || e.type === "image")) return els;
-  for (const e of els) {
-    if (e.type === "text" && e.x < 10 && e.w > 70) e.w = 50;
-  }
-  els.push(
-    youtubeElement({ x: 57, y: 24, w: 38, h: 50, z: topZ(els), videoId: video.videoId, title: video.title }),
-  );
-  return els;
 }
