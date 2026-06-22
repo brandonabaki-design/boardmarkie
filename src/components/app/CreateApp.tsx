@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { FolderOpen, Settings, Plus, ArrowLeft, AlertCircle, X } from "lucide-react";
+import { FolderOpen, Settings, Plus, ArrowLeft, AlertCircle, X, Play } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import type {
   Artifact,
@@ -25,6 +25,7 @@ import { SeriesView } from "./SeriesView";
 import { SettingsModal } from "./SettingsModal";
 import { LibraryDrawer } from "./LibraryDrawer";
 import { ExportMenu } from "./ExportMenu";
+import { PresentMode } from "./PresentMode";
 import { Spinner } from "./ui";
 
 function isMode(v: string | null): v is GenerationMode {
@@ -57,6 +58,7 @@ export function CreateApp() {
   const [error, setError] = useState<string | null>(null);
   const [libOpen, setLibOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [presenting, setPresenting] = useState(false);
   const [mediaBusy, setMediaBusy] = useState<{ slideId: string; kind: "image" | "diagram" } | null>(
     null,
   );
@@ -250,6 +252,14 @@ export function CreateApp() {
           <div className="flex items-center gap-2">
             {current && (
               <>
+                {current.kind === "lesson" && (
+                  <button
+                    onClick={() => setPresenting(true)}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
+                  >
+                    <Play size={16} /> <span className="hidden sm:inline">Present</span>
+                  </button>
+                )}
                 <ExportMenu artifact={current} />
                 <button
                   onClick={startNew}
@@ -344,6 +354,10 @@ export function CreateApp() {
         onDelete={removeArtifact}
       />
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+      {presenting && current && current.kind === "lesson" && (
+        <PresentMode lesson={current} onClose={() => setPresenting(false)} />
+      )}
     </div>
   );
 }

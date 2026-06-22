@@ -1,6 +1,7 @@
 "use client";
 
-import type { Artifact, Lesson, Slide } from "./types";
+import type { Artifact, Lesson, LessonSeries, Slide, Worksheet } from "./types";
+import type * as Docx from "docx";
 
 const BRAND = "0D9488"; // teal-600
 const INK = "1B1B1F";
@@ -182,4 +183,132 @@ export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
   }
 
   await pptx.writeFile({ fileName: `${slugify(lesson.meta.title)}.pptx` });
+}
+
+// ---- Word (.docx) export ----
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+type RunOpts = { bold?: boolean; italics?: boolean; color?: string };
+
+export async function exportLessonToDocx(lesson: Lesson): Promise<void> {
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import("docx");
+  const kids: Docx.Paragraph[] = [];
+  const para = (text: string, opts: RunOpts = {}) =>
+    new Paragraph({ children: [new TextRun({ text, ...opts })] });
+  const bullet = (text: string, level = 0) => new Paragraph({ text, bullet: { level } });
+  const term = (t: string, def: string) =>
+    new Paragraph({ children: [new TextRun({ text: `${t}: `, bold: true }), new TextRun(def)] });
+
+  kids.push(new Paragraph({ text: lesson.meta.title, heading: HeadingLevel.TITLE }));
+  kids.push(
+    para(`${lesson.meta.subject}  •  ${lesson.meta.yearGroup}  •  ${lesson.meta.durationMinutes} min`, {
+      color: "5B6472",
+    }),
+  );
+  if (lesson.meta.summary) kids.push(para(lesson.meta.summary));
+
+  if (lesson.meta.standards?.length) {
+    kids.push(new Paragraph({ text: "Curriculum standards", heading: HeadingLevel.HEADING_2 }));
+    lesson.meta.standards.forEach((s) => kids.push(bullet(s)));
+  }
+  if (lesson.meta.objectives.length) {
+    kids.push(new Paragraph({ text: "Learning objectives", heading: HeadingLevel.HEADING_2 }));
+    lesson.meta.objectives.forEach((o) => kids.push(bullet(o)));
+  }
+  if (lesson.meta.vocabulary.length) {
+    kids.push(new Paragraph({ text: "Key vocabulary", heading: HeadingLevel.HEADING_2 }));
+    lesson.meta.vocabulary.forEach((v) => kids.push(term(v.term, v.definition)));
+  }
+
+  lesson.slides.forEach((slide, i) => {
+    kids.push(new Paragraph({ text: `${i + 1}. ${slide.title}`, heading: HeadingLevel.HEADING_2 }));
+    if (slide.subtitle) kids.push(para(slide.subtitle, { italics: true, color: "5B6472" }));
+    if (slide.body) kids.push(para(slide.body));
+    (slide.bullets ?? []).forEach((b) => kids.push(bullet(b)));
+    (slide.vocabulary ?? []).forEach((v) => kids.push(term(v.term, v.definition)));
+    if (slide.activity) {
+      kids.push(para(`Activity — ${slide.activity.title}`, { bold: true, color: "0D9488" }));
+      if (slide.activity.instructions) kids.push(para(slide.activity.instructions));
+    }
+    (slide.discussionQuestions ?? []).forEach((q) => kids.push(bullet(q)));
+    (slide.quiz ?? []).forEach((q) => {
+      kids.push(para(q.question, { bold: true }));
+      q.options.forEach((o) => kids.push(bullet(o, 1)));
+      if (q.answer) kids.push(para(`Answer: ${q.answer}`, { italics: true, color: "0D9488" }));
+    });
+    if (slide.teacherNotes) kids.push(para(`Teacher notes: ${slide.teacherNotes}`, { italics: true, color: "5B6472" }));
+  });
+
+  const doc = new Document({ creator: "Boardmarkie", title: lesson.meta.title, sections: [{ children: kids }] });
+  downloadBlob(await Packer.toBlob(doc), `${slugify(lesson.meta.title)}.docx`);
+}
+
+export async function exportWorksheetToDocx(ws: Worksheet): Promise<void> {
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import("docx");
+  const kids: Docx.Paragraph[] = [];
+  const para = (text: string, opts: RunOpts = {}) =>
+    new Paragraph({ children: [new TextRun({ text, ...opts })] });
+
+  kids.push(new Paragraph({ text: ws.meta.title, heading: HeadingLevel.TITLE }));
+  kids.push(para(`${ws.meta.subject}  •  ${ws.meta.yearGroup}`, { color: "5B6472" }));
+  if (ws.meta.instructions) kids.push(para(ws.meta.instructions));
+  kids.push(para("Name: ____________________     Date: ____________"));
+
+  ws.sections.forEach((sec) => {
+    kids.push(new Paragraph({ text: sec.title, heading: HeadingLevel.HEADING_2 }));
+    if (sec.instructions) kids.push(para(sec.instructions, { italics: true, color: "5B6472" }));
+    sec.questions.forEach((q) => {
+      kids.push(para(`${q.number}. ${q.prompt}${q.marks ? `   [${q.marks} marks]` : ""}`));
+      if ((q.type === "mcq" || q.type === "matching") && q.options?.length) {
+        q.options.forEach((o, idx) =>
+          kids.push(new Paragraph({ text: `${String.fromCharCode(97 + idx)}) ${o}`, bullet: { level: 0 } })),
+        );
+      } else if (q.type === "truefalse") {
+        kids.push(para("True   /   False"));
+      } else {
+        const lines = q.type === "long" ? 3 : 1;
+        for (let k = 0; k < lines; k++) kids.push(new Paragraph({ text: "" }));
+      }
+    });
+  });
+
+  // Teacher answer key on its own page.
+  kids.push(new Paragraph({ text: "Answer Key", heading: HeadingLevel.HEADING_1, pageBreakBefore: true }));
+  ws.sections.forEach((sec) => {
+    sec.questions.forEach((q) => {
+      if (q.answer) kids.push(para(`${q.number}. ${q.answer}`));
+    });
+  });
+
+  const doc = new Document({ creator: "Boardmarkie", title: ws.meta.title, sections: [{ children: kids }] });
+  downloadBlob(await Packer.toBlob(doc), `${slugify(ws.meta.title)}.docx`);
+}
+
+export async function exportSeriesToDocx(series: LessonSeries): Promise<void> {
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import("docx");
+  const kids: Docx.Paragraph[] = [];
+  const para = (text: string, opts: RunOpts = {}) =>
+    new Paragraph({ children: [new TextRun({ text, ...opts })] });
+
+  kids.push(new Paragraph({ text: series.meta.title, heading: HeadingLevel.TITLE }));
+  kids.push(para(`${series.meta.subject}  •  ${series.meta.yearGroup}`, { color: "5B6472" }));
+  if (series.meta.summary) kids.push(para(series.meta.summary));
+
+  series.lessons.forEach((l) => {
+    kids.push(new Paragraph({ text: `Lesson ${l.number}: ${l.title}`, heading: HeadingLevel.HEADING_2 }));
+    if (l.objective) kids.push(para(`Objective: ${l.objective}`, { bold: true }));
+    if (l.summary) kids.push(para(l.summary));
+    l.keyActivities.forEach((a) => kids.push(new Paragraph({ text: a, bullet: { level: 0 } })));
+  });
+
+  const doc = new Document({ creator: "Boardmarkie", title: series.meta.title, sections: [{ children: kids }] });
+  downloadBlob(await Packer.toBlob(doc), `${slugify(series.meta.title)}.docx`);
 }
