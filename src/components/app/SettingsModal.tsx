@@ -273,8 +273,10 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                   <Search size={16} className="text-brand-600" /> Image search
                 </h3>
                 <p className="mt-1.5 text-xs text-muted">
-                  The editor’s <span className="font-semibold text-ink">Swap → Web search</span> finds
-                  high-quality, classroom-safe photos and illustrations via{" "}
+                  <span className="font-semibold text-ink">Swap → Web search</span> uses Google image search
+                  when your proxy has <code className="rounded bg-paper px-1">GOOGLE_CSE_KEY</code> and{" "}
+                  <code className="rounded bg-paper px-1">GOOGLE_CSE_CX</code> set — broad, high-quality web
+                  images. Otherwise it falls back to{" "}
                   <a
                     href="https://pixabay.com"
                     target="_blank"
@@ -282,8 +284,8 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                     className="font-medium text-brand-700 hover:underline"
                   >
                     Pixabay
-                  </a>
-                  . Add your free API key (email signup — no cloud project or billing).
+                  </a>{" "}
+                  (add a free key below).
                 </p>
 
                 <label className="mt-3 block">
