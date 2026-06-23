@@ -1,8 +1,12 @@
 "use client";
 
-// In-app image search. Uses Google Programmable Search (Custom Search JSON API)
-// via the Vercel proxy when configured — broad, high-quality web images — and
-// falls back to Pixabay (a free bring-your-own key in Settings).
+// In-app image search backed by Openverse (openverse.org) — ~800M openly
+// licensed images aggregated from Flickr, Wikimedia Commons, museums and more,
+// with no API key and no setup. Tries the Vercel proxy first (avoids any CORS
+// surprises), then a direct browser call, then an optional Pixabay key.
+//
+// (Google's Custom Search JSON API is closed to new Google Cloud projects and
+// is being shut down on 2027-01-01, so it's no longer a usable backend.)
 
 import { getSearchKey, getImageConfig } from "./storage";
 
@@ -12,14 +16,32 @@ export interface ImageResult {
   thumb: string; // smaller URL for the results grid
 }
 
+const OPENVERSE = "https://api.openverse.org/v1/images/";
+
 export const NO_SEARCH_KEY =
-  "Set up Google image search on your proxy (GOOGLE_CSE_KEY + GOOGLE_CSE_CX), or add a Pixabay API key in Settings.";
+  "Image search is temporarily unavailable — check your connection, or add a free Pixabay API key in Settings as a backup.";
+
+interface OpenverseItem {
+  title?: string;
+  url?: string;
+  thumbnail?: string;
+}
+
+function mapOpenverse(items: OpenverseItem[] | undefined): ImageResult[] {
+  return (items ?? [])
+    .map((it) => ({
+      title: it.title ?? "",
+      url: it.url || it.thumbnail || "",
+      thumb: it.thumbnail || it.url || "",
+    }))
+    .filter((r) => r.url);
+}
 
 export async function searchImages(query: string): Promise<ImageResult[]> {
   const q = query.trim();
   if (!q) return [];
 
-  // 1) Google image search via the proxy (best quality).
+  // 1) Openverse via the proxy (no key needed; sidesteps any CORS issues).
   const { proxyUrl } = getImageConfig();
   if (proxyUrl) {
     try {
@@ -32,20 +54,34 @@ export async function searchImages(query: string): Promise<ImageResult[]> {
       if (res.ok) {
         const data = (await res.json()) as {
           results?: ImageResult[];
-          note?: string;
           error?: string;
           detail?: string;
         };
         if (data.results && data.results.length) return data.results;
-        if (data.error) console.warn("[imagesearch] Google:", data.error, data.detail || "");
-        else if (data.note) console.warn("[imagesearch]", data.note);
+        if (data.error) console.warn("[imagesearch] proxy:", data.error, data.detail || "");
       }
     } catch (e) {
       console.warn("[imagesearch] proxy request failed:", e);
     }
   }
 
-  // 2) Pixabay fallback (bring-your-own key).
+  // 2) Openverse directly from the browser (CORS-friendly, no key, no proxy).
+  try {
+    const u = new URL(OPENVERSE);
+    u.searchParams.set("q", q);
+    u.searchParams.set("page_size", "20");
+    u.searchParams.set("mature", "false");
+    const res = await fetch(u.toString(), { headers: { Accept: "application/json" } });
+    if (res.ok) {
+      const data = (await res.json()) as { results?: OpenverseItem[] };
+      const mapped = mapOpenverse(data.results);
+      if (mapped.length) return mapped;
+    }
+  } catch (e) {
+    console.warn("[imagesearch] Openverse direct request failed:", e);
+  }
+
+  // 3) Pixabay fallback (bring-your-own key).
   const key = getSearchKey();
   if (key) return pixabaySearch(q, key);
 

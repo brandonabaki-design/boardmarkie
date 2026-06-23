@@ -273,10 +273,17 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                   <Search size={16} className="text-brand-600" /> Image search
                 </h3>
                 <p className="mt-1.5 text-xs text-muted">
-                  <span className="font-semibold text-ink">Swap → Web search</span> uses Google image search
-                  when your proxy has <code className="rounded bg-paper px-1">GOOGLE_CSE_KEY</code> and{" "}
-                  <code className="rounded bg-paper px-1">GOOGLE_CSE_CX</code> set — broad, high-quality web
-                  images. Otherwise it falls back to{" "}
+                  <span className="font-semibold text-ink">Swap → Web search</span> uses{" "}
+                  <a
+                    href="https://openverse.org"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-brand-700 hover:underline"
+                  >
+                    Openverse
+                  </a>{" "}
+                  — millions of openly-licensed images from Flickr, Wikimedia Commons, museums and more —
+                  with no key and no setup. A{" "}
                   <a
                     href="https://pixabay.com"
                     target="_blank"
@@ -285,7 +292,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                   >
                     Pixabay
                   </a>{" "}
-                  (add a free key below).
+                  key (below) is an optional backup for extra stock photos.
                 </p>
 
                 <label className="mt-3 block">

@@ -260,7 +260,7 @@ export function ImageSwap({
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && runSearch()}
-                  placeholder="Search high-quality images (Pixabay)…"
+                  placeholder="Search openly-licensed images…"
                   className="flex-1 rounded-xl border border-line px-3.5 py-2.5 text-sm outline-none focus:border-brand-400"
                 />
                 <button
@@ -287,7 +287,7 @@ export function ImageSwap({
                   ))}
                 </div>
               ) : (
-                !searching && <p className="mt-6 text-center text-xs text-muted">Search Pixabay for classroom-safe photos and illustrations.</p>
+                !searching && <p className="mt-6 text-center text-xs text-muted">Search millions of free, openly-licensed images you can safely reuse in class.</p>
               )}
             </div>
           )}
