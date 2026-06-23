@@ -5,6 +5,7 @@ import type {
   GenerateRequest,
   Lesson,
   LessonSeries,
+  OutlineSlide,
   Slide,
   VocabItem,
   Worksheet,
@@ -173,6 +174,16 @@ function cleanSlide(raw: RawSlide): Slide {
   }
 
   return slide;
+}
+
+export function toOutline(raw: { slides?: unknown }): OutlineSlide[] {
+  return arr<{ title?: unknown; layout?: unknown; summary?: unknown }>(raw.slides)
+    .map((s) => ({
+      title: str(s?.title) || "Untitled slide",
+      layout: (typeof s?.layout === "string" && LAYOUTS.has(s.layout) ? s.layout : "content") as Slide["layout"],
+      summary: str(s?.summary),
+    }))
+    .filter((s) => s.title.length > 0);
 }
 
 interface RawLesson {

@@ -3,7 +3,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { DIAGRAM_MODEL, NO_KEY_MESSAGE } from "./anthropic";
 import { getApiKey, getModel } from "./storage";
-import { diagramSchema, lessonSchema, seriesSchema, worksheetSchema } from "./schemas";
+import { diagramSchema, lessonSchema, outlineSchema, seriesSchema, worksheetSchema } from "./schemas";
 import {
   lessonSystemPrompt,
   lessonUserPrompt,
@@ -15,11 +15,13 @@ import {
   editUserPrompt,
   editWorksheetSystemPrompt,
   editWorksheetUserPrompt,
+  outlineSystemPrompt,
+  outlineUserPrompt,
   diagramSystemPrompt,
   diagramUserPrompt,
 } from "./prompts";
-import { runStructured, toLesson, toSeries, toWorksheet } from "./generate";
-import type { Artifact, EditRequest, GenerateRequest, Lesson, Worksheet } from "./types";
+import { runStructured, toLesson, toOutline, toSeries, toWorksheet } from "./generate";
+import type { Artifact, EditRequest, GenerateRequest, Lesson, OutlineSlide, Worksheet } from "./types";
 
 function err(message: string, status?: number): Error & { status?: number } {
   const e = new Error(message) as Error & { status?: number };
@@ -51,6 +53,22 @@ function normalize(req: GenerateRequest): GenerateRequest {
     yearGroup: req.yearGroup?.trim() || "Year 7",
     region: req.region?.trim() || "United Kingdom (National Curriculum)",
   };
+}
+
+/** A fast, lightweight lesson outline for the teacher to refine before the full
+ *  lesson is generated. Uses the user's chosen (default fast) model. */
+export async function generateOutline(input: GenerateRequest): Promise<OutlineSlide[]> {
+  const client = browserClient();
+  const req = normalize(input);
+  const raw = await runStructured<{ slides?: unknown }>({
+    client,
+    system: outlineSystemPrompt(),
+    user: outlineUserPrompt(req),
+    schema: outlineSchema,
+    maxTokens: 3000,
+    model: getModel(),
+  });
+  return toOutline(raw);
 }
 
 export async function generateArtifact(input: GenerateRequest): Promise<Artifact> {

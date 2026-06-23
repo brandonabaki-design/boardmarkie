@@ -11,10 +11,11 @@ import type {
   GenerateRequest,
   GenerationMode,
   Lesson,
+  OutlineSlide,
   SeriesLesson,
   Slide,
 } from "@/lib/types";
-import { generateArtifact, editLesson, editWorksheet } from "@/lib/client";
+import { generateArtifact, generateOutline, editLesson, editWorksheet } from "@/lib/client";
 import { generateImage, illustrationPrompt, canGenerateImages } from "@/lib/images";
 import { resolveYoutube } from "@/lib/youtube";
 import { searchImages } from "@/lib/imageSearch";
@@ -32,6 +33,7 @@ import {
 import { GeneratorForm } from "./GeneratorForm";
 import { GeneratingState } from "./GeneratingState";
 import { LessonSkeleton } from "./LessonSkeleton";
+import { OutlineRefiner } from "./OutlineRefiner";
 import { CanvasEditor } from "./CanvasEditor";
 import { AskBoardmarkie } from "./AskBoardmarkie";
 import { WorksheetView } from "./WorksheetView";
@@ -90,6 +92,8 @@ export function CreateApp() {
   const [current, setCurrent] = useState<Artifact | null>(null);
   const [genMode, setGenMode] = useState<GenerationMode>(initialMode);
   const [loading, setLoading] = useState(false);
+  const [outlining, setOutlining] = useState(false);
+  const [refine, setRefine] = useState<{ req: GenerateRequest; outline: OutlineSlide[] } | null>(null);
   const [editing, setEditing] = useState(false);
   const [expanding, setExpanding] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -112,7 +116,35 @@ export function CreateApp() {
     if (e.status === 401) setSettingsOpen(true);
   };
 
+  // Lessons go through an outline-first wizard (Topic → Refine → Theme); other
+  // modes generate directly.
   const handleGenerate = async (req: GenerateRequest) => {
+    setError(null);
+    if (req.mode === "lesson") {
+      setGenMode("lesson");
+      setOutlining(true);
+      try {
+        const outline = await generateOutline(req);
+        setRefine({ req, outline });
+      } catch (err) {
+        handleError(err);
+      } finally {
+        setOutlining(false);
+      }
+      return;
+    }
+    await runGenerate(req);
+  };
+
+  // The refined outline + chosen theme were confirmed → expand to a full lesson.
+  const confirmOutline = (outline: OutlineSlide[], themeId: string) => {
+    if (!refine) return;
+    const req2: GenerateRequest = { ...refine.req, outline, slideCount: outline.length };
+    setRefine(null);
+    void runGenerate(req2, themeId);
+  };
+
+  const runGenerate = async (req: GenerateRequest, themeId?: string) => {
     setError(null);
     setGenMode(req.mode);
     setLoading(true);
@@ -124,7 +156,8 @@ export function CreateApp() {
       setLoading(false);
       return;
     }
-    const seeded = artifact.kind === "lesson" ? seedLesson(artifact) : artifact;
+    let seeded = artifact.kind === "lesson" ? seedLesson(artifact) : artifact;
+    if (themeId && seeded.kind === "lesson") seeded = { ...seeded, theme: themeId };
     saveArtifact(seeded);
     setCurrent(seeded);
     setPast([]);
@@ -504,11 +537,7 @@ export function CreateApp() {
           </div>
         )}
 
-        {loading && !current ? (
-          genMode === "lesson" ? <LessonSkeleton /> : <GeneratingState mode={genMode} />
-        ) : !current ? (
-          <GeneratorForm initialMode={initialMode} loading={loading} onSubmit={handleGenerate} />
-        ) : (
+        {current ? (
           <div>
             <button
               onClick={startNew}
@@ -532,6 +561,24 @@ export function CreateApp() {
             {current.kind === "worksheet" && <WorksheetView worksheet={current} />}
             {current.kind === "series" && <SeriesView series={current} busyLesson={expanding} onExpand={handleExpand} />}
           </div>
+        ) : loading ? (
+          genMode === "lesson" ? <LessonSkeleton /> : <GeneratingState mode={genMode} />
+        ) : (
+          <>
+            {/* Form stays mounted (just hidden) during Refine so inputs are preserved on Back. */}
+            <div className={refine ? "hidden" : ""}>
+              <GeneratorForm initialMode={initialMode} loading={outlining} onSubmit={handleGenerate} />
+            </div>
+            {refine && (
+              <OutlineRefiner
+                req={refine.req}
+                outline={refine.outline}
+                busy={loading}
+                onBack={() => setRefine(null)}
+                onConfirm={confirmOutline}
+              />
+            )}
+          </>
         )}
       </main>
 

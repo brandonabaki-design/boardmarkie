@@ -245,11 +245,12 @@ export function GeneratorForm({
           >
             {loading ? (
               <>
-                <Spinner /> Generating…
+                <Spinner /> {mode === "lesson" ? "Sketching outline…" : "Generating…"}
               </>
             ) : (
               <>
-                <Sparkles size={18} /> Generate {mode === "series" ? "unit" : mode}
+                <Sparkles size={18} />{" "}
+                {mode === "lesson" ? "Generate outline" : `Generate ${mode === "series" ? "unit" : mode}`}
               </>
             )}
           </button>

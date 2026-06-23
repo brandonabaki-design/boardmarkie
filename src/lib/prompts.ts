@@ -52,6 +52,25 @@ export function lessonUserPrompt(req: GenerateRequest): string {
     req.includeStandards === false
       ? "Do not include curriculum standards — leave the standards field as an empty array."
       : "Include the 1-4 most relevant official curriculum standards in the standards field, matched to the subject, year group and curriculum above.";
+
+  if (req.outline?.length) {
+    const list = req.outline
+      .map((o, i) => `${i + 1}. [${o.layout}] ${o.title} — ${o.summary}`)
+      .join("\n");
+    return `Build a ${duration}-minute lesson by fully expanding the teacher-approved outline below.
+
+${context(req)}
+
+${standards}
+
+Produce EXACTLY ${req.outline.length} slides — one per outline item, in this order — keeping each slide's title and layout. Flesh out each slide with complete, accurate, age-appropriate content (bullets, definitions, activities, questions, teacher notes, image/video suggestions as appropriate to its layout).
+
+Approved outline:
+${list}
+
+Make it accurate, well-paced and ready to teach.`;
+  }
+
   return `Create a ${duration}-minute lesson with about ${slides} slides.
 
 ${context(req)}
@@ -59,6 +78,24 @@ ${context(req)}
 ${standards}
 
 Make it accurate, well-paced and ready to teach.`;
+}
+
+export function outlineSystemPrompt(): string {
+  return `${PERSONA}
+
+You are sketching the OUTLINE of a single lesson delivered as slides — just the running order, not the full content yet. Produce an ordered list of slides; for each give a clear title, a layout, and a one-sentence summary of what it will cover.
+
+Follow this shape: a title slide, a learning-objectives slide, a starter/hook, content slides that build understanding step by step, at least one vocabulary slide, at least one activity slide, a discussion slide, one slide with a relevant video, a short quiz/check-for-understanding, and a plenary. Use these layout values exactly: title, objectives, content, vocabulary, activity, discussion, video, quiz, plenary. One idea per slide; keep summaries to a single short sentence.`;
+}
+
+export function outlineUserPrompt(req: GenerateRequest): string {
+  const slides = req.slideCount ?? 9;
+  const duration = req.durationMinutes ?? 60;
+  return `Outline a ${duration}-minute lesson of about ${slides} slides.
+
+${context(req)}
+
+Give the slide-by-slide running order.`;
 }
 
 export function seriesSystemPrompt(): string {

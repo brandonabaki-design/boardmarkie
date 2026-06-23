@@ -216,6 +216,15 @@ export interface GenerateRequest {
   notes?: string;
   includeStandards?: boolean; // find & include curriculum standards (lessons)
   autoImages?: boolean; // generate slide illustrations during creation
+  outline?: OutlineSlide[]; // approved outline to expand into a full lesson
+}
+
+// A lightweight, editable lesson plan produced before full generation
+// (the "Refine" step of the create wizard).
+export interface OutlineSlide {
+  title: string;
+  layout: SlideLayout;
+  summary: string;
 }
 
 export type EditAction =
