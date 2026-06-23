@@ -109,21 +109,41 @@ async function ytThumb(id: string): Promise<string | null> {
 
 const hex = (c?: string, fallback = "16181d") => (c ?? `#${fallback}`).replace("#", "");
 
-const stripMd = (s: string) => s.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/\*([^*]+)\*/g, "$1");
+// Strip markdown emphasis to plain text; also drop any stray/unbalanced markers
+// so "**" / "*" can never leak into a DOCX.
+const stripMd = (s: string) =>
+  s
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/\*+/g, "");
 
-// Split a line into runs by **bold** / *italic* markdown.
+// Split a line into runs by **bold** / *italic* markdown. A toggling parser
+// (not pair-matching) so stray/unbalanced markers never appear as literal text.
 function mdRuns(line: string): { text: string; bold?: boolean; italic?: boolean }[] {
   const runs: { text: string; bold?: boolean; italic?: boolean }[] = [];
-  const re = /(\*\*([^*]+)\*\*|\*([^*]+)\*)/g;
-  let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(line))) {
-    if (m.index > last) runs.push({ text: line.slice(last, m.index) });
-    if (m[2] != null) runs.push({ text: m[2], bold: true });
-    else runs.push({ text: m[3] ?? "", italic: true });
-    last = re.lastIndex;
+  let buf = "";
+  let bold = false;
+  let italic = false;
+  const flush = () => {
+    if (!buf) return;
+    runs.push({ text: buf, ...(bold ? { bold: true } : {}), ...(italic ? { italic: true } : {}) });
+    buf = "";
+  };
+  for (let i = 0; i < line.length; ) {
+    if (line[i] === "*" && line[i + 1] === "*") {
+      flush();
+      bold = !bold;
+      i += 2;
+    } else if (line[i] === "*") {
+      flush();
+      italic = !italic;
+      i += 1;
+    } else {
+      buf += line[i];
+      i += 1;
+    }
   }
-  if (last < line.length) runs.push({ text: line.slice(last) });
+  flush();
   return runs.length ? runs : [{ text: line }];
 }
 

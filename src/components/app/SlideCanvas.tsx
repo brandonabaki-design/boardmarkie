@@ -361,11 +361,32 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-/** Render light markdown (**bold**, *italic*) to safe inline HTML for display. */
+/** Render light markdown (**bold**, *italic*) to safe inline HTML for display.
+ *  Uses a toggling parser rather than pair-matching regexes so that stray or
+ *  unbalanced markers (e.g. from an AI/inline edit) never render as literal
+ *  "**"/"*" — any tag left open is simply closed at the end. */
 export function inlineHtml(text: string): string {
-  return escapeHtml(text)
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*([^*\n]+)\*/g, "<em>$1</em>");
+  const s = escapeHtml(text);
+  let out = "";
+  let bold = false;
+  let italic = false;
+  for (let i = 0; i < s.length; ) {
+    if (s[i] === "*" && s[i + 1] === "*") {
+      out += bold ? "</strong>" : "<strong>";
+      bold = !bold;
+      i += 2;
+    } else if (s[i] === "*") {
+      out += italic ? "</em>" : "<em>";
+      italic = !italic;
+      i += 1;
+    } else {
+      out += s[i];
+      i += 1;
+    }
+  }
+  if (italic) out += "</em>";
+  if (bold) out += "</strong>";
+  return out;
 }
 
 function TextBox({ el, editing, onCommit }: { el: TextElement; editing: boolean; onCommit: (t: string) => void }) {
