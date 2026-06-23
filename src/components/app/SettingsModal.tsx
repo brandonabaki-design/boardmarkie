@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, KeyRound, ShieldCheck, ExternalLink, Check, ImagePlus, Search, Zap, Sparkles, Bot, Film } from "lucide-react";
+import { X, KeyRound, ShieldCheck, ExternalLink, Check, ImagePlus, Search, Zap, Sparkles, Bot, Film, Eye, EyeOff } from "lucide-react";
 import {
   getApiKey,
   setApiKey,
@@ -30,6 +30,41 @@ import { CHAT_MODEL, chatComplete } from "@/lib/openai";
 import { Spinner } from "./ui";
 
 type Tab = "claude" | "openai" | "images";
+
+// Masked API-key input with a show/hide toggle, so keys can be verified.
+function SecretInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative mt-1.5">
+      <input
+        type={show ? "text" : "password"}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        autoComplete="off"
+        spellCheck={false}
+        className="w-full rounded-xl border border-line px-3.5 py-2.5 pr-10 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+      />
+      <button
+        type="button"
+        onClick={() => setShow((s) => !s)}
+        className="absolute inset-y-0 right-0 grid w-10 place-items-center text-muted hover:text-ink"
+        aria-label={show ? "Hide API key" : "Show API key"}
+        title={show ? "Hide" : "Show"}
+      >
+        {show ? <EyeOff size={16} /> : <Eye size={16} />}
+      </button>
+    </div>
+  );
+}
 
 export function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [tab, setTab] = useState<Tab>("claude");
@@ -158,14 +193,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
               <label className="mt-5 block">
                 <span className="text-sm font-semibold text-ink">Anthropic API key</span>
-                <input
-                  type="password"
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
-                  placeholder="sk-ant-…"
-                  autoComplete="off"
-                  className={inputCls}
-                />
+                <SecretInput value={value} onChange={setValue} placeholder="sk-ant-…" />
               </label>
 
               <div className="mt-4 flex items-start gap-2 rounded-xl bg-mint px-3.5 py-3 text-xs text-brand-900">
@@ -223,14 +251,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
               <label className="mt-5 block">
                 <span className="text-sm font-semibold text-ink">OpenAI API key</span>
-                <input
-                  type="password"
-                  value={openaiKey}
-                  onChange={(e) => setOpenaiKeyState(e.target.value)}
-                  placeholder="sk-…"
-                  autoComplete="off"
-                  className={inputCls}
-                />
+                <SecretInput value={openaiKey} onChange={setOpenaiKeyState} placeholder="sk-…" />
               </label>
 
               <div className="mt-4 flex items-start gap-2 rounded-xl bg-mint px-3.5 py-3 text-xs text-brand-900">
@@ -324,14 +345,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                   Gemini API key{" "}
                   <span className="font-normal text-muted">(blank if the proxy holds a shared key)</span>
                 </span>
-                <input
-                  type="password"
-                  value={imageKey}
-                  onChange={(e) => setImageKey(e.target.value)}
-                  placeholder="AIza…"
-                  autoComplete="off"
-                  className={inputCls}
-                />
+                <SecretInput value={imageKey} onChange={setImageKey} placeholder="AIza…" />
               </label>
 
               <a
@@ -426,14 +440,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
                 <label className="mt-3 block">
                   <span className="text-sm font-semibold text-ink">Pixabay API key</span>
-                  <input
-                    type="password"
-                    value={pixabayKey}
-                    onChange={(e) => setPixabayKey(e.target.value)}
-                    placeholder="e.g. 12345678-abcdef…"
-                    autoComplete="off"
-                    className={inputCls}
-                  />
+                  <SecretInput value={pixabayKey} onChange={setPixabayKey} placeholder="e.g. 12345678-abcdef…" />
                 </label>
 
                 <a
@@ -453,14 +460,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                     Enables the <span className="font-semibold text-ink">GIFs</span> toggle in Swap → Web
                     search.
                   </p>
-                  <input
-                    type="password"
-                    value={giphyKey}
-                    onChange={(e) => setGiphyKeyState(e.target.value)}
-                    placeholder="Giphy API key…"
-                    autoComplete="off"
-                    className={inputCls}
-                  />
+                  <SecretInput value={giphyKey} onChange={setGiphyKeyState} placeholder="Giphy API key…" />
                   <a
                     href="https://developers.giphy.com/dashboard/"
                     target="_blank"
