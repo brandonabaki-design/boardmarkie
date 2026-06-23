@@ -26,7 +26,8 @@ import {
   setGiphyKey,
 } from "@/lib/storage";
 import { MODEL_OPTIONS } from "@/lib/anthropic";
-import { CHAT_MODEL } from "@/lib/openai";
+import { CHAT_MODEL, chatComplete } from "@/lib/openai";
+import { Spinner } from "./ui";
 
 type Tab = "claude" | "openai" | "images";
 
@@ -43,6 +44,8 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   const [imgStyle, setImgStyle] = useState<ImageStyle>("line");
   const [imgQuality, setImgQuality] = useState<ImageQuality>("standard");
   const [saved, setSaved] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -64,7 +67,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
   if (!open) return null;
 
-  const save = () => {
+  const persist = () => {
     setApiKey(value);
     setImageConfig({ proxyUrl, apiKey: imageKey });
     setSearchKey(pixabayKey);
@@ -74,9 +77,32 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
     setImageProvider(imgProvider);
     setImageStyle(imgStyle);
     setImageQuality(imgQuality);
+  };
+
+  const save = () => {
+    persist();
     setSaved(true);
     setTimeout(onClose, 600);
   };
+
+  // One-click OpenAI check: saves settings, then pings the proxy and reports the
+  // exact outcome (success, or OpenAI's precise error) so setup issues are obvious.
+  const testOpenAI = async () => {
+    persist();
+    setTestMsg(null);
+    setTesting(true);
+    try {
+      const r = await chatComplete([{ role: "user", content: "Reply with exactly: OK" }]);
+      setTestMsg({ ok: true, text: `Connected — OpenAI replied “${(r.content || "").trim().slice(0, 40)}”.` });
+    } catch (e) {
+      setTestMsg({ ok: false, text: (e as Error).message });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const keyPreview = openaiKey ? `${openaiKey.slice(0, 7)}…${openaiKey.slice(-4)}` : "(empty)";
+  const chatEndpoint = proxyUrl ? proxyUrl.replace(/\/image\/?$/, "/openai-chat") : "(no proxy URL set)";
 
   const inputCls =
     "mt-1.5 w-full rounded-xl border border-line px-3.5 py-2.5 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100";
@@ -220,6 +246,27 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
               >
                 Get an OpenAI API key <ExternalLink size={13} />
               </a>
+
+              <div className="mt-5 rounded-xl border border-line p-3.5">
+                <button
+                  type="button"
+                  onClick={testOpenAI}
+                  disabled={testing}
+                  className="inline-flex items-center gap-2 rounded-lg bg-ink px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink/90 disabled:opacity-50"
+                >
+                  {testing ? <Spinner /> : <Bot size={15} />} Test OpenAI connection
+                </button>
+                <p className="mt-2 break-all text-[11px] leading-relaxed text-muted">
+                  Saves, then sends key <code className="rounded bg-paper px-1">{keyPreview}</code> to{" "}
+                  <code className="rounded bg-paper px-1">{chatEndpoint}</code>
+                </p>
+                {testMsg && (
+                  <p className={`mt-2 text-xs ${testMsg.ok ? "font-medium text-brand-700" : "text-coral"}`}>
+                    {testMsg.ok ? "✅ " : "❌ "}
+                    {testMsg.text}
+                  </p>
+                )}
+              </div>
 
               <div className="mt-4 flex items-start gap-2 rounded-xl border border-line bg-paper px-3.5 py-3 text-xs text-muted">
                 <Sparkles size={15} className="mt-0.5 shrink-0 text-brand-600" />
