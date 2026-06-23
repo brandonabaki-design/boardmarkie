@@ -21,6 +21,27 @@ function err(message: string, status?: number): Error & { status?: number } {
   return e;
 }
 
+// Turn a non-OK proxy response into a useful message. The proxy returns
+// { error, detail } where `detail` is OpenAI's raw error body; surface the
+// specific reason (e.g. "Incorrect API key provided", "insufficient_quota").
+async function proxyErrorMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const b = (await res.json()) as { error?: string; detail?: string };
+    let msg = b.error || fallback;
+    if (b.detail) {
+      try {
+        const d = JSON.parse(b.detail) as { error?: { message?: string } };
+        if (d.error?.message) msg = `${msg} — ${d.error.message}`;
+      } catch {
+        /* detail wasn't JSON; ignore */
+      }
+    }
+    return msg;
+  } catch {
+    return fallback;
+  }
+}
+
 /** Is OpenAI usable right now (key + proxy both configured)? */
 export function openAiReady(): boolean {
   return !!getOpenAIKey() && !!getImageConfig().proxyUrl;
@@ -54,14 +75,7 @@ export async function chatComplete(messages: ChatMessage[]): Promise<string> {
   }
 
   if (!res.ok) {
-    let message = `Ask Boardmarkie failed (${res.status}).`;
-    try {
-      const b = (await res.json()) as { error?: string };
-      if (b?.error) message = b.error;
-    } catch {
-      /* keep the generic message */
-    }
-    throw err(message, res.status);
+    throw err(await proxyErrorMessage(res, `Ask Boardmarkie failed (${res.status}).`), res.status);
   }
 
   const data = (await res.json()) as { content?: string };
@@ -99,14 +113,7 @@ export async function generateOpenAIImage(
   }
 
   if (!res.ok) {
-    let message = `Image generation failed (${res.status}).`;
-    try {
-      const b = (await res.json()) as { error?: string };
-      if (b?.error) message = b.error;
-    } catch {
-      /* keep the generic message */
-    }
-    throw err(message, res.status);
+    throw err(await proxyErrorMessage(res, `Image generation failed (${res.status}).`), res.status);
   }
 
   const data = (await res.json()) as { image?: string };
