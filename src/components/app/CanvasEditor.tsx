@@ -469,6 +469,8 @@ export function CanvasEditor({
                   }}
                   onClick={() => goTo(i)}
                   title="Drag to reorder"
+                  // Skip layout/paint for off-screen thumbnails (big win for long decks).
+                  style={{ contentVisibility: "auto", containIntrinsicSize: "auto 104px" }}
                   className={`group relative flex cursor-grab items-stretch gap-1 rounded-lg border-2 transition-colors active:cursor-grabbing ${
                     i === safeIdx ? "border-brand-500" : "border-line hover:border-brand-300"
                   } ${dragOver === i && dragFrom !== null && dragFrom !== i ? "ring-2 ring-brand-400" : ""} ${

@@ -314,7 +314,7 @@ function ElementContent({
     return (
       <div style={{ width: "100%", height: "100%", position: "relative", borderRadius: 8, overflow: "hidden", background: "#000" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={`https://img.youtube.com/vi/${el.videoId}/hqdefault.jpg`} alt={el.title || "YouTube"} style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.85 }} />
+        <img src={`https://img.youtube.com/vi/${el.videoId}/hqdefault.jpg`} alt={el.title || "YouTube"} loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.85 }} />
         <span style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center" }}>
           <span style={{ background: "#ff0000", color: "#fff", borderRadius: 999, padding: "6cqh 9cqh", fontSize: "4cqh", fontWeight: 700 }}>▶ YouTube</span>
         </span>
@@ -340,6 +340,8 @@ function ElementContent({
         src={el.src}
         alt={el.alt || ""}
         draggable={false}
+        loading="lazy"
+        decoding="async"
         // "contain" shows the whole image (never cropped/cut); boxes are sized ~16:9 to match.
         style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: `${el.radius ?? 4}%`, opacity: (el.opacity ?? 100) / 100 }}
       />

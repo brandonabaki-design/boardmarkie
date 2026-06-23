@@ -301,7 +301,7 @@ export function ImageSwap({
                       className="aspect-square overflow-hidden rounded-lg border border-line transition-colors hover:border-brand-400 disabled:opacity-50"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={r.thumb} alt={r.title} className="h-full w-full object-cover" />
+                      <img src={r.thumb} alt={r.title} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                     </button>
                   ))}
                 </div>
