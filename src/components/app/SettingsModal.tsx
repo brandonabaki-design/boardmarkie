@@ -31,6 +31,7 @@ import {
 import { MODEL_OPTIONS } from "@/lib/anthropic";
 import { CHAT_MODEL, chatComplete } from "@/lib/openai";
 import { Spinner } from "./ui";
+import { useDialog } from "./useDialog";
 
 type Tab = "claude" | "openai" | "images";
 
@@ -85,6 +86,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   const [saved, setSaved] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const dialogRef = useDialog(open, onClose);
 
   useEffect(() => {
     if (open) {
@@ -157,7 +159,14 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-line bg-white card-shadow">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Settings"
+        tabIndex={-1}
+        className="relative flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-line bg-white outline-none card-shadow"
+      >
         {/* header */}
         <div className="flex shrink-0 items-center justify-between border-b border-line px-6 py-4">
           <h2 className="flex items-center gap-2 font-display text-xl font-bold text-ink">

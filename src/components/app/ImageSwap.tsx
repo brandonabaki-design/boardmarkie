@@ -8,6 +8,7 @@ import { getImageConfig } from "@/lib/storage";
 import { generateImage, illustrationPrompt } from "@/lib/images";
 import { generateDiagram } from "@/lib/client";
 import { Spinner } from "./ui";
+import { useDialog } from "./useDialog";
 
 export interface SwapMedia {
   src?: string;
@@ -84,6 +85,8 @@ export function ImageSwap({
 
   // Upload / URL
   const [url, setUrl] = useState("");
+
+  const dialogRef = useDialog(true, onClose);
 
   const finish = (media: SwapMedia) => {
     onPick(media);
@@ -166,7 +169,14 @@ export function ImageSwap({
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative flex max-h-[88vh] w-full max-w-lg flex-col rounded-2xl border border-line bg-white p-6 card-shadow">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Swap image"
+        tabIndex={-1}
+        className="relative flex max-h-[88vh] w-full max-w-lg flex-col rounded-2xl border border-line bg-white p-6 outline-none card-shadow"
+      >
         <div className="flex items-center justify-between">
           <h2 className="font-display text-xl font-bold text-ink">Swap image</h2>
           <button onClick={onClose} className="text-muted hover:text-ink" aria-label="Close">

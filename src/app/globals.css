@@ -123,8 +123,16 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-fade-up, .animate-float, .animate-spin-slow, .shimmer {
-    animation: none;
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

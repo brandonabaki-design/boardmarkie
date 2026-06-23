@@ -2,6 +2,7 @@
 
 import { X, Presentation, Layers, ClipboardList, Trash2, FolderOpen } from "lucide-react";
 import type { Artifact } from "@/lib/types";
+import { useDialog } from "./useDialog";
 
 const KIND_ICON = {
   lesson: Presentation,
@@ -30,14 +31,20 @@ export function LibraryDrawer({
   onOpen: (a: Artifact) => void;
   onDelete: (id: string) => void;
 }) {
+  const dialogRef = useDialog<HTMLElement>(open, onClose);
   return (
-    <div className={`fixed inset-0 z-[55] ${open ? "" : "pointer-events-none"}`}>
+    <div className={`fixed inset-0 z-[55] ${open ? "" : "pointer-events-none"}`} aria-hidden={!open}>
       <div
         className={`absolute inset-0 bg-ink/40 backdrop-blur-sm transition-opacity ${open ? "opacity-100" : "opacity-0"}`}
         onClick={onClose}
       />
       <aside
-        className={`absolute right-0 top-0 flex h-full w-full max-w-sm flex-col border-l border-line bg-white transition-transform duration-300 ${
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="My library"
+        tabIndex={-1}
+        className={`absolute right-0 top-0 flex h-full w-full max-w-sm flex-col border-l border-line bg-white outline-none transition-transform duration-300 ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
       >

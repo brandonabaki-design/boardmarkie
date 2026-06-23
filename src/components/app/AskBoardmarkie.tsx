@@ -137,6 +137,15 @@ export function AskBoardmarkie({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [msgs, busy, open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
   const ready = openAiReady();
   const canEdit = !!editKind && !!onEdit;
 
@@ -223,7 +232,11 @@ export function AskBoardmarkie({
       </button>
 
       {open && (
-        <div className="no-print fixed bottom-24 right-5 z-40 flex h-[34rem] max-h-[75vh] w-[23rem] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-line bg-white card-shadow">
+        <div
+          role="dialog"
+          aria-label="Ask Boardmarkie"
+          className="no-print fixed bottom-24 right-5 z-40 flex h-[34rem] max-h-[75vh] w-[23rem] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-line bg-white card-shadow"
+        >
           {/* header */}
           <div className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
             <div>
