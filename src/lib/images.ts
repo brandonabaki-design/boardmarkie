@@ -5,7 +5,8 @@
 // so requests go through a small Cloudflare Worker proxy (see worker/). The
 // proxy URL and the teacher's Gemini key live in localStorage (Settings).
 
-import { getImageConfig, getImageStyle, getImageQuality } from "./storage";
+import { getImageConfig, getImageStyle, getImageQuality, getImageProvider, getOpenAIKey } from "./storage";
+import { generateOpenAIImage } from "./openai";
 
 // AI illustration quality → Imagen tier. Ultra has the best prompt alignment.
 const QUALITY_MODEL: Record<string, string> = {
@@ -42,11 +43,24 @@ export interface ImageOptions {
   aspectRatio?: AspectRatio;
 }
 
+/** Can we generate images with the current settings? Imagen needs the proxy;
+ *  DALL·E 3 needs the proxy plus an OpenAI key. */
+export function canGenerateImages(): boolean {
+  if (!getImageConfig().proxyUrl) return false;
+  if (getImageProvider() === "dalle") return !!getOpenAIKey();
+  return true;
+}
+
 /**
- * Generate an illustration from a text prompt via the Worker proxy (which
- * forwards to Google's Imagen API). Resolves to a `data:` URL.
+ * Generate an illustration from a text prompt. Routes to OpenAI's DALL·E 3 or
+ * Google's Imagen (via the proxy) per the user's chosen engine. Resolves to a
+ * `data:` URL.
  */
 export async function generateImage(prompt: string, opts: ImageOptions = {}): Promise<string> {
+  if (getImageProvider() === "dalle") {
+    return generateOpenAIImage(prompt, opts.aspectRatio ?? "16:9");
+  }
+
   const { proxyUrl, apiKey } = getImageConfig();
   if (!proxyUrl) throw err(NO_IMAGE_PROXY_MESSAGE, 401);
 

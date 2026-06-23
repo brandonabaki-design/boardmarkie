@@ -99,6 +99,50 @@ export function setImageQuality(value: ImageQuality): void {
   window.localStorage.setItem(KEY_IMG_QUALITY, value);
 }
 
+const KEY_IMG_PROVIDER = "boardmarkie.imageProvider";
+export type ImageProvider = "imagen" | "dalle";
+
+// Which engine generates AI illustrations: Google Imagen (default, via the
+// proxy) or OpenAI's DALL·E 3 (also via the proxy, using the OpenAI key below).
+export function getImageProvider(): ImageProvider {
+  if (typeof window === "undefined") return "imagen";
+  return window.localStorage.getItem(KEY_IMG_PROVIDER) === "dalle" ? "dalle" : "imagen";
+}
+
+export function setImageProvider(value: ImageProvider): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(KEY_IMG_PROVIDER, value);
+}
+
+const KEY_OPENAI = "boardmarkie.openaiKey";
+
+// Bring-your-own OpenAI key. Powers Ask Boardmarkie (GPT-4o) and DALL·E 3 image
+// generation. Stored only in this browser; sent per request to the user's proxy.
+export function getOpenAIKey(): string {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(KEY_OPENAI) ?? "";
+}
+
+export function setOpenAIKey(value: string): void {
+  if (typeof window === "undefined") return;
+  if (value.trim()) window.localStorage.setItem(KEY_OPENAI, value.trim());
+  else window.localStorage.removeItem(KEY_OPENAI);
+}
+
+const KEY_GIPHY = "boardmarkie.giphyKey";
+
+// Bring-your-own Giphy key for in-app GIF search (free from developers.giphy.com).
+export function getGiphyKey(): string {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(KEY_GIPHY) ?? "";
+}
+
+export function setGiphyKey(value: string): void {
+  if (typeof window === "undefined") return;
+  if (value.trim()) window.localStorage.setItem(KEY_GIPHY, value.trim());
+  else window.localStorage.removeItem(KEY_GIPHY);
+}
+
 export function getLibrary(): Artifact[] {
   if (typeof window === "undefined") return [];
   try {

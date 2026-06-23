@@ -15,7 +15,7 @@ import type {
   Slide,
 } from "@/lib/types";
 import { generateArtifact, editLesson } from "@/lib/client";
-import { generateImage, illustrationPrompt } from "@/lib/images";
+import { generateImage, illustrationPrompt, canGenerateImages } from "@/lib/images";
 import { resolveYoutube } from "@/lib/youtube";
 import { ensureElements, slideToElements } from "@/lib/canvas";
 import { deleteArtifact, getArtifactFull, getImageConfig, getLibrary, saveArtifact } from "@/lib/storage";
@@ -23,6 +23,7 @@ import { GeneratorForm } from "./GeneratorForm";
 import { GeneratingState } from "./GeneratingState";
 import { LessonSkeleton } from "./LessonSkeleton";
 import { CanvasEditor } from "./CanvasEditor";
+import { AskBoardmarkie } from "./AskBoardmarkie";
 import { WorksheetView } from "./WorksheetView";
 import { SeriesView } from "./SeriesView";
 import { SettingsModal } from "./SettingsModal";
@@ -109,15 +110,17 @@ export function CreateApp() {
 
     if (seeded.kind === "lesson") {
       const hasProxy = !!getImageConfig().proxyUrl;
-      if (req.autoImages && !hasProxy) {
+      const canImg = canGenerateImages();
+      if (req.autoImages && !canImg) {
         setError(
-          "Lesson created. To auto-generate images, add your image proxy URL and Gemini key in Settings — then use Swap → AI create on a slide.",
+          "Lesson created. To auto-generate images, set up an engine in Settings → Images: add your image proxy + Gemini key (Imagen), or switch to DALL·E 3 and add your OpenAI key.",
         );
         setSettingsOpen(true);
-      } else if (hasProxy) {
-        const working = req.autoImages ? await autoGenerateImages(seeded) : seeded;
-        await autoEmbedYoutube(working);
       }
+      let working = seeded;
+      if (req.autoImages && canImg) working = await autoGenerateImages(seeded);
+      // YouTube resolution needs the proxy regardless of the image engine.
+      if (hasProxy) await autoEmbedYoutube(working);
     }
   };
 
@@ -397,6 +400,20 @@ export function CreateApp() {
         onDelete={removeArtifact}
       />
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+      <AskBoardmarkie
+        context={
+          current?.kind === "lesson"
+            ? {
+                title: current.meta.title,
+                subject: current.meta.subject,
+                yearGroup: current.meta.yearGroup,
+                region: current.meta.region,
+              }
+            : undefined
+        }
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
 
       {presenting && current && current.kind === "lesson" && (
         <PresentMode lesson={current} onClose={() => setPresenting(false)} />

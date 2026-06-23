@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X, Search, Upload, Link2, Sparkles, PenTool, ImageIcon, ExternalLink } from "lucide-react";
 import { searchImages, googleImagesUrl, type ImageResult } from "@/lib/imageSearch";
+import { searchGifs } from "@/lib/gifSearch";
 import { getImageConfig } from "@/lib/storage";
 import { generateImage, illustrationPrompt } from "@/lib/images";
 import { generateDiagram } from "@/lib/client";
@@ -79,6 +80,7 @@ export function ImageSwap({
   const [q, setQ] = useState(initialQuery);
   const [results, setResults] = useState<ImageResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchKind, setSearchKind] = useState<"image" | "gif">("image");
 
   // Upload / URL
   const [url, setUrl] = useState("");
@@ -120,7 +122,7 @@ export function ImageSwap({
     setSearching(true);
     setResults([]);
     try {
-      setResults(await searchImages(q.trim()));
+      setResults(searchKind === "gif" ? await searchGifs(q.trim()) : await searchImages(q.trim()));
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -255,12 +257,29 @@ export function ImageSwap({
 
           {tab === "search" && (
             <div>
+              <div className="mb-2 grid grid-cols-2 gap-1.5 rounded-xl border border-line bg-paper p-1">
+                {(["image", "gif"] as const).map((k) => (
+                  <button
+                    key={k}
+                    onClick={() => {
+                      setSearchKind(k);
+                      setResults([]);
+                      setErr(null);
+                    }}
+                    className={`rounded-lg px-2 py-1.5 text-xs font-semibold transition-all ${
+                      searchKind === k ? "bg-white text-brand-700 card-shadow" : "text-muted hover:text-ink"
+                    }`}
+                  >
+                    {k === "image" ? "Images" : "GIFs"}
+                  </button>
+                ))}
+              </div>
               <div className="flex gap-2">
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && runSearch()}
-                  placeholder="Search openly-licensed images…"
+                  placeholder={searchKind === "gif" ? "Search GIFs (Giphy)…" : "Search openly-licensed images…"}
                   className="flex-1 rounded-xl border border-line px-3.5 py-2.5 text-sm outline-none focus:border-brand-400"
                 />
                 <button
@@ -287,7 +306,13 @@ export function ImageSwap({
                   ))}
                 </div>
               ) : (
-                !searching && <p className="mt-6 text-center text-xs text-muted">Search millions of free, openly-licensed images you can safely reuse in class.</p>
+                !searching && (
+                  <p className="mt-6 text-center text-xs text-muted">
+                    {searchKind === "gif"
+                      ? "Search Giphy for fun, classroom-safe GIFs."
+                      : "Search millions of free, openly-licensed images you can safely reuse in class."}
+                  </p>
+                )
               )}
             </div>
           )}

@@ -164,3 +164,29 @@ ${scope}
 Current lesson JSON:
 ${lessonJson}`;
 }
+
+export interface AskContext {
+  title?: string;
+  subject?: string;
+  yearGroup?: string;
+  region?: string;
+}
+
+export function askBoardmarkieSystemPrompt(ctx?: AskContext): string {
+  const base = `${PERSONA}
+
+You are "Ask Boardmarkie", a friendly, practical teaching assistant chatting with a teacher inside the Boardmarkie app. Help with planning, explaining concepts, suggesting activities and differentiation, writing questions, rubrics and feedback, classroom management, and quick subject knowledge. Keep answers concise and immediately classroom-usable: short paragraphs or bullet points, no padding. Use the spelling and terminology conventions of the teacher's region. If you are unsure of a fact, say so briefly rather than inventing it.`;
+
+  if (ctx && (ctx.title || ctx.subject)) {
+    const lines: string[] = [];
+    if (ctx.title) lines.push(`Title: ${ctx.title}`);
+    if (ctx.subject) lines.push(`Subject: ${ctx.subject}`);
+    if (ctx.yearGroup) lines.push(`Year group / grade: ${ctx.yearGroup}`);
+    if (ctx.region) lines.push(`Curriculum / region: ${ctx.region}`);
+    return `${base}
+
+The teacher currently has this lesson open — tailor your help to it when relevant:
+${lines.join("\n")}`;
+  }
+  return base;
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, KeyRound, ShieldCheck, ExternalLink, Check, ImagePlus, Search, Zap, Sparkles } from "lucide-react";
+import { X, KeyRound, ShieldCheck, ExternalLink, Check, ImagePlus, Search, Zap, Sparkles, Bot, Film } from "lucide-react";
 import {
   getApiKey,
   setApiKey,
@@ -17,10 +17,18 @@ import {
   getImageQuality,
   setImageQuality,
   type ImageQuality,
+  getImageProvider,
+  setImageProvider,
+  type ImageProvider,
+  getOpenAIKey,
+  setOpenAIKey,
+  getGiphyKey,
+  setGiphyKey,
 } from "@/lib/storage";
 import { MODEL_OPTIONS } from "@/lib/anthropic";
+import { CHAT_MODEL } from "@/lib/openai";
 
-type Tab = "claude" | "images";
+type Tab = "claude" | "openai" | "images";
 
 export function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [tab, setTab] = useState<Tab>("claude");
@@ -28,7 +36,10 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   const [proxyUrl, setProxyUrl] = useState("");
   const [imageKey, setImageKey] = useState("");
   const [pixabayKey, setPixabayKey] = useState("");
+  const [giphyKey, setGiphyKeyState] = useState("");
+  const [openaiKey, setOpenaiKeyState] = useState("");
   const [model, setModelState] = useState<string>("");
+  const [imgProvider, setImgProvider] = useState<ImageProvider>("imagen");
   const [imgStyle, setImgStyle] = useState<ImageStyle>("line");
   const [imgQuality, setImgQuality] = useState<ImageQuality>("standard");
   const [saved, setSaved] = useState(false);
@@ -41,7 +52,10 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
       setProxyUrl(cfg.proxyUrl);
       setImageKey(cfg.apiKey);
       setPixabayKey(getSearchKey());
+      setGiphyKeyState(getGiphyKey());
+      setOpenaiKeyState(getOpenAIKey());
       setModelState(getModel());
+      setImgProvider(getImageProvider());
       setImgStyle(getImageStyle());
       setImgQuality(getImageQuality());
       setSaved(false);
@@ -54,7 +68,10 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
     setApiKey(value);
     setImageConfig({ proxyUrl, apiKey: imageKey });
     setSearchKey(pixabayKey);
+    setGiphyKey(giphyKey);
+    setOpenAIKey(openaiKey);
     setModel(model);
+    setImageProvider(imgProvider);
     setImageStyle(imgStyle);
     setImageQuality(imgQuality);
     setSaved(true);
@@ -66,6 +83,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
   const tabs: { id: Tab; label: string; icon: typeof KeyRound }[] = [
     { id: "claude", label: "Claude", icon: Zap },
+    { id: "openai", label: "OpenAI", icon: Bot },
     { id: "images", label: "Images", icon: ImagePlus },
   ];
 
@@ -85,7 +103,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
         {/* tabs */}
         <div className="shrink-0 px-4 pt-3">
-          <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-line bg-paper p-1.5">
+          <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-line bg-paper p-1.5">
             {tabs.map((t) => (
               <button
                 key={t.id}
@@ -168,14 +186,78 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
             </div>
           )}
 
+          {tab === "openai" && (
+            <div>
+              <p className="text-sm text-muted">
+                An OpenAI key powers <span className="font-semibold text-ink">Ask Boardmarkie</span> (the{" "}
+                {CHAT_MODEL} chat assistant) and <span className="font-semibold text-ink">DALL·E 3</span> image
+                generation. It&apos;s stored only in this browser and routed through your image proxy — OpenAI
+                blocks direct browser calls — so you&apos;ll also need a proxy URL set in the Images tab.
+              </p>
+
+              <label className="mt-5 block">
+                <span className="text-sm font-semibold text-ink">OpenAI API key</span>
+                <input
+                  type="password"
+                  value={openaiKey}
+                  onChange={(e) => setOpenaiKeyState(e.target.value)}
+                  placeholder="sk-…"
+                  autoComplete="off"
+                  className={inputCls}
+                />
+              </label>
+
+              <div className="mt-4 flex items-start gap-2 rounded-xl bg-mint px-3.5 py-3 text-xs text-brand-900">
+                <ShieldCheck size={16} className="mt-0.5 shrink-0 text-brand-600" />
+                Your key stays in your browser&apos;s local storage and is sent only to your own proxy.
+              </div>
+
+              <a
+                href="https://platform.openai.com/api-keys"
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline"
+              >
+                Get an OpenAI API key <ExternalLink size={13} />
+              </a>
+
+              <div className="mt-4 flex items-start gap-2 rounded-xl border border-line bg-paper px-3.5 py-3 text-xs text-muted">
+                <Sparkles size={15} className="mt-0.5 shrink-0 text-brand-600" />
+                To draw slide illustrations with DALL·E 3, switch the image engine to DALL·E 3 in the Images
+                tab.
+              </div>
+            </div>
+          )}
+
           {tab === "images" && (
             <div>
               <h3 className="flex items-center gap-2 text-sm font-bold text-ink">
                 <Sparkles size={16} className="text-brand-600" /> Image generation
               </h3>
+
+              <div className="mt-2 grid grid-cols-2 gap-1.5 rounded-2xl border border-line bg-paper p-1.5">
+                {(
+                  [
+                    ["imagen", "Imagen (Google)"],
+                    ["dalle", "DALL·E 3 (OpenAI)"],
+                  ] as const
+                ).map(([v, label]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setImgProvider(v)}
+                    className={`rounded-xl px-2 py-2 text-sm font-semibold transition-all ${
+                      imgProvider === v ? "bg-white text-brand-700 card-shadow" : "text-muted hover:text-ink"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               <p className="mt-1.5 text-xs text-muted">
-                Slide illustrations use Google Imagen via a small proxy you deploy once. Diagrams are drawn by
-                Claude and need nothing extra here.
+                {imgProvider === "dalle"
+                  ? "DALL·E 3 uses your OpenAI key (OpenAI tab), routed through the proxy below. Diagrams are still drawn by Claude."
+                  : "Google Imagen runs through the proxy below. Diagrams are drawn by Claude and need nothing extra."}
               </p>
 
               <label className="mt-3 block">
@@ -315,6 +397,32 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                 >
                   Get a free Pixabay API key <ExternalLink size={13} />
                 </a>
+
+                <div className="mt-5">
+                  <span className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+                    <Film size={14} className="text-brand-600" /> Giphy API key
+                  </span>
+                  <p className="mt-1 text-xs text-muted">
+                    Enables the <span className="font-semibold text-ink">GIFs</span> toggle in Swap → Web
+                    search.
+                  </p>
+                  <input
+                    type="password"
+                    value={giphyKey}
+                    onChange={(e) => setGiphyKeyState(e.target.value)}
+                    placeholder="Giphy API key…"
+                    autoComplete="off"
+                    className={inputCls}
+                  />
+                  <a
+                    href="https://developers.giphy.com/dashboard/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline"
+                  >
+                    Get a free Giphy API key <ExternalLink size={13} />
+                  </a>
+                </div>
               </div>
             </div>
           )}
