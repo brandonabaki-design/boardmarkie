@@ -3,6 +3,7 @@
 import type { Artifact, ImageElement, Lesson, LessonSeries, Worksheet } from "./types";
 import type * as Docx from "docx";
 import { ensureElements } from "./canvas";
+import { getTheme } from "./themes";
 
 function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "boardmarkie";
@@ -180,11 +181,12 @@ export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
   const H = 7.5;
   const inX = (p: number) => (p / 100) * W;
   const inY = (p: number) => (p / 100) * H;
+  const theme = getTheme(lesson.theme);
 
   for (const raw of lesson.slides) {
     const slide = ensureElements(raw);
     const s = pptx.addSlide();
-    s.background = { color: hex(slide.background, "ffffff") };
+    s.background = { color: hex(slide.background ?? theme.bg, "ffffff") };
 
     const els = [...(slide.elements ?? [])].sort((a, b) => a.z - b.z);
     for (const el of els) {
@@ -197,7 +199,7 @@ export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
           fontSize: Math.max(6, Math.round((el.fontSize / 100) * 540)), // cqh → pt (7.5in = 540pt)
           align: el.align ?? "left",
           valign: "top",
-          color: hex(el.color),
+          color: hex(el.color ?? theme.ink),
           fontFace: "Arial",
         });
       } else if (el.type === "shape") {

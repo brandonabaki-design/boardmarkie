@@ -23,6 +23,7 @@ import {
   Redo2,
   GripVertical,
   LayoutGrid,
+  Palette,
 } from "lucide-react";
 import type { CanvasElement, EditAction, Lesson, Slide } from "@/lib/types";
 import {
@@ -40,6 +41,7 @@ import {
 import { SlideCanvas } from "./SlideCanvas";
 import { ImageSwap, type SwapMedia } from "./ImageSwap";
 import { Editable, Spinner } from "./ui";
+import { getTheme, THEMES } from "@/lib/themes";
 
 export function CanvasEditor({
   lesson,
@@ -84,6 +86,7 @@ export function CanvasEditor({
   const safeIdx = Math.min(idx, lesson.slides.length - 1);
   const slide = ensureElements(lesson.slides[safeIdx]);
   const els = slide.elements ?? [];
+  const theme = getTheme(lesson.theme);
 
   const writeSlide = (patch: Partial<Slide>) =>
     onChange({
@@ -339,7 +342,9 @@ export function CanvasEditor({
           <div className="overflow-hidden rounded-2xl border border-line bg-white card-shadow">
             <SlideCanvas
               elements={els}
-              background={slide.background}
+              background={slide.background ?? theme.bg}
+              ink={theme.ink}
+              muted={theme.muted}
               editable
               selectedId={selectedId}
               onSelect={setSelectedId}
@@ -382,6 +387,22 @@ export function CanvasEditor({
             <IconBtn title="Auto-arrange (reset layout from content)" onClick={autoArrange}>
               <LayoutGrid size={15} />
             </IconBtn>
+            <span className="mx-1 h-5 w-px bg-line" />
+            <label className="inline-flex items-center gap-1.5" title="Deck theme">
+              <Palette size={15} className="text-brand-600" />
+              <select
+                value={lesson.theme ?? "classic"}
+                onChange={(e) => onChange({ ...lesson, theme: e.target.value })}
+                aria-label="Deck theme"
+                className="rounded-lg border border-line bg-white px-2 py-1 text-xs font-semibold text-ink outline-none focus:border-brand-400"
+              >
+                {THEMES.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </label>
 
             <div className="relative ml-auto">
               <button
@@ -484,7 +505,7 @@ export function CanvasEditor({
                     {i + 1}
                   </span>
                   <div className="pointer-events-none min-w-0 flex-1 overflow-hidden rounded-r-md">
-                    <SlideCanvas elements={thumb.elements ?? []} background={s.background} />
+                    <SlideCanvas elements={thumb.elements ?? []} background={s.background ?? theme.bg} ink={theme.ink} muted={theme.muted} />
                   </div>
                 </div>
               );
@@ -567,13 +588,14 @@ export function CanvasEditor({
 }
 
 function PrintDeck({ lesson }: { lesson: Lesson }) {
+  const theme = getTheme(lesson.theme);
   return (
     <div className="hidden print:block">
       {lesson.slides.map((s) => {
         const slide = ensureElements(s);
         return (
           <div key={s.id} className="print-page">
-            <SlideCanvas elements={slide.elements ?? []} background={s.background} />
+            <SlideCanvas elements={slide.elements ?? []} background={s.background ?? theme.bg} ink={theme.ink} muted={theme.muted} />
           </div>
         );
       })}

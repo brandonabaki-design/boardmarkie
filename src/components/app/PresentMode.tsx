@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { X, ChevronLeft, ChevronRight, StickyNote, Play, Pause, RotateCcw } from "lucide-react";
 import type { Lesson } from "@/lib/types";
 import { ensureElements } from "@/lib/canvas";
+import { getTheme } from "@/lib/themes";
 import { SlideCanvas } from "./SlideCanvas";
 
 function mmss(total: number): string {
@@ -56,6 +57,7 @@ export function PresentMode({ lesson, onClose }: { lesson: Lesson; onClose: () =
   }, [go, onClose, total]);
 
   const slide = ensureElements(lesson.slides[i]);
+  const theme = getTheme(lesson.theme);
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-ink" role="dialog" aria-modal="true" aria-label="Presentation">
@@ -111,7 +113,7 @@ export function PresentMode({ lesson, onClose }: { lesson: Lesson; onClose: () =
 
       <div className="relative flex flex-1 items-center justify-center px-4 pb-6">
         <div className="aspect-video max-h-full w-full max-w-6xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-          <SlideCanvas elements={slide.elements ?? []} background={slide.background} interactive />
+          <SlideCanvas elements={slide.elements ?? []} background={slide.background ?? theme.bg} ink={theme.ink} muted={theme.muted} interactive />
         </div>
 
         <button

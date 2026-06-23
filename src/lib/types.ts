@@ -124,6 +124,7 @@ export interface Lesson {
   createdAt: number;
   meta: LessonMeta;
   slides: Slide[];
+  theme?: string; // deck theme id (see src/lib/themes.ts); defaults to "classic"
 }
 
 // ---- Worksheet ----

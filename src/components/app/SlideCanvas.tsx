@@ -15,7 +15,7 @@ import {
   AlignRight,
 } from "lucide-react";
 import type { CanvasElement, TextElement } from "@/lib/types";
-import { clamp } from "@/lib/canvas";
+import { clamp, INK, MUTED } from "@/lib/canvas";
 
 const SELECT = "#0c8a78"; // brand-600
 
@@ -39,6 +39,8 @@ const TEXT_COLORS = ["#16181d", "#0c8a78", "#ff6f5e", "#f6a609", "#7c6cf0", "#ff
 export function SlideCanvas({
   elements,
   background = "#ffffff",
+  ink = INK,
+  muted = MUTED,
   editable = false,
   interactive = false,
   selectedId = null,
@@ -49,6 +51,8 @@ export function SlideCanvas({
 }: {
   elements: CanvasElement[];
   background?: string;
+  ink?: string; // default text colour (from the deck theme)
+  muted?: string; // secondary text colour (from the deck theme)
   editable?: boolean;
   interactive?: boolean; // allow iframe playback (Present mode)
   selectedId?: string | null;
@@ -215,6 +219,8 @@ export function SlideCanvas({
               editing={editingId === el.id}
               editable={editable}
               interactive={interactive}
+              ink={ink}
+              muted={muted}
               onCommitText={(t) => {
                 update(el.id, { text: t });
                 setEditingId(null);
@@ -275,16 +281,20 @@ function ElementContent({
   editing,
   editable,
   interactive,
+  ink,
+  muted,
   onCommitText,
 }: {
   el: CanvasElement;
   editing: boolean;
   editable: boolean;
   interactive: boolean;
+  ink: string;
+  muted: string;
   onCommitText: (text: string) => void;
 }) {
   if (el.type === "text") {
-    return <TextBox el={el} editing={editing} onCommit={onCommitText} />;
+    return <TextBox el={el} editing={editing} onCommit={onCommitText} ink={ink} muted={muted} />;
   }
   if (el.type === "shape") {
     return (
@@ -391,7 +401,21 @@ export function inlineHtml(text: string): string {
   return out;
 }
 
-function TextBox({ el, editing, onCommit }: { el: TextElement; editing: boolean; onCommit: (t: string) => void }) {
+function TextBox({
+  el,
+  editing,
+  onCommit,
+  ink = INK,
+  muted = MUTED,
+}: {
+  el: TextElement;
+  editing: boolean;
+  onCommit: (t: string) => void;
+  ink?: string;
+  muted?: string;
+}) {
+  // Map the canvas default ink/muted to the deck theme; explicit user colours stay.
+  const color = !el.color || el.color === INK ? ink : el.color === MUTED ? muted : el.color;
   const ref = useRef<HTMLDivElement>(null);
 
   // Editing → show raw text (with markdown markers); not editing → rendered bold/italic.
@@ -441,7 +465,7 @@ function TextBox({ el, editing, onCommit }: { el: TextElement; editing: boolean;
         fontWeight: el.bold ? 800 : 500,
         fontStyle: el.italic ? "italic" : "normal",
         textAlign: el.align ?? "left",
-        color: el.color ?? "#16181d",
+        color,
         letterSpacing: el.font === "display" ? "-0.01em" : undefined,
       }}
     />
