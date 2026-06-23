@@ -1,6 +1,6 @@
 "use client";
 
-// OpenAI-powered features: the "Ask Boardmarkie" assistant (GPT-4o) and DALL·E 3
+// OpenAI-powered features: the "Ask Boardmarkie" assistant (GPT-4o) and gpt-image-1
 // image generation. OpenAI's API does not send CORS headers, so — unlike the
 // Anthropic flow — these can't run straight from the browser; they go through
 // the same small Vercel proxy used for images. The proxy URL in Settings
@@ -8,12 +8,12 @@
 // OpenAI key is bring-your-own: stored in this browser and sent per request to
 // your own proxy.
 
-import { getImageConfig, getOpenAIKey } from "./storage";
+import { getImageConfig, getImageQuality, getOpenAIKey } from "./storage";
 
 export const CHAT_MODEL = "gpt-4o";
 
 export const NO_OPENAI_SETUP =
-  "Add your OpenAI key in Settings (and your image proxy URL) to use Ask Boardmarkie and DALL·E 3.";
+  "Add your OpenAI key in Settings (and your image proxy URL) to use Ask Boardmarkie and OpenAI image generation.";
 
 function err(message: string, status?: number): Error & { status?: number } {
   const e = new Error(message) as Error & { status?: number };
@@ -131,27 +131,31 @@ export async function chatComplete(messages: ChatMessage[], tools?: ChatTool[]):
 
 type AspectRatio = "1:1" | "3:4" | "4:3" | "9:16" | "16:9";
 
-/** Generate an image with DALL·E 3 via the proxy. Resolves to a `data:` URL. */
+// Map the user's image-quality setting to gpt-image-1's quality tiers.
+const GPT_IMAGE_QUALITY: Record<string, string> = { fast: "low", standard: "medium", ultra: "high" };
+
+/** Generate an image with OpenAI's gpt-image-1 via the proxy. Resolves to a `data:` URL. */
 export async function generateOpenAIImage(
   prompt: string,
   aspectRatio: AspectRatio = "16:9",
 ): Promise<string> {
   const apiKey = requireOpenAIKey();
 
-  // DALL·E 3 only supports these three sizes.
+  // gpt-image-1 sizes: square, landscape, or portrait.
   const size =
     aspectRatio === "9:16" || aspectRatio === "3:4"
-      ? "1024x1792"
+      ? "1024x1536"
       : aspectRatio === "1:1"
         ? "1024x1024"
-        : "1792x1024";
+        : "1536x1024";
+  const quality = GPT_IMAGE_QUALITY[getImageQuality()] ?? "medium";
 
   let res: Response;
   try {
     res = await fetch(endpoint("openai-image"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ apiKey, prompt, size }),
+      body: JSON.stringify({ apiKey, prompt, size, quality }),
     });
   } catch {
     throw err("Couldn't reach the image proxy. Check the URL in Settings.");

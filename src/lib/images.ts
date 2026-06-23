@@ -44,7 +44,7 @@ export interface ImageOptions {
 }
 
 /** Can we generate images with the current settings? Imagen needs the proxy;
- *  DALL·E 3 needs the proxy plus an OpenAI key. */
+ *  OpenAI (gpt-image-1) needs the proxy plus an OpenAI key. */
 export function canGenerateImages(): boolean {
   if (!getImageConfig().proxyUrl) return false;
   if (getImageProvider() === "dalle") return !!getOpenAIKey();
@@ -52,7 +52,7 @@ export function canGenerateImages(): boolean {
 }
 
 /**
- * Generate an illustration from a text prompt. Routes to OpenAI's DALL·E 3 or
+ * Generate an illustration from a text prompt. Routes to OpenAI's gpt-image-1 or
  * Google's Imagen (via the proxy) per the user's chosen engine. Resolves to a
  * `data:` URL.
  */

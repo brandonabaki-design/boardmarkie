@@ -103,7 +103,7 @@ const KEY_IMG_PROVIDER = "boardmarkie.imageProvider";
 export type ImageProvider = "imagen" | "dalle";
 
 // Which engine generates AI illustrations: Google Imagen (default, via the
-// proxy) or OpenAI's DALL·E 3 (also via the proxy, using the OpenAI key below).
+// proxy) or OpenAI's gpt-image-1 (also via the proxy, using the OpenAI key below).
 export function getImageProvider(): ImageProvider {
   if (typeof window === "undefined") return "imagen";
   return window.localStorage.getItem(KEY_IMG_PROVIDER) === "dalle" ? "dalle" : "imagen";
@@ -116,7 +116,7 @@ export function setImageProvider(value: ImageProvider): void {
 
 const KEY_OPENAI = "boardmarkie.openaiKey";
 
-// Bring-your-own OpenAI key. Powers Ask Boardmarkie (GPT-4o) and DALL·E 3 image
+// Bring-your-own OpenAI key. Powers Ask Boardmarkie (GPT-4o) and gpt-image-1 image
 // generation. Stored only in this browser; sent per request to the user's proxy.
 export function getOpenAIKey(): string {
   if (typeof window === "undefined") return "";

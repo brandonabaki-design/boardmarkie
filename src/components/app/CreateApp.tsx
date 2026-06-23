@@ -122,7 +122,7 @@ export function CreateApp() {
       const canImg = canGenerateImages();
       if (req.autoImages && !canImg) {
         setError(
-          "Lesson created. To auto-generate images, set up an engine in Settings → Images: add your image proxy + Gemini key (Imagen), or switch to DALL·E 3 and add your OpenAI key.",
+          "Lesson created. To auto-generate images, set up an engine in Settings → Images: add your image proxy + Gemini key (Imagen), or switch to OpenAI (GPT Image) and add your OpenAI key.",
         );
         setSettingsOpen(true);
       }

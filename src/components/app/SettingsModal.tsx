@@ -244,7 +244,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
             <div>
               <p className="text-sm text-muted">
                 An OpenAI key powers <span className="font-semibold text-ink">Ask Boardmarkie</span> (the{" "}
-                {CHAT_MODEL} chat assistant) and <span className="font-semibold text-ink">DALL·E 3</span> image
+                {CHAT_MODEL} chat assistant) and <span className="font-semibold text-ink">GPT Image</span>{" "}
                 generation. It&apos;s stored only in this browser and routed through your image proxy — OpenAI
                 blocks direct browser calls — so you&apos;ll also need a proxy URL set in the Images tab.
               </p>
@@ -291,8 +291,8 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
               <div className="mt-4 flex items-start gap-2 rounded-xl border border-line bg-paper px-3.5 py-3 text-xs text-muted">
                 <Sparkles size={15} className="mt-0.5 shrink-0 text-brand-600" />
-                To draw slide illustrations with DALL·E 3, switch the image engine to DALL·E 3 in the Images
-                tab.
+                To draw slide illustrations with OpenAI GPT Image, switch the image engine to GPT Image in the
+                Images tab.
               </div>
             </div>
           )}
@@ -307,7 +307,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                 {(
                   [
                     ["imagen", "Imagen (Google)"],
-                    ["dalle", "DALL·E 3 (OpenAI)"],
+                    ["dalle", "GPT Image (OpenAI)"],
                   ] as const
                 ).map(([v, label]) => (
                   <button
@@ -324,7 +324,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
               </div>
               <p className="mt-1.5 text-xs text-muted">
                 {imgProvider === "dalle"
-                  ? "DALL·E 3 uses your OpenAI key (OpenAI tab), routed through the proxy below. Diagrams are still drawn by Claude."
+                  ? "GPT Image uses your OpenAI key (OpenAI tab), routed through the proxy below. Diagrams are still drawn by Claude."
                   : "Google Imagen runs through the proxy below. Diagrams are drawn by Claude and need nothing extra."}
               </p>
 

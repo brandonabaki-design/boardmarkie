@@ -1,17 +1,22 @@
-// Vercel serverless function — OpenAI image proxy (DALL·E 3) for Boardmarkie.
+// Vercel serverless function — OpenAI image proxy for Boardmarkie.
 //
-// OpenAI's API does not send CORS headers, so the browser can't call it
-// directly; image generation goes through this proxy instead. Same key model as
-// the chat/image proxies: bring-your-own per request, or a shared OPENAI_API_KEY
-// env var on the project.
+// Uses gpt-image-1 (DALL·E 3 was retired in March 2026; its `style` /
+// `response_format` params no longer exist). OpenAI's API has no CORS, so
+// browser image generation goes through this proxy. Key model: bring-your-own
+// per request, or a shared OPENAI_API_KEY env var on the project.
 //
-// Debug: POST { prompt, apiKey?, size?, quality? } -> { image: dataUrl }
+// gpt-image-1 always returns base64 (data[0].b64_json) — no response_format
+// needed — and uses quality low|medium|high|auto and sizes 1024x1024,
+// 1536x1024, 1024x1536, auto.
+//
+// Debug: GET -> capability marker; POST { prompt, apiKey?, size?, quality? } -> { image }
 
 export const config = { maxDuration: 60 };
 
 const ALLOW_ORIGIN = "*";
-const DEFAULT_MODEL = "dall-e-3";
-const ALLOWED_SIZES = new Set(["1024x1024", "1792x1024", "1024x1792"]);
+const DEFAULT_MODEL = "gpt-image-1";
+const ALLOWED_SIZES = new Set(["1024x1024", "1536x1024", "1024x1536", "auto"]);
+const ALLOWED_QUALITY = new Set(["low", "medium", "high", "auto"]);
 
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Origin", ALLOW_ORIGIN);
@@ -24,7 +29,7 @@ export default async function handler(req, res) {
   setCors(res);
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method === "GET") {
-    return res.status(200).json({ ok: true, endpoint: "openai-image", model: "dall-e-3" });
+    return res.status(200).json({ ok: true, endpoint: "openai-image", model: DEFAULT_MODEL });
   }
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST." });
 
@@ -48,26 +53,17 @@ export default async function handler(req, res) {
       .json({ error: "No OpenAI API key. Add one in Settings, or set OPENAI_API_KEY on the project." });
   }
 
-  const size = ALLOWED_SIZES.has(payload.size) ? payload.size : "1792x1024";
-  const quality = payload.quality === "hd" ? "hd" : "standard";
-  // "natural" is less stylised than the default "vivid" — better for clean,
-  // accurate educational illustrations.
-  const style = payload.style === "vivid" ? "vivid" : "natural";
+  const model =
+    typeof payload.model === "string" && payload.model.trim() ? payload.model.trim() : DEFAULT_MODEL;
+  const size = ALLOWED_SIZES.has(payload.size) ? payload.size : "1536x1024";
+  const quality = ALLOWED_QUALITY.has(payload.quality) ? payload.quality : "medium";
 
   let upstream;
   try {
     upstream = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: DEFAULT_MODEL,
-        prompt,
-        n: 1,
-        size,
-        quality,
-        style,
-        response_format: "b64_json",
-      }),
+      body: JSON.stringify({ model, prompt, n: 1, size, quality }),
     });
   } catch {
     return res.status(502).json({ error: "Could not reach OpenAI." });
