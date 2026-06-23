@@ -34,7 +34,8 @@ Keep every slide uncluttered and skimmable — it must fit on screen without cro
 
 Emphasise only the most important word or two per slide using markdown: wrap key terms in **double asterisks** for bold and *single asterisks* for italics. Use it sparingly — genuinely key words only, never whole sentences.
 
-For most slides, suggest a vivid imagePrompt describing a helpful illustration, a concise imageAlt, and an imageQuery of 2-4 simple keywords for finding a stock photo or GIF (e.g. "water cycle", "cell division", "ancient Rome").
+For most slides, suggest a vivid imagePrompt describing a helpful illustration, a concise imageAlt, and an imageQuery of 2-4 simple keywords for finding a stock PHOTO (e.g. "water cycle", "cell division", "ancient Rome").
+Also set gifQuery ONLY when a short looping GIF would genuinely help — and make it a 1-3 word CONCRETE, VISUAL subject that a mainstream GIF site actually has (real things, animals, actions, weather, space, reactions: e.g. "volcano erupting", "rain", "beating heart", "galaxy", "celebration"). Leave gifQuery as an empty string for abstract points, detailed processes, diagrams, or when a still photo is better — never force a GIF, and use only a few across the whole lesson.
 Always include practical teacherNotes on every slide.
 
 Curriculum standards (the "standards" field): identify the specific official standard(s) this lesson aligns to for the given subject, year group/grade and curriculum/region — each as its official code plus a short description (e.g. "NGSS 5-PS1-1: …", "CCSS.MATH.CONTENT.4.NF.B.3: …", "National Curriculum KS2 Science: …", "UAE MOE Science Gr.3: …"). Use the framework that matches the region. Only cite standards you are confident genuinely exist; if unsure of an exact code, give the standard's substance and framework without inventing a precise code. Give the 1-4 most relevant. If standards are not requested, leave the field as an empty array.

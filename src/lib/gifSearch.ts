@@ -42,7 +42,8 @@ export async function searchGifs(query: string): Promise<GifResult[]> {
   u.searchParams.set("q", q);
   u.searchParams.set("limit", "24");
   u.searchParams.set("rating", "g"); // classroom-safe
-  u.searchParams.set("bundle", "messaging_non_clips");
+  u.searchParams.set("lang", "en");
+  u.searchParams.set("bundle", "messaging_non_clips"); // renderable, non-video gifs
 
   let res: Response;
   try {

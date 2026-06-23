@@ -58,7 +58,8 @@ export interface Slide {
   quiz?: QuizQuestion[];
   imagePrompt?: string;
   imageAlt?: string;
-  imageQuery?: string; // short keywords for stock-image / GIF search
+  imageQuery?: string; // short keywords for stock-image search
+  gifQuery?: string; // concrete, visual keywords for GIF search (when a GIF fits)
   imageUrl?: string; // generated illustration or searched image/GIF URL
   diagramSvg?: string; // Claude-generated, sanitized SVG diagram markup
   youtube?: { title: string; searchQuery: string };

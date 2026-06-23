@@ -121,7 +121,12 @@ const slideSchema: JSONSchema = {
     imageQuery: {
       type: "string",
       description:
-        "2-4 plain keywords to find a stock photo or GIF for this slide via image/GIF search (e.g. 'water cycle', 'volcano eruption', 'cheering students'). Empty string if the slide needs no image.",
+        "2-4 plain keywords to find a stock PHOTO for this slide via image search (e.g. 'water cycle', 'volcano eruption', 'cheering students'). Empty string if the slide needs no image.",
+    },
+    gifQuery: {
+      type: "string",
+      description:
+        "1-3 word CONCRETE, VISUAL subject for a fun looping GIF, chosen so a mainstream GIF site (Giphy) is likely to actually have a good match — real-world things, animals, actions, weather, space, or reactions (e.g. 'volcano erupting', 'rain', 'beating heart', 'galaxy', 'celebration', 'thinking'). Use ONLY where a short GIF genuinely adds energy or illustrates the idea; LEAVE EMPTY ('') for abstract points, detailed processes, diagrams, or when a still photo is clearly better. Do NOT force a GIF onto every slide — a few per lesson at most.",
     },
     youtube: {
       type: "object",
@@ -153,6 +158,7 @@ const slideSchema: JSONSchema = {
     "imagePrompt",
     "imageAlt",
     "imageQuery",
+    "gifQuery",
     "youtube",
   ],
 };

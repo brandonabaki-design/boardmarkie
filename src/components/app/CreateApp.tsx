@@ -213,7 +213,7 @@ export function CreateApp() {
   // Embeds the result URL directly; the same concurrent-pool pattern keeps it fast.
   const autoSearchMedia = async (lesson: Lesson, kind: "search" | "gif") => {
     const targets = lesson.slides.filter(
-      (s) => (s.imageQuery || s.imageAlt || s.imagePrompt) && !s.imageUrl && !s.youtube?.searchQuery,
+      (s) => (s.gifQuery || s.imageQuery || s.imageAlt || s.imagePrompt) && !s.imageUrl && !s.youtube?.searchQuery,
     );
     if (!targets.length) return lesson;
     setImageProgress({ done: 0, total: targets.length });
@@ -229,12 +229,19 @@ export function CreateApp() {
         if (i >= targets.length) break;
         const t = targets[i];
         try {
-          const results = kind === "gif" ? await searchGifs(slideQuery(t)) : await searchImages(slideQuery(t));
-          const top = results[0];
-          if (top?.url) {
+          let url: string | undefined;
+          const gq = (t.gifQuery || "").trim();
+          // In GIF mode, embed a GIF only where the model chose a concrete
+          // gifQuery; otherwise fall back to a relevant photo (never a random GIF).
+          if (kind === "gif" && gq) url = (await searchGifs(gq))[0]?.url;
+          if (!url) {
+            const iq = slideQuery(t);
+            if (iq) url = (await searchImages(iq))[0]?.url;
+          }
+          if (url) {
             const cur = working.slides.find((s) => s.id === t.id) ?? t;
-            const withImage = { ...cur, imageUrl: top.url };
-            working = patchSlide(working, t.id, { imageUrl: top.url, elements: slideToElements(withImage) });
+            const withImage = { ...cur, imageUrl: url };
+            working = patchSlide(working, t.id, { imageUrl: url, elements: slideToElements(withImage) });
             setCurrent(working);
             saveArtifact(working);
           }

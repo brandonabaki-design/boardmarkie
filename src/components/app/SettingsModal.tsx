@@ -335,7 +335,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                 {autoMedia === "generate"
                   ? "AI-drawn illustrations via the engine below — most polished, but costs per image."
                   : autoMedia === "gif"
-                    ? "Animated GIFs from Giphy (needs a Giphy key below) — free and fun."
+                    ? "Animated GIFs (needs a Giphy key below) where they genuinely fit, with relevant photos on the other slides — free and fun."
                     : "Real photos & illustrations from free web search — free, no setup needed."}
               </p>
 
