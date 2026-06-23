@@ -47,6 +47,21 @@ export function openAiReady(): boolean {
   return !!getOpenAIKey() && !!getImageConfig().proxyUrl;
 }
 
+// Read the OpenAI key and fail fast with a clear message on the common mistake
+// of pasting an Anthropic key (sk-ant-…) into the OpenAI field — that key would
+// otherwise be sent to OpenAI and bounce back as a confusing 401.
+function requireOpenAIKey(): string {
+  const key = getOpenAIKey();
+  if (!key) throw err(NO_OPENAI_SETUP, 401);
+  if (key.startsWith("sk-ant-")) {
+    throw err(
+      "That's an Anthropic key (sk-ant-…) in the OpenAI tab. Paste your OpenAI key (it starts with sk-proj-… or sk-…) in Settings → OpenAI, and keep the sk-ant-… key in the Claude tab.",
+      401,
+    );
+  }
+  return key;
+}
+
 function endpoint(name: "openai-chat" | "openai-image"): string {
   const { proxyUrl } = getImageConfig();
   if (!proxyUrl) throw err(NO_OPENAI_SETUP, 401);
@@ -79,8 +94,7 @@ export interface ChatResult {
  * decided to make (e.g. to edit the open presentation).
  */
 export async function chatComplete(messages: ChatMessage[], tools?: ChatTool[]): Promise<ChatResult> {
-  const apiKey = getOpenAIKey();
-  if (!apiKey) throw err(NO_OPENAI_SETUP, 401);
+  const apiKey = requireOpenAIKey();
 
   let res: Response;
   try {
@@ -122,8 +136,7 @@ export async function generateOpenAIImage(
   prompt: string,
   aspectRatio: AspectRatio = "16:9",
 ): Promise<string> {
-  const apiKey = getOpenAIKey();
-  if (!apiKey) throw err(NO_OPENAI_SETUP, 401);
+  const apiKey = requireOpenAIKey();
 
   // DALL·E 3 only supports these three sizes.
   const size =
