@@ -340,27 +340,47 @@ function ElementContent({
         src={el.src}
         alt={el.alt || ""}
         draggable={false}
-        style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: `${el.radius ?? 4}%`, opacity: (el.opacity ?? 100) / 100 }}
+        // "contain" shows the whole image (never cropped/cut); boxes are sized ~16:9 to match.
+        style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: `${el.radius ?? 4}%`, opacity: (el.opacity ?? 100) / 100 }}
       />
     );
   }
+  // No image yet: a subtle drop target in the editor; nothing when presenting/exporting.
+  if (!editable) return null;
   return (
     <div
       style={{ width: "100%", height: "100%", borderRadius: 8 }}
-      className={`grid place-items-center border-2 border-dashed border-line bg-paper/60 text-muted ${editable ? "" : ""}`}
+      className="grid place-items-center border-2 border-dashed border-line bg-paper/60 text-muted"
     >
       <span style={{ fontSize: "4cqh" }}>Image</span>
     </div>
   );
 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** Render light markdown (**bold**, *italic*) to safe inline HTML for display. */
+export function inlineHtml(text: string): string {
+  return escapeHtml(text)
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*\n]+)\*/g, "<em>$1</em>");
+}
+
 function TextBox({ el, editing, onCommit }: { el: TextElement; editing: boolean; onCommit: (t: string) => void }) {
   const ref = useRef<HTMLDivElement>(null);
 
+  // Editing → show raw text (with markdown markers); not editing → rendered bold/italic.
   useEffect(() => {
     const node = ref.current;
-    if (node && node.textContent !== el.text) node.textContent = el.text;
-  }, [el.text]);
+    if (!node) return;
+    if (editing) {
+      if (node.textContent !== el.text) node.textContent = el.text;
+    } else {
+      node.innerHTML = inlineHtml(el.text);
+    }
+  }, [editing, el.text]);
 
   useEffect(() => {
     if (editing && ref.current) {

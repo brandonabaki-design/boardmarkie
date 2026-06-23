@@ -133,14 +133,14 @@ function bodyText(slide: Slide): string {
   const lines: string[] = [];
   if (slide.body) lines.push(slide.body);
   for (const b of slide.bullets ?? []) lines.push(`•  ${b}`);
-  for (const v of slide.vocabulary ?? []) lines.push(`${v.term}: ${v.definition}`);
+  for (const v of slide.vocabulary ?? []) lines.push(`**${v.term}:** ${v.definition}`);
   if (slide.activity) {
-    lines.push(slide.activity.title || "Activity");
+    lines.push(`**${slide.activity.title || "Activity"}**`);
     if (slide.activity.instructions) lines.push(slide.activity.instructions);
   }
   for (const q of slide.discussionQuestions ?? []) lines.push(`•  ${q}`);
   for (const q of slide.quiz ?? []) {
-    lines.push(q.question);
+    lines.push(`**${q.question}**`);
     (q.options ?? []).forEach((o, i) => lines.push(`    ${String.fromCharCode(97 + i)})  ${o}`));
   }
   return lines.join("\n");
@@ -175,14 +175,17 @@ function visualElementFrom(v: SlideVisual, box: Box): CanvasElement {
  * content never overflows or gets clipped. Approximate but conservative.
  */
 export function fitFontSize(text: string, wPct: number, hPct: number, max = 4, min = 1.7): number {
-  const W = Math.max(4, wPct - 3); // allow for padding
-  const H = Math.max(4, hPct - 3);
+  const W = Math.max(4, wPct - 4); // allow for padding
+  const H = Math.max(4, hPct - 4);
   const lines = text.split("\n");
   for (let f = max; f >= min; f -= 0.1) {
-    const charsPerLine = Math.max(1, Math.floor(W / (0.3 * f)));
+    const charsPerLine = Math.max(1, Math.floor(W / (0.32 * f)));
     let rows = 0;
-    for (const ln of lines) rows += Math.max(1, Math.ceil((ln.trim().length || 1) / charsPerLine));
-    if (rows * (1.3 * f) <= H) return Math.round(f * 10) / 10;
+    for (const ln of lines) {
+      const len = ln.replace(/\*/g, "").trim().length || 1; // ignore markdown markers
+      rows += Math.max(1, Math.ceil(len / charsPerLine));
+    }
+    if (rows * (1.35 * f) <= H) return Math.round(f * 10) / 10;
   }
   return min;
 }
@@ -230,7 +233,7 @@ export function slideToElements(slide: Slide, extraVisual?: SlideVisual): Canvas
           }),
         );
       }
-      els.push(visualElementFrom(visual, { x: 54, y: 8, w: 40, h: 84, z: z++ }));
+      els.push(visualElementFrom(visual, { x: 52, y: 28, w: 42, h: 42, z: z++ }));
     } else {
       els.push(
         textElement({
@@ -302,7 +305,9 @@ export function slideToElements(slide: Slide, extraVisual?: SlideVisual): Canvas
     if (body) {
       els.push(textElement({ text: body, x: 6, y: top, w: 48, h, fontSize: fitFontSize(body, 48, h, 3.4, 1.7), z: z++ }));
     }
-    els.push(visualElementFrom(visual, { x: 57, y: top, w: 37, h: Math.min(62, h), z: z++ }));
+    // Square %-box ≈ 16:9 real aspect, so a generated 16:9 image fills it exactly.
+    const vh = Math.min(37, h);
+    els.push(visualElementFrom(visual, { x: 57, y: top + (h - vh) / 2, w: 37, h: vh, z: z++ }));
   } else if (body) {
     const lines = body.split("\n");
     const dense = lines.length > 6 || body.length > 360;

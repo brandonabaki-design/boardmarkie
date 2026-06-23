@@ -32,6 +32,8 @@ Follow this structure:
 
 Keep every slide uncluttered and skimmable — it must fit on screen without crowding. Hard limits per slide: at most ~5 short bullet points OR ~5 vocabulary terms, and keep each point/definition to roughly 12 words. If there is more to cover, split it across additional slides rather than overfilling one. Put extension/differentiation ideas, stretch tasks, model answers, and extra detail in teacherNotes — never in the on-slide body. One idea per slide; prefer more slides over dense ones.
 
+Emphasise only the most important word or two per slide using markdown: wrap key terms in **double asterisks** for bold and *single asterisks* for italics. Use it sparingly — genuinely key words only, never whole sentences.
+
 For most slides, suggest a vivid imagePrompt describing a helpful illustration, plus concise imageAlt.
 Always include practical teacherNotes on every slide.
 

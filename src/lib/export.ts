@@ -109,6 +109,44 @@ async function ytThumb(id: string): Promise<string | null> {
 
 const hex = (c?: string, fallback = "16181d") => (c ?? `#${fallback}`).replace("#", "");
 
+const stripMd = (s: string) => s.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/\*([^*]+)\*/g, "$1");
+
+// Split a line into runs by **bold** / *italic* markdown.
+function mdRuns(line: string): { text: string; bold?: boolean; italic?: boolean }[] {
+  const runs: { text: string; bold?: boolean; italic?: boolean }[] = [];
+  const re = /(\*\*([^*]+)\*\*|\*([^*]+)\*)/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(line))) {
+    if (m.index > last) runs.push({ text: line.slice(last, m.index) });
+    if (m[2] != null) runs.push({ text: m[2], bold: true });
+    else runs.push({ text: m[3] ?? "", italic: true });
+    last = re.lastIndex;
+  }
+  if (last < line.length) runs.push({ text: line.slice(last) });
+  return runs.length ? runs : [{ text: line }];
+}
+
+// Build pptxgenjs text runs (bold/italic per markdown) preserving line breaks.
+function mdParas(text: string, bold: boolean, italic: boolean) {
+  const out: { text: string; options: Record<string, unknown> }[] = [];
+  const lines = text.split("\n");
+  lines.forEach((line, li) => {
+    const runs = mdRuns(line);
+    runs.forEach((r, ri) => {
+      out.push({
+        text: r.text,
+        options: {
+          bold: bold || !!r.bold,
+          italic: italic || !!r.italic,
+          breakLine: ri === runs.length - 1 && li < lines.length - 1,
+        },
+      });
+    });
+  });
+  return out as never;
+}
+
 // ---- PowerPoint: render the slide canvas (elements) natively ----
 
 export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
@@ -134,11 +172,9 @@ export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
 
       if (el.type === "text") {
         if (!el.text.trim()) continue;
-        s.addText(el.text, {
+        s.addText(mdParas(el.text, !!el.bold, !!el.italic), {
           ...box,
           fontSize: Math.max(6, Math.round((el.fontSize / 100) * 540)), // cqh → pt (7.5in = 540pt)
-          bold: !!el.bold,
-          italic: !!el.italic,
           align: el.align ?? "left",
           valign: "top",
           color: hex(el.color),
@@ -153,7 +189,8 @@ export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
       } else if (el.type === "image") {
         const data = await imageData(el);
         if (data) {
-          s.addImage({ data, ...box, sizing: { type: el.svg ? "contain" : "cover", w: box.w, h: box.h } });
+          // "contain" shows the whole image (never cropped) — boxes are sized ~16:9 to match.
+          s.addImage({ data, ...box, sizing: { type: "contain", w: box.w, h: box.h } });
         }
       } else if (el.type === "youtube") {
         const url = `https://www.youtube.com/watch?v=${el.videoId}`;
@@ -196,10 +233,10 @@ export async function exportLessonToDocx(lesson: Lesson): Promise<void> {
   const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import("docx");
   const kids: Docx.Paragraph[] = [];
   const para = (text: string, opts: RunOpts = {}) =>
-    new Paragraph({ children: [new TextRun({ text, ...opts })] });
-  const bullet = (text: string, level = 0) => new Paragraph({ text, bullet: { level } });
+    new Paragraph({ children: [new TextRun({ text: stripMd(text), ...opts })] });
+  const bullet = (text: string, level = 0) => new Paragraph({ text: stripMd(text), bullet: { level } });
   const term = (t: string, def: string) =>
-    new Paragraph({ children: [new TextRun({ text: `${t}: `, bold: true }), new TextRun(def)] });
+    new Paragraph({ children: [new TextRun({ text: `${stripMd(t)}: `, bold: true }), new TextRun(stripMd(def))] });
 
   kids.push(new Paragraph({ text: lesson.meta.title, heading: HeadingLevel.TITLE }));
   kids.push(
