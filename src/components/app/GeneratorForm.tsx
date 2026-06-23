@@ -12,6 +12,13 @@ const EXAMPLES: Record<GenerationMode, string[]> = {
   worksheet: ["Times tables practice", "Punctuation: apostrophes", "Balancing equations", "Map skills"],
 };
 
+const READING_LEVELS = [
+  "At grade level",
+  "Below grade level (simpler)",
+  "Above grade level (stretch)",
+  "Much simpler (SEN / EAL support)",
+];
+
 export function GeneratorForm({
   initialMode = "lesson",
   loading,
@@ -26,6 +33,7 @@ export function GeneratorForm({
   const [subject, setSubject] = useState(SUBJECTS[2]);
   const [regionId, setRegionId] = useState(REGIONS[0].id);
   const [yearGroup, setYearGroup] = useState(REGIONS[0].yearGroups[6]);
+  const [readingLevel, setReadingLevel] = useState(READING_LEVELS[0]);
   const [tone, setTone] = useState(TONES[0]);
   const [notes, setNotes] = useState("");
   const [durationMinutes, setDuration] = useState(60);
@@ -53,6 +61,7 @@ export function GeneratorForm({
       subject,
       yearGroup,
       region: region.label,
+      readingLevel,
       tone,
       notes: notes.trim() || undefined,
       durationMinutes,
@@ -146,6 +155,14 @@ export function GeneratorForm({
               </Select>
             </Field>
           </div>
+
+          <Field label="Reading level" hint="adjusts vocabulary & scaffolding">
+            <Select value={readingLevel} onChange={(e) => setReadingLevel(e.target.value)}>
+              {READING_LEVELS.map((r) => (
+                <option key={r}>{r}</option>
+              ))}
+            </Select>
+          </Field>
 
           {mode === "lesson" && (
             <div className="grid gap-4 sm:grid-cols-2">

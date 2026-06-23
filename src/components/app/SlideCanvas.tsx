@@ -41,6 +41,7 @@ export function SlideCanvas({
   background = "#ffffff",
   ink = INK,
   muted = MUTED,
+  displayFont = "var(--font-bricolage)",
   editable = false,
   interactive = false,
   selectedId = null,
@@ -53,6 +54,7 @@ export function SlideCanvas({
   background?: string;
   ink?: string; // default text colour (from the deck theme)
   muted?: string; // secondary text colour (from the deck theme)
+  displayFont?: string; // heading/title font family (from the deck theme)
   editable?: boolean;
   interactive?: boolean; // allow iframe playback (Present mode)
   selectedId?: string | null;
@@ -221,6 +223,7 @@ export function SlideCanvas({
               interactive={interactive}
               ink={ink}
               muted={muted}
+              displayFont={displayFont}
               onCommitText={(t) => {
                 update(el.id, { text: t });
                 setEditingId(null);
@@ -283,6 +286,7 @@ function ElementContent({
   interactive,
   ink,
   muted,
+  displayFont,
   onCommitText,
 }: {
   el: CanvasElement;
@@ -291,10 +295,11 @@ function ElementContent({
   interactive: boolean;
   ink: string;
   muted: string;
+  displayFont: string;
   onCommitText: (text: string) => void;
 }) {
   if (el.type === "text") {
-    return <TextBox el={el} editing={editing} onCommit={onCommitText} ink={ink} muted={muted} />;
+    return <TextBox el={el} editing={editing} onCommit={onCommitText} ink={ink} muted={muted} displayFont={displayFont} />;
   }
   if (el.type === "shape") {
     return (
@@ -407,12 +412,14 @@ function TextBox({
   onCommit,
   ink = INK,
   muted = MUTED,
+  displayFont = "var(--font-bricolage)",
 }: {
   el: TextElement;
   editing: boolean;
   onCommit: (t: string) => void;
   ink?: string;
   muted?: string;
+  displayFont?: string;
 }) {
   // Map the canvas default ink/muted to the deck theme; explicit user colours stay.
   const color = !el.color || el.color === INK ? ink : el.color === MUTED ? muted : el.color;
@@ -466,6 +473,7 @@ function TextBox({
         fontStyle: el.italic ? "italic" : "normal",
         textAlign: el.align ?? "left",
         color,
+        fontFamily: el.font === "display" ? displayFont : undefined,
         letterSpacing: el.font === "display" ? "-0.01em" : undefined,
       }}
     />

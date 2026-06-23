@@ -9,6 +9,8 @@ function context(req: GenerateRequest): string {
     `Year group / grade: ${req.yearGroup}`,
     `Curriculum / region: ${req.region}`,
   ];
+  if (req.readingLevel)
+    lines.push(`Reading level: ${req.readingLevel} — match vocabulary, sentence length and scaffolding to this.`);
   if (req.tone) lines.push(`Tone: ${req.tone}`);
   if (req.notes) lines.push(`Extra teacher instructions: ${req.notes}`);
   return lines.join("\n");

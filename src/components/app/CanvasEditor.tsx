@@ -345,6 +345,7 @@ export function CanvasEditor({
               background={slide.background ?? theme.bg}
               ink={theme.ink}
               muted={theme.muted}
+              displayFont={theme.displayFont}
               editable
               selectedId={selectedId}
               onSelect={setSelectedId}
@@ -505,7 +506,7 @@ export function CanvasEditor({
                     {i + 1}
                   </span>
                   <div className="pointer-events-none min-w-0 flex-1 overflow-hidden rounded-r-md">
-                    <SlideCanvas elements={thumb.elements ?? []} background={s.background ?? theme.bg} ink={theme.ink} muted={theme.muted} />
+                    <SlideCanvas elements={thumb.elements ?? []} background={s.background ?? theme.bg} ink={theme.ink} muted={theme.muted} displayFont={theme.displayFont} />
                   </div>
                 </div>
               );
@@ -595,7 +596,7 @@ function PrintDeck({ lesson }: { lesson: Lesson }) {
         const slide = ensureElements(s);
         return (
           <div key={s.id} className="print-page">
-            <SlideCanvas elements={slide.elements ?? []} background={s.background ?? theme.bg} ink={theme.ink} muted={theme.muted} />
+            <SlideCanvas elements={slide.elements ?? []} background={s.background ?? theme.bg} ink={theme.ink} muted={theme.muted} displayFont={theme.displayFont} />
           </div>
         );
       })}

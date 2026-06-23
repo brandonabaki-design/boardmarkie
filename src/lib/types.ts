@@ -206,6 +206,7 @@ export interface GenerateRequest {
   subject: string;
   yearGroup: string;
   region: string;
+  readingLevel?: string; // e.g. "At grade level", "Below grade level (simpler)"
   durationMinutes?: number;
   slideCount?: number;
   lessonCount?: number;
