@@ -13,11 +13,13 @@ import {
   worksheetUserPrompt,
   editSystemPrompt,
   editUserPrompt,
+  editWorksheetSystemPrompt,
+  editWorksheetUserPrompt,
   diagramSystemPrompt,
   diagramUserPrompt,
 } from "./prompts";
 import { runStructured, toLesson, toSeries, toWorksheet } from "./generate";
-import type { Artifact, EditRequest, GenerateRequest, Lesson } from "./types";
+import type { Artifact, EditRequest, GenerateRequest, Lesson, Worksheet } from "./types";
 
 function err(message: string, status?: number): Error & { status?: number } {
   const e = new Error(message) as Error & { status?: number };
@@ -127,6 +129,40 @@ export async function editLesson(input: EditRequest): Promise<Lesson> {
   const updated = toLesson(raw as never, req);
   updated.id = lesson.id;
   updated.createdAt = lesson.createdAt;
+  return updated;
+}
+
+export async function editWorksheet(input: { worksheet: Worksheet; instruction: string }): Promise<Worksheet> {
+  const client = browserClient();
+  const { worksheet, instruction } = input;
+
+  const worksheetForModel = {
+    title: worksheet.meta.title,
+    instructions: worksheet.meta.instructions,
+    sections: worksheet.sections,
+  };
+
+  const req: GenerateRequest = {
+    mode: "worksheet",
+    topic: worksheet.meta.topic,
+    subject: worksheet.meta.subject,
+    yearGroup: worksheet.meta.yearGroup,
+    region: worksheet.meta.region,
+  };
+
+  const raw = await runStructured({
+    client,
+    system: editWorksheetSystemPrompt(),
+    user: editWorksheetUserPrompt(JSON.stringify(worksheetForModel), instruction),
+    schema: worksheetSchema,
+    maxTokens: 12000,
+    effort: "low",
+    model: getModel(),
+  });
+
+  const updated = toWorksheet(raw as never, req);
+  updated.id = worksheet.id;
+  updated.createdAt = worksheet.createdAt;
   return updated;
 }
 

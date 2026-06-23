@@ -14,10 +14,10 @@ import type {
   SeriesLesson,
   Slide,
 } from "@/lib/types";
-import { generateArtifact, editLesson } from "@/lib/client";
+import { generateArtifact, editLesson, editWorksheet } from "@/lib/client";
 import { generateImage, illustrationPrompt, canGenerateImages } from "@/lib/images";
 import { resolveYoutube } from "@/lib/youtube";
-import { ensureElements, slideToElements } from "@/lib/canvas";
+import { cid, ensureElements, slideToElements } from "@/lib/canvas";
 import { deleteArtifact, getArtifactFull, getImageConfig, getLibrary, saveArtifact } from "@/lib/storage";
 import { GeneratorForm } from "./GeneratorForm";
 import { GeneratingState } from "./GeneratingState";
@@ -40,6 +40,15 @@ function patchSlide(lesson: Lesson, slideId: string, patch: Partial<Slide>): Les
   return {
     ...lesson,
     slides: lesson.slides.map((s) => (s.id === slideId ? { ...s, ...patch } : s)),
+  };
+}
+
+// Clone a slide with fresh ids (slide + each element) for instant duplication.
+function duplicateSlide(slide: Slide): Slide {
+  return {
+    ...slide,
+    id: cid("sl"),
+    elements: slide.elements?.map((el) => ({ ...el, id: cid(el.type) })),
   };
 }
 
@@ -220,19 +229,60 @@ export function CreateApp() {
   // through the same Claude edit pipeline as the Improve buttons, record it in
   // undo history, and return a short confirmation for the chat.
   const askEdit = async (instruction: string, slideNumber?: number): Promise<string> => {
-    if (!current || current.kind !== "lesson") return "There's no lesson open to edit.";
-    const slide = slideNumber ? current.slides[slideNumber - 1] : undefined;
+    if (!current) return "There's nothing open to edit.";
     setEditing(true);
     try {
-      const updated = seedLesson(
-        await editLesson({ lesson: current, action: "rewrite", instruction, slideId: slide?.id }),
-        true,
-      );
-      commitLesson(updated);
-      return slide ? `✓ Updated slide ${slideNumber}.` : "✓ Done — updated the presentation.";
+      if (current.kind === "lesson") {
+        const slide = slideNumber ? current.slides[slideNumber - 1] : undefined;
+        const updated = seedLesson(
+          await editLesson({ lesson: current, action: "rewrite", instruction, slideId: slide?.id }),
+          true,
+        );
+        commitLesson(updated);
+        return slide ? `✓ Updated slide ${slideNumber}.` : "✓ Done — updated the presentation.";
+      }
+      if (current.kind === "worksheet") {
+        const updated = await editWorksheet({ worksheet: current, instruction });
+        setCurrent(updated);
+        saveArtifact(updated);
+        refresh();
+        return "✓ Done — updated the worksheet.";
+      }
+      return "This document type can't be edited from chat yet.";
     } finally {
       setEditing(false);
     }
+  };
+
+  // Instant structural slide ops (no model call) — undoable like other edits.
+  const askArrange = async (op: string, slideNumber: number, toPosition?: number): Promise<string> => {
+    if (!current || current.kind !== "lesson") return "There's no lesson open to rearrange.";
+    const n = current.slides.length;
+    const i = slideNumber - 1;
+    if (i < 0 || i >= n) return `There's no slide ${slideNumber} — the lesson has ${n}.`;
+    const slides = [...current.slides];
+
+    if (op === "delete") {
+      if (n <= 1) return "I can't delete the only slide.";
+      slides.splice(i, 1);
+      commitLesson({ ...current, slides });
+      return `✓ Deleted slide ${slideNumber}.`;
+    }
+    if (op === "duplicate") {
+      slides.splice(i + 1, 0, duplicateSlide(current.slides[i]));
+      commitLesson({ ...current, slides });
+      return `✓ Duplicated slide ${slideNumber}.`;
+    }
+    if (op === "move") {
+      let to = (toPosition ?? n) - 1;
+      to = Math.max(0, Math.min(n - 1, to));
+      if (to === i) return `Slide ${slideNumber} is already in that position.`;
+      const [m] = slides.splice(i, 1);
+      slides.splice(to, 0, m);
+      commitLesson({ ...current, slides });
+      return `✓ Moved slide ${slideNumber} to position ${to + 1}.`;
+    }
+    return "I didn't recognise that slide operation.";
   };
 
   const undo = () => {
@@ -422,7 +472,7 @@ export function CreateApp() {
 
       <AskBoardmarkie
         context={
-          current?.kind === "lesson"
+          current && (current.kind === "lesson" || current.kind === "worksheet")
             ? {
                 title: current.meta.title,
                 subject: current.meta.subject,
@@ -431,8 +481,16 @@ export function CreateApp() {
               }
             : undefined
         }
-        lesson={current?.kind === "lesson" ? (current as Lesson) : undefined}
+        editKind={
+          current?.kind === "lesson" ? "lesson" : current?.kind === "worksheet" ? "worksheet" : undefined
+        }
+        slides={
+          current?.kind === "lesson"
+            ? current.slides.map((s, i) => ({ number: i + 1, title: s.title }))
+            : undefined
+        }
         onEdit={askEdit}
+        onArrange={askArrange}
         onOpenSettings={() => setSettingsOpen(true)}
       />
 

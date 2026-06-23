@@ -3,21 +3,36 @@
 import { useEffect, useRef, useState } from "react";
 import { MessageCircle, X, Send, Sparkles, Settings as SettingsIcon, Eraser } from "lucide-react";
 import { chatComplete, openAiReady, CHAT_MODEL, type ChatMessage, type ChatTool } from "@/lib/openai";
-import { askBoardmarkieSystemPrompt, type AskContext } from "@/lib/prompts";
-import type { Lesson } from "@/lib/types";
+import { askBoardmarkieSystemPrompt, type AskContext, type AskEdit } from "@/lib/prompts";
 import { Spinner } from "./ui";
+
+type EditKind = "lesson" | "worksheet";
 
 interface UiMsg {
   role: "user" | "assistant";
   content: string;
 }
 
-const SUGGESTIONS = [
-  "Explain this topic in simple terms",
-  "Give me a 5-minute starter activity",
-  "Make slide 1 more engaging",
-  "Add a quick recap slide at the end",
-];
+const SUGGESTIONS: Record<"none" | EditKind, string[]> = {
+  none: [
+    "Explain a tricky topic simply",
+    "Give me a 5-minute starter activity",
+    "Write 3 exit-ticket questions",
+    "Ideas to differentiate for lower attainers",
+  ],
+  lesson: [
+    "Make slide 1 more engaging",
+    "Add a quick recap slide at the end",
+    "Simplify the whole lesson",
+    "Move the video slide to the front",
+  ],
+  worksheet: [
+    "Add 3 harder questions",
+    "Make question 2 multiple choice",
+    "Add a model answer to every question",
+    "Make it easier for lower attainers",
+  ],
+};
 
 // Tool GPT-4o can call to change the open presentation. Executed by the existing
 // Claude lesson-edit pipeline (reliable, schema-constrained) via `onEdit`.
@@ -51,15 +66,63 @@ const EDIT_TOOL: ChatTool = {
   },
 };
 
+// Structural slide ops are applied instantly in the app — no model call at all.
+const ARRANGE_TOOL: ChatTool = {
+  type: "function",
+  function: {
+    name: "arrange_slides",
+    description:
+      "Instantly reorder, delete, or duplicate a slide — purely structural, no rewriting. Prefer this over edit_presentation when the teacher only wants to change slide order or count.",
+    parameters: {
+      type: "object",
+      properties: {
+        op: { type: "string", enum: ["delete", "duplicate", "move"], description: "The structural operation." },
+        slideNumber: { type: "integer", description: "The 1-based slide to act on." },
+        toPosition: {
+          type: "integer",
+          description: "The 1-based destination position (required for 'move').",
+        },
+      },
+      required: ["op", "slideNumber"],
+      additionalProperties: false,
+    },
+  },
+};
+
+// Worksheet content edits, executed by the Claude worksheet-edit pipeline.
+const EDIT_WORKSHEET_TOOL: ChatTool = {
+  type: "function",
+  function: {
+    name: "edit_worksheet",
+    description:
+      "Edit the teacher's open worksheet (change, add, remove, reorder, or re-mark questions/sections, adjust difficulty, rewrite content). Use only for actual changes, not questions or advice.",
+    parameters: {
+      type: "object",
+      properties: {
+        instruction: {
+          type: "string",
+          description: "A precise, self-contained directive describing exactly what to change.",
+        },
+      },
+      required: ["instruction"],
+      additionalProperties: false,
+    },
+  },
+};
+
 export function AskBoardmarkie({
   context,
-  lesson,
+  editKind,
+  slides,
   onEdit,
+  onArrange,
   onOpenSettings,
 }: {
   context?: AskContext;
-  lesson?: Lesson;
+  editKind?: EditKind;
+  slides?: { number: number; title: string }[];
   onEdit?: (instruction: string, slideNumber?: number) => Promise<string>;
+  onArrange?: (op: string, slideNumber: number, toPosition?: number) => Promise<string>;
   onOpenSettings: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -75,7 +138,30 @@ export function AskBoardmarkie({
   }, [msgs, busy, open]);
 
   const ready = openAiReady();
-  const canEdit = !!lesson && !!onEdit;
+  const canEdit = !!editKind && !!onEdit;
+
+  const tools = (): ChatTool[] | undefined => {
+    if (!canEdit) return undefined;
+    if (editKind === "lesson") return [EDIT_TOOL, ARRANGE_TOOL];
+    if (editKind === "worksheet") return [EDIT_WORKSHEET_TOOL];
+    return undefined;
+  };
+
+  const editDescriptor = (): AskEdit | undefined => {
+    if (!canEdit) return undefined;
+    if (editKind === "lesson") return { kind: "lesson", slides: slides ?? [] };
+    if (editKind === "worksheet") return { kind: "worksheet" };
+    return undefined;
+  };
+
+  const push = (content: string) => setMsgs((m) => [...m, { role: "assistant", content }]);
+  const parseArgs = <T,>(raw: string): T => {
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      return {} as T;
+    }
+  };
 
   const ask = async (text: string) => {
     const q = text.trim();
@@ -87,33 +173,32 @@ export function AskBoardmarkie({
     setBusy(true);
     setPhase("think");
     try {
-      const slides = lesson?.slides.map((s, i) => ({ number: i + 1, title: s.title }));
       const payload: ChatMessage[] = [
-        { role: "system", content: askBoardmarkieSystemPrompt(context, canEdit ? slides : undefined) },
+        { role: "system", content: askBoardmarkieSystemPrompt(context, editDescriptor()) },
         ...next.map((m) => ({ role: m.role, content: m.content })),
       ];
-      const result = await chatComplete(payload, canEdit ? [EDIT_TOOL] : undefined);
+      const result = await chatComplete(payload, tools());
+      const call = result.toolCalls[0];
 
-      // GPT-4o asked to change the deck → run it through the Claude edit pipeline.
-      const call = result.toolCalls.find((t) => t.name === "edit_presentation");
-      if (call && onEdit) {
-        if (result.content) setMsgs((m) => [...m, { role: "assistant", content: result.content }]);
-        let args: { instruction?: string; scope?: string; slideNumber?: number } = {};
-        try {
-          args = JSON.parse(call.arguments);
-        } catch {
-          /* malformed args */
-        }
-        if (!args.instruction) {
-          setMsgs((m) => [...m, { role: "assistant", content: "I couldn't work out that change — try rephrasing it." }]);
-        } else {
+      if (call && result.content) push(result.content);
+
+      if (call?.name === "arrange_slides" && onArrange) {
+        const a = parseArgs<{ op?: string; slideNumber?: number; toPosition?: number }>(call.arguments);
+        if (!a.op || !a.slideNumber) push("I couldn't work out that change — try naming the slide number.");
+        else {
           setPhase("edit");
-          const slideNumber = args.scope === "slide" ? args.slideNumber : undefined;
-          const summary = await onEdit(args.instruction, slideNumber);
-          setMsgs((m) => [...m, { role: "assistant", content: summary }]);
+          push(await onArrange(a.op, a.slideNumber, a.toPosition));
+        }
+      } else if ((call?.name === "edit_presentation" || call?.name === "edit_worksheet") && onEdit) {
+        const a = parseArgs<{ instruction?: string; scope?: string; slideNumber?: number }>(call.arguments);
+        if (!a.instruction) push("I couldn't work out that change — try rephrasing it.");
+        else {
+          setPhase("edit");
+          const slideNumber = a.scope === "slide" ? a.slideNumber : undefined;
+          push(await onEdit(a.instruction, slideNumber));
         }
       } else {
-        setMsgs((m) => [...m, { role: "assistant", content: result.content }]);
+        push(result.content);
       }
     } catch (e) {
       const ex = e as Error & { status?: number };
@@ -183,7 +268,7 @@ export function AskBoardmarkie({
                   rubrics, differentiation…
                 </p>
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  {SUGGESTIONS.map((s) => (
+                  {SUGGESTIONS[editKind ?? "none"].map((s) => (
                     <button
                       key={s}
                       onClick={() => ask(s)}
@@ -214,7 +299,7 @@ export function AskBoardmarkie({
               <div className="flex justify-start">
                 <div className="flex items-center gap-2 rounded-2xl rounded-bl-md bg-paper px-3.5 py-2 text-sm text-muted">
                   <Spinner className="h-3.5 w-3.5 text-brand-600" />{" "}
-                  {phase === "edit" ? "Updating the presentation…" : "Thinking…"}
+                  {phase === "edit" ? "Applying your change…" : "Thinking…"}
                 </div>
               </div>
             )}

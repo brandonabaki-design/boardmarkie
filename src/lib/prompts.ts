@@ -165,6 +165,21 @@ Current lesson JSON:
 ${lessonJson}`;
 }
 
+export function editWorksheetSystemPrompt(): string {
+  return `${PERSONA}
+
+You are revising an existing worksheet. You will receive it as JSON and an instruction. Return the COMPLETE revised worksheet in the same JSON structure (all sections and questions, not just the changed ones). Preserve good content; only change what the instruction requires. Keep an answer/marking key for every question, vary question types appropriately, number questions sequentially across the whole worksheet, and leave inapplicable fields as empty strings or empty arrays.`;
+}
+
+export function editWorksheetUserPrompt(worksheetJson: string, instruction: string): string {
+  return `Instruction: ${instruction}
+
+Apply the change across the worksheet where relevant, then renumber all questions sequentially from 1.
+
+Current worksheet JSON:
+${worksheetJson}`;
+}
+
 export interface AskContext {
   title?: string;
   subject?: string;
@@ -172,10 +187,11 @@ export interface AskContext {
   region?: string;
 }
 
-export function askBoardmarkieSystemPrompt(
-  ctx?: AskContext,
-  slides?: { number: number; title: string }[],
-): string {
+export type AskEdit =
+  | { kind: "lesson"; slides: { number: number; title: string }[] }
+  | { kind: "worksheet" };
+
+export function askBoardmarkieSystemPrompt(ctx?: AskContext, edit?: AskEdit): string {
   let prompt = `${PERSONA}
 
 You are "Ask Boardmarkie", a friendly, practical teaching assistant chatting with a teacher inside the Boardmarkie app. Help with planning, explaining concepts, suggesting activities and differentiation, writing questions, rubrics and feedback, classroom management, and quick subject knowledge. Keep answers concise and immediately classroom-usable: short paragraphs or bullet points, no padding. Use the spelling and terminology conventions of the teacher's region. If you are unsure of a fact, say so briefly rather than inventing it.`;
@@ -188,19 +204,25 @@ You are "Ask Boardmarkie", a friendly, practical teaching assistant chatting wit
     if (ctx.region) lines.push(`Curriculum / region: ${ctx.region}`);
     prompt += `
 
-The teacher currently has this lesson open — tailor your help to it when relevant:
+The teacher currently has this ${edit?.kind === "worksheet" ? "worksheet" : "lesson"} open — tailor your help to it when relevant:
 ${lines.join("\n")}`;
   }
 
-  if (slides && slides.length) {
+  if (edit?.kind === "lesson") {
     prompt += `
 
-You can EDIT this open presentation. When the teacher asks you to change, add, remove, reorder, rewrite, simplify, expand, retitle, or otherwise modify the slides or their content, call the \`edit_presentation\` tool with a precise, self-contained instruction. Set scope to "slide" (with the 1-based slideNumber) for a single-slide change, or "whole_lesson" for changes across the lesson. The edit is carried out by Boardmarkie's lesson engine — write the instruction as a clear directive, e.g. "Change the title of slide 1 to …", "Add a worked example slide after slide 3 about …", "Remove slide 5", "Make the whole lesson more fun with a game".
+You can EDIT this open presentation. For CONTENT changes (rewrite, simplify, expand, retitle, change wording, add/remove content), call the \`edit_presentation\` tool with a precise, self-contained instruction — set scope to "slide" (with the 1-based slideNumber) for a single slide, or "whole_lesson" otherwise. For purely STRUCTURAL changes to slide order or count — delete, duplicate, or move a slide — call the \`arrange_slides\` tool instead (it's instant and free, no rewriting).
 
-Only call the tool for actual changes to THIS presentation. For questions, advice, or content the teacher just wants to read, reply normally without the tool. Do not claim you've changed the presentation unless you called the tool.
+Only call a tool for actual changes to THIS presentation. For questions, advice, or content the teacher just wants to read, reply normally without a tool. Do not claim you've changed the presentation unless you called a tool.
 
 Current slides:
-${slides.map((s) => `${s.number}. ${s.title || "(untitled)"}`).join("\n")}`;
+${edit.slides.map((s) => `${s.number}. ${s.title || "(untitled)"}`).join("\n")}`;
+  } else if (edit?.kind === "worksheet") {
+    prompt += `
+
+You can EDIT this open worksheet. When the teacher asks to change, add, remove, reorder, or re-mark questions or sections, adjust difficulty, or rewrite content, call the \`edit_worksheet\` tool with a precise, self-contained instruction, e.g. "Add three harder short-answer questions about …", "Make question 2 multiple choice", "Add a model answer to every question".
+
+Only call the tool for actual changes to THIS worksheet. For questions or advice, reply normally without the tool. Do not claim you've changed the worksheet unless you called the tool.`;
   }
 
   return prompt;
