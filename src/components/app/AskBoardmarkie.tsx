@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MessageCircle, X, Send, Sparkles, Settings as SettingsIcon, Eraser } from "lucide-react";
-import { chatComplete, openAiReady, CHAT_MODEL, type ChatMessage } from "@/lib/openai";
+import { chatComplete, openAiReady, CHAT_MODEL, type ChatMessage, type ChatTool } from "@/lib/openai";
 import { askBoardmarkieSystemPrompt, type AskContext } from "@/lib/prompts";
+import type { Lesson } from "@/lib/types";
 import { Spinner } from "./ui";
 
 interface UiMsg {
@@ -14,21 +15,58 @@ interface UiMsg {
 const SUGGESTIONS = [
   "Explain this topic in simple terms",
   "Give me a 5-minute starter activity",
-  "Write 3 exit-ticket questions",
-  "How can I differentiate this for lower attainers?",
+  "Make slide 1 more engaging",
+  "Add a quick recap slide at the end",
 ];
+
+// Tool GPT-4o can call to change the open presentation. Executed by the existing
+// Claude lesson-edit pipeline (reliable, schema-constrained) via `onEdit`.
+const EDIT_TOOL: ChatTool = {
+  type: "function",
+  function: {
+    name: "edit_presentation",
+    description:
+      "Edit the teacher's currently open lesson/presentation. Use only for actual changes to the slides or their content (change, add, remove, reorder, rewrite, simplify, expand, retitle). Do not use for questions or advice.",
+    parameters: {
+      type: "object",
+      properties: {
+        instruction: {
+          type: "string",
+          description:
+            "A precise, self-contained directive describing exactly what to change, e.g. 'Change the title of slide 1 to ...', 'Add a worked-example slide after slide 3 about ...', 'Remove slide 5'.",
+        },
+        scope: {
+          type: "string",
+          enum: ["whole_lesson", "slide"],
+          description: "Whether the change targets one slide or the whole lesson.",
+        },
+        slideNumber: {
+          type: "integer",
+          description: "The 1-based slide number to change when scope is 'slide'.",
+        },
+      },
+      required: ["instruction", "scope"],
+      additionalProperties: false,
+    },
+  },
+};
 
 export function AskBoardmarkie({
   context,
+  lesson,
+  onEdit,
   onOpenSettings,
 }: {
   context?: AskContext;
+  lesson?: Lesson;
+  onEdit?: (instruction: string, slideNumber?: number) => Promise<string>;
   onOpenSettings: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState<UiMsg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState<"think" | "edit">("think");
   const [err, setErr] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -37,6 +75,7 @@ export function AskBoardmarkie({
   }, [msgs, busy, open]);
 
   const ready = openAiReady();
+  const canEdit = !!lesson && !!onEdit;
 
   const ask = async (text: string) => {
     const q = text.trim();
@@ -46,19 +85,43 @@ export function AskBoardmarkie({
     setMsgs(next);
     setInput("");
     setBusy(true);
+    setPhase("think");
     try {
+      const slides = lesson?.slides.map((s, i) => ({ number: i + 1, title: s.title }));
       const payload: ChatMessage[] = [
-        { role: "system", content: askBoardmarkieSystemPrompt(context) },
+        { role: "system", content: askBoardmarkieSystemPrompt(context, canEdit ? slides : undefined) },
         ...next.map((m) => ({ role: m.role, content: m.content })),
       ];
-      const reply = await chatComplete(payload);
-      setMsgs((m) => [...m, { role: "assistant", content: reply }]);
+      const result = await chatComplete(payload, canEdit ? [EDIT_TOOL] : undefined);
+
+      // GPT-4o asked to change the deck → run it through the Claude edit pipeline.
+      const call = result.toolCalls.find((t) => t.name === "edit_presentation");
+      if (call && onEdit) {
+        if (result.content) setMsgs((m) => [...m, { role: "assistant", content: result.content }]);
+        let args: { instruction?: string; scope?: string; slideNumber?: number } = {};
+        try {
+          args = JSON.parse(call.arguments);
+        } catch {
+          /* malformed args */
+        }
+        if (!args.instruction) {
+          setMsgs((m) => [...m, { role: "assistant", content: "I couldn't work out that change — try rephrasing it." }]);
+        } else {
+          setPhase("edit");
+          const slideNumber = args.scope === "slide" ? args.slideNumber : undefined;
+          const summary = await onEdit(args.instruction, slideNumber);
+          setMsgs((m) => [...m, { role: "assistant", content: summary }]);
+        }
+      } else {
+        setMsgs((m) => [...m, { role: "assistant", content: result.content }]);
+      }
     } catch (e) {
       const ex = e as Error & { status?: number };
       setErr(ex.message);
       if (ex.status === 401) onOpenSettings();
     } finally {
       setBusy(false);
+      setPhase("think");
     }
   };
 
@@ -150,7 +213,8 @@ export function AskBoardmarkie({
             {busy && (
               <div className="flex justify-start">
                 <div className="flex items-center gap-2 rounded-2xl rounded-bl-md bg-paper px-3.5 py-2 text-sm text-muted">
-                  <Spinner className="h-3.5 w-3.5 text-brand-600" /> Thinking…
+                  <Spinner className="h-3.5 w-3.5 text-brand-600" />{" "}
+                  {phase === "edit" ? "Updating the presentation…" : "Thinking…"}
                 </div>
               </div>
             )}

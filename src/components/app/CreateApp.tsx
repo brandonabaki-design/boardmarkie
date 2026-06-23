@@ -216,6 +216,25 @@ export function CreateApp() {
     refresh();
   };
 
+  // Chat-driven edit: Ask Boardmarkie (GPT-4o) requested a change → run it
+  // through the same Claude edit pipeline as the Improve buttons, record it in
+  // undo history, and return a short confirmation for the chat.
+  const askEdit = async (instruction: string, slideNumber?: number): Promise<string> => {
+    if (!current || current.kind !== "lesson") return "There's no lesson open to edit.";
+    const slide = slideNumber ? current.slides[slideNumber - 1] : undefined;
+    setEditing(true);
+    try {
+      const updated = seedLesson(
+        await editLesson({ lesson: current, action: "rewrite", instruction, slideId: slide?.id }),
+        true,
+      );
+      commitLesson(updated);
+      return slide ? `✓ Updated slide ${slideNumber}.` : "✓ Done — updated the presentation.";
+    } finally {
+      setEditing(false);
+    }
+  };
+
   const undo = () => {
     if (!current || current.kind !== "lesson" || !past.length) return;
     const prev = past[past.length - 1];
@@ -412,6 +431,8 @@ export function CreateApp() {
               }
             : undefined
         }
+        lesson={current?.kind === "lesson" ? (current as Lesson) : undefined}
+        onEdit={askEdit}
         onOpenSettings={() => setSettingsOpen(true)}
       />
 

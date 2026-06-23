@@ -58,8 +58,27 @@ export interface ChatMessage {
   content: string;
 }
 
-/** Ask Boardmarkie (GPT-4o). Returns the assistant's reply text. */
-export async function chatComplete(messages: ChatMessage[]): Promise<string> {
+export interface ChatTool {
+  type: "function";
+  function: { name: string; description: string; parameters: Record<string, unknown> };
+}
+
+export interface ToolCall {
+  id: string;
+  name: string;
+  arguments: string; // raw JSON string of the call's arguments
+}
+
+export interface ChatResult {
+  content: string;
+  toolCalls: ToolCall[];
+}
+
+/**
+ * Ask Boardmarkie (GPT-4o). Returns the assistant's reply and any tool calls it
+ * decided to make (e.g. to edit the open presentation).
+ */
+export async function chatComplete(messages: ChatMessage[], tools?: ChatTool[]): Promise<ChatResult> {
   const apiKey = getOpenAIKey();
   if (!apiKey) throw err(NO_OPENAI_SETUP, 401);
 
@@ -68,7 +87,12 @@ export async function chatComplete(messages: ChatMessage[]): Promise<string> {
     res = await fetch(endpoint("openai-chat"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ apiKey, model: CHAT_MODEL, messages }),
+      body: JSON.stringify({
+        apiKey,
+        model: CHAT_MODEL,
+        messages,
+        ...(tools && tools.length ? { tools } : {}),
+      }),
     });
   } catch {
     throw err("Couldn't reach the proxy. Check the URL in Settings.");
@@ -78,9 +102,17 @@ export async function chatComplete(messages: ChatMessage[]): Promise<string> {
     throw err(await proxyErrorMessage(res, `Ask Boardmarkie failed (${res.status}).`), res.status);
   }
 
-  const data = (await res.json()) as { content?: string };
-  if (!data.content) throw err("No response from the assistant.");
-  return data.content;
+  const data = (await res.json()) as {
+    content?: string;
+    tool_calls?: Array<{ id?: string; function?: { name?: string; arguments?: string } }> | null;
+  };
+  const toolCalls: ToolCall[] = (data.tool_calls ?? []).map((t) => ({
+    id: t.id ?? "",
+    name: t.function?.name ?? "",
+    arguments: t.function?.arguments ?? "{}",
+  }));
+  if (!data.content && !toolCalls.length) throw err("No response from the assistant.");
+  return { content: data.content ?? "", toolCalls };
 }
 
 type AspectRatio = "1:1" | "3:4" | "4:3" | "9:16" | "16:9";

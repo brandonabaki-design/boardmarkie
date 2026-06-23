@@ -52,12 +52,25 @@ export default async function handler(req, res) {
     ? Math.min(2000, Math.max(1, payload.maxTokens))
     : 900;
 
+  // Optional passthrough so the app can use function calling / JSON mode without
+  // ever needing the proxy redeployed again.
+  const tools = Array.isArray(payload.tools) ? payload.tools : undefined;
+  const toolChoice = payload.tool_choice;
+  const responseFormat = payload.response_format;
+
+  const body = { model, messages, max_tokens: maxTokens, temperature: 0.7 };
+  if (tools) {
+    body.tools = tools;
+    if (toolChoice) body.tool_choice = toolChoice;
+  }
+  if (responseFormat) body.response_format = responseFormat;
+
   let upstream;
   try {
     upstream = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature: 0.7 }),
+      body: JSON.stringify(body),
     });
   } catch {
     return res.status(502).json({ error: "Could not reach OpenAI." });
@@ -72,8 +85,7 @@ export default async function handler(req, res) {
   }
 
   const data = await upstream.json();
-  const content =
-    data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-  if (!content) return res.status(502).json({ error: "OpenAI returned no message." });
-  return res.status(200).json({ content });
+  const msg = data && data.choices && data.choices[0] && data.choices[0].message;
+  if (!msg) return res.status(502).json({ error: "OpenAI returned no message." });
+  return res.status(200).json({ content: msg.content || "", tool_calls: msg.tool_calls || null });
 }

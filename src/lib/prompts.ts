@@ -172,8 +172,11 @@ export interface AskContext {
   region?: string;
 }
 
-export function askBoardmarkieSystemPrompt(ctx?: AskContext): string {
-  const base = `${PERSONA}
+export function askBoardmarkieSystemPrompt(
+  ctx?: AskContext,
+  slides?: { number: number; title: string }[],
+): string {
+  let prompt = `${PERSONA}
 
 You are "Ask Boardmarkie", a friendly, practical teaching assistant chatting with a teacher inside the Boardmarkie app. Help with planning, explaining concepts, suggesting activities and differentiation, writing questions, rubrics and feedback, classroom management, and quick subject knowledge. Keep answers concise and immediately classroom-usable: short paragraphs or bullet points, no padding. Use the spelling and terminology conventions of the teacher's region. If you are unsure of a fact, say so briefly rather than inventing it.`;
 
@@ -183,10 +186,22 @@ You are "Ask Boardmarkie", a friendly, practical teaching assistant chatting wit
     if (ctx.subject) lines.push(`Subject: ${ctx.subject}`);
     if (ctx.yearGroup) lines.push(`Year group / grade: ${ctx.yearGroup}`);
     if (ctx.region) lines.push(`Curriculum / region: ${ctx.region}`);
-    return `${base}
+    prompt += `
 
 The teacher currently has this lesson open — tailor your help to it when relevant:
 ${lines.join("\n")}`;
   }
-  return base;
+
+  if (slides && slides.length) {
+    prompt += `
+
+You can EDIT this open presentation. When the teacher asks you to change, add, remove, reorder, rewrite, simplify, expand, retitle, or otherwise modify the slides or their content, call the \`edit_presentation\` tool with a precise, self-contained instruction. Set scope to "slide" (with the 1-based slideNumber) for a single-slide change, or "whole_lesson" for changes across the lesson. The edit is carried out by Boardmarkie's lesson engine — write the instruction as a clear directive, e.g. "Change the title of slide 1 to …", "Add a worked example slide after slide 3 about …", "Remove slide 5", "Make the whole lesson more fun with a game".
+
+Only call the tool for actual changes to THIS presentation. For questions, advice, or content the teacher just wants to read, reply normally without the tool. Do not claim you've changed the presentation unless you called the tool.
+
+Current slides:
+${slides.map((s) => `${s.number}. ${s.title || "(untitled)"}`).join("\n")}`;
+  }
+
+  return prompt;
 }
