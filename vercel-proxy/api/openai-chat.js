@@ -24,6 +24,12 @@ function setCors(res) {
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === "OPTIONS") return res.status(204).end();
+  // GET = capability check. If you see supports:["tools"] the tool-calling build
+  // (needed for chat-to-slides editing) is live. If you still see "Use POST."
+  // the proxy hasn't been redeployed with the latest code.
+  if (req.method === "GET") {
+    return res.status(200).json({ ok: true, endpoint: "openai-chat", supports: ["tools", "response_format"] });
+  }
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST." });
 
   let payload = req.body;
