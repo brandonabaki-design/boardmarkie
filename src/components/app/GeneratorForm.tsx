@@ -179,8 +179,8 @@ export function GeneratorForm({
                 onChange={setIncludeStandards}
               />
               <Toggle
-                label="Generate images while creating"
-                hint="Illustrates the slides automatically (needs your image proxy + key in Settings)"
+                label="Add images while creating"
+                hint="Auto-fills slides with media — pick Web search (free), GIFs, or AI in Settings → Images"
                 checked={autoImages}
                 onChange={setAutoImages}
               />

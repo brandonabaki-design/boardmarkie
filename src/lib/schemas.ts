@@ -118,6 +118,11 @@ const slideSchema: JSONSchema = {
       type: "string",
       description: "Short alt text for the suggested image. Empty if no image.",
     },
+    imageQuery: {
+      type: "string",
+      description:
+        "2-4 plain keywords to find a stock photo or GIF for this slide via image/GIF search (e.g. 'water cycle', 'volcano eruption', 'cheering students'). Empty string if the slide needs no image.",
+    },
     youtube: {
       type: "object",
       additionalProperties: false,
@@ -147,6 +152,7 @@ const slideSchema: JSONSchema = {
     "quiz",
     "imagePrompt",
     "imageAlt",
+    "imageQuery",
     "youtube",
   ],
 };

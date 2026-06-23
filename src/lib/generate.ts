@@ -106,6 +106,7 @@ interface RawSlide {
   quiz?: unknown;
   imagePrompt?: unknown;
   imageAlt?: unknown;
+  imageQuery?: unknown;
   youtube?: { title?: unknown; searchQuery?: unknown };
 }
 
@@ -163,6 +164,7 @@ function cleanSlide(raw: RawSlide): Slide {
 
   if (str(raw.imagePrompt)) slide.imagePrompt = str(raw.imagePrompt);
   if (str(raw.imageAlt)) slide.imageAlt = str(raw.imageAlt);
+  if (str(raw.imageQuery)) slide.imageQuery = str(raw.imageQuery);
 
   if (raw.youtube && (str(raw.youtube.title) || str(raw.youtube.searchQuery))) {
     slide.youtube = { title: str(raw.youtube.title), searchQuery: str(raw.youtube.searchQuery) };

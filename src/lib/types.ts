@@ -58,7 +58,8 @@ export interface Slide {
   quiz?: QuizQuestion[];
   imagePrompt?: string;
   imageAlt?: string;
-  imageUrl?: string; // generated illustration, stored as a data: URL
+  imageQuery?: string; // short keywords for stock-image / GIF search
+  imageUrl?: string; // generated illustration or searched image/GIF URL
   diagramSvg?: string; // Claude-generated, sanitized SVG diagram markup
   youtube?: { title: string; searchQuery: string };
   elements?: CanvasElement[]; // freeform canvas layout (Canva/PPT-style editor)

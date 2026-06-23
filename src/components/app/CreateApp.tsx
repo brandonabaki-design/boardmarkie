@@ -17,8 +17,18 @@ import type {
 import { generateArtifact, editLesson, editWorksheet } from "@/lib/client";
 import { generateImage, illustrationPrompt, canGenerateImages } from "@/lib/images";
 import { resolveYoutube } from "@/lib/youtube";
+import { searchImages } from "@/lib/imageSearch";
+import { searchGifs } from "@/lib/gifSearch";
 import { cid, ensureElements, slideToElements } from "@/lib/canvas";
-import { deleteArtifact, getArtifactFull, getImageConfig, getLibrary, saveArtifact } from "@/lib/storage";
+import {
+  deleteArtifact,
+  getArtifactFull,
+  getAutoMediaSource,
+  getGiphyKey,
+  getImageConfig,
+  getLibrary,
+  saveArtifact,
+} from "@/lib/storage";
 import { GeneratorForm } from "./GeneratorForm";
 import { GeneratingState } from "./GeneratingState";
 import { LessonSkeleton } from "./LessonSkeleton";
@@ -41,6 +51,11 @@ function patchSlide(lesson: Lesson, slideId: string, patch: Partial<Slide>): Les
     ...lesson,
     slides: lesson.slides.map((s) => (s.id === slideId ? { ...s, ...patch } : s)),
   };
+}
+
+// Short query for searching a stock image / GIF for a slide.
+function slideQuery(s: Slide): string {
+  return (s.imageQuery || s.imageAlt || s.title || "").trim();
 }
 
 // Clone a slide with fresh ids (slide + each element) for instant duplication.
@@ -119,16 +134,32 @@ export function CreateApp() {
 
     if (seeded.kind === "lesson") {
       const hasProxy = !!getImageConfig().proxyUrl;
-      const canImg = canGenerateImages();
-      if (req.autoImages && !canImg) {
-        setError(
-          "Lesson created. To auto-generate images, set up an engine in Settings → Images: add your image proxy + Gemini key (Imagen), or switch to OpenAI (GPT Image) and add your OpenAI key.",
-        );
-        setSettingsOpen(true);
-      }
       let working = seeded;
-      if (req.autoImages && canImg) working = await autoGenerateImages(seeded);
-      // YouTube resolution needs the proxy regardless of the image engine.
+      if (req.autoImages) {
+        const source = getAutoMediaSource();
+        if (source === "generate") {
+          if (canGenerateImages()) {
+            working = await autoGenerateImages(seeded);
+          } else {
+            setError(
+              "Lesson created. To AI-generate images, set up an engine in Settings → Images, or switch “Add images” to Web search (free).",
+            );
+            setSettingsOpen(true);
+          }
+        } else if (source === "gif") {
+          if (getGiphyKey()) {
+            working = await autoSearchMedia(seeded, "gif");
+          } else {
+            setError(
+              "Lesson created. To auto-add GIFs, add a Giphy key in Settings → Images, or switch “Add images” to Web search (free).",
+            );
+            setSettingsOpen(true);
+          }
+        } else {
+          working = await autoSearchMedia(seeded, "search"); // free, no setup needed
+        }
+      }
+      // YouTube resolution needs the proxy.
       if (hasProxy) await autoEmbedYoutube(working);
     }
   };
@@ -165,6 +196,50 @@ export function CreateApp() {
             handleError(err);
             break;
           }
+        } finally {
+          done++;
+          setImageProgress({ done, total: targets.length });
+        }
+      }
+    };
+
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, targets.length) }, () => worker()));
+    refresh();
+    setImageProgress(null);
+    return working;
+  };
+
+  // Auto-embed a searched image or GIF on each slide (free — no AI generation).
+  // Embeds the result URL directly; the same concurrent-pool pattern keeps it fast.
+  const autoSearchMedia = async (lesson: Lesson, kind: "search" | "gif") => {
+    const targets = lesson.slides.filter(
+      (s) => (s.imageQuery || s.imageAlt || s.imagePrompt) && !s.imageUrl && !s.youtube?.searchQuery,
+    );
+    if (!targets.length) return lesson;
+    setImageProgress({ done: 0, total: targets.length });
+
+    let working = lesson;
+    let done = 0;
+    let next = 0;
+    const CONCURRENCY = 3;
+
+    const worker = async () => {
+      while (true) {
+        const i = next++;
+        if (i >= targets.length) break;
+        const t = targets[i];
+        try {
+          const results = kind === "gif" ? await searchGifs(slideQuery(t)) : await searchImages(slideQuery(t));
+          const top = results[0];
+          if (top?.url) {
+            const cur = working.slides.find((s) => s.id === t.id) ?? t;
+            const withImage = { ...cur, imageUrl: top.url };
+            working = patchSlide(working, t.id, { imageUrl: top.url, elements: slideToElements(withImage) });
+            setCurrent(working);
+            saveArtifact(working);
+          }
+        } catch {
+          /* no result for this slide — skip it */
         } finally {
           done++;
           setImageProgress({ done, total: targets.length });
@@ -418,7 +493,7 @@ export function CreateApp() {
 
         {imageProgress && (
           <div className="no-print mx-auto mb-6 flex max-w-2xl items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-2.5 text-sm font-medium text-brand-800">
-            <Spinner className="h-4 w-4 text-brand-600" /> Generating images… {imageProgress.done}/{imageProgress.total}
+            <Spinner className="h-4 w-4 text-brand-600" /> Adding images… {imageProgress.done}/{imageProgress.total}
           </div>
         )}
 

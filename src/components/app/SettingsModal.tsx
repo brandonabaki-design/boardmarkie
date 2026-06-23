@@ -20,6 +20,9 @@ import {
   getImageProvider,
   setImageProvider,
   type ImageProvider,
+  getAutoMediaSource,
+  setAutoMediaSource,
+  type AutoMediaSource,
   getOpenAIKey,
   setOpenAIKey,
   getGiphyKey,
@@ -76,6 +79,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   const [openaiKey, setOpenaiKeyState] = useState("");
   const [model, setModelState] = useState<string>("");
   const [imgProvider, setImgProvider] = useState<ImageProvider>("imagen");
+  const [autoMedia, setAutoMediaState] = useState<AutoMediaSource>("search");
   const [imgStyle, setImgStyle] = useState<ImageStyle>("line");
   const [imgQuality, setImgQuality] = useState<ImageQuality>("standard");
   const [saved, setSaved] = useState(false);
@@ -94,6 +98,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
       setOpenaiKeyState(getOpenAIKey());
       setModelState(getModel());
       setImgProvider(getImageProvider());
+      setAutoMediaState(getAutoMediaSource());
       setImgStyle(getImageStyle());
       setImgQuality(getImageQuality());
       setSaved(false);
@@ -110,6 +115,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
     setOpenAIKey(openaiKey);
     setModel(model);
     setImageProvider(imgProvider);
+    setAutoMediaSource(autoMedia);
     setImageStyle(imgStyle);
     setImageQuality(imgQuality);
   };
@@ -299,6 +305,42 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
           {tab === "images" && (
             <div>
+              <h3 className="flex items-center gap-2 text-sm font-bold text-ink">
+                <ImagePlus size={16} className="text-brand-600" /> Add images while creating
+              </h3>
+              <p className="mt-1.5 text-xs text-muted">
+                When &ldquo;Add images while creating&rdquo; is on, fill each slide with:
+              </p>
+              <div className="mt-2 grid grid-cols-3 gap-1.5 rounded-2xl border border-line bg-paper p-1.5">
+                {(
+                  [
+                    ["search", "Web search"],
+                    ["gif", "GIFs"],
+                    ["generate", "AI generate"],
+                  ] as const
+                ).map(([v, label]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setAutoMediaState(v)}
+                    className={`rounded-xl px-2 py-2 text-sm font-semibold transition-all ${
+                      autoMedia === v ? "bg-white text-brand-700 card-shadow" : "text-muted hover:text-ink"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-xs text-muted">
+                {autoMedia === "generate"
+                  ? "AI-drawn illustrations via the engine below — most polished, but costs per image."
+                  : autoMedia === "gif"
+                    ? "Animated GIFs from Giphy (needs a Giphy key below) — free and fun."
+                    : "Real photos & illustrations from free web search — free, no setup needed."}
+              </p>
+
+              <div className="my-6 border-t border-line" />
+
               <h3 className="flex items-center gap-2 text-sm font-bold text-ink">
                 <Sparkles size={16} className="text-brand-600" /> Image generation
               </h3>

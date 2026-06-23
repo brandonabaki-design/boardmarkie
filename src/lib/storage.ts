@@ -114,6 +114,22 @@ export function setImageProvider(value: ImageProvider): void {
   window.localStorage.setItem(KEY_IMG_PROVIDER, value);
 }
 
+const KEY_AUTO_MEDIA = "boardmarkie.autoMedia";
+export type AutoMediaSource = "generate" | "search" | "gif";
+
+// How "Add images while creating" fills slides: AI generation (costs per image),
+// free web image search, or GIFs. Defaults to free web search.
+export function getAutoMediaSource(): AutoMediaSource {
+  if (typeof window === "undefined") return "search";
+  const v = window.localStorage.getItem(KEY_AUTO_MEDIA);
+  return v === "generate" || v === "gif" ? v : "search";
+}
+
+export function setAutoMediaSource(value: AutoMediaSource): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(KEY_AUTO_MEDIA, value);
+}
+
 const KEY_OPENAI = "boardmarkie.openaiKey";
 
 // Bring-your-own OpenAI key. Powers Ask Boardmarkie (GPT-4o) and gpt-image-1 image
