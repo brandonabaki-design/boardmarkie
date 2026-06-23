@@ -1,5 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { MODEL } from "./anthropic";
+import { MODEL, supportsEffort } from "./anthropic";
 import { jsonFormat } from "./schemas";
 import type {
   GenerateRequest,
@@ -21,6 +21,8 @@ interface RunArgs {
   schema: Record<string, unknown>;
   maxTokens?: number;
   effort?: "low" | "medium" | "high";
+  model?: string;
+  think?: boolean;
 }
 
 /**
@@ -34,12 +36,20 @@ export async function runStructured<T = unknown>({
   schema,
   maxTokens = 16000,
   effort = "medium",
+  model = MODEL,
+  think = false,
 }: RunArgs): Promise<T> {
   const stream = client.messages.stream({
-    model: MODEL,
+    model,
     max_tokens: maxTokens,
     system,
-    output_config: { effort, format: jsonFormat(schema) },
+    // `effort` is rejected by Haiku; only send it to models that support it.
+    output_config: supportsEffort(model)
+      ? { effort, format: jsonFormat(schema) }
+      : { format: jsonFormat(schema) },
+    // Adaptive thinking sharply improves accuracy-critical output (diagrams);
+    // it's supported on the Opus/Sonnet tiers (same gate as effort).
+    ...(think && supportsEffort(model) ? { thinking: { type: "adaptive" as const } } : {}),
     messages: [{ role: "user", content: user }],
   });
 
@@ -96,6 +106,8 @@ interface RawSlide {
   quiz?: unknown;
   imagePrompt?: unknown;
   imageAlt?: unknown;
+  imageQuery?: unknown;
+  gifQuery?: unknown;
   youtube?: { title?: unknown; searchQuery?: unknown };
 }
 
@@ -153,6 +165,8 @@ function cleanSlide(raw: RawSlide): Slide {
 
   if (str(raw.imagePrompt)) slide.imagePrompt = str(raw.imagePrompt);
   if (str(raw.imageAlt)) slide.imageAlt = str(raw.imageAlt);
+  if (str(raw.imageQuery)) slide.imageQuery = str(raw.imageQuery);
+  if (str(raw.gifQuery)) slide.gifQuery = str(raw.gifQuery);
 
   if (raw.youtube && (str(raw.youtube.title) || str(raw.youtube.searchQuery))) {
     slide.youtube = { title: str(raw.youtube.title), searchQuery: str(raw.youtube.searchQuery) };
@@ -166,6 +180,7 @@ interface RawLesson {
   summary?: unknown;
   objectives?: unknown;
   vocabulary?: unknown;
+  standards?: unknown;
   slides?: unknown;
 }
 
@@ -185,6 +200,7 @@ export function toLesson(raw: RawLesson, req: GenerateRequest): Lesson {
       summary: str(raw.summary),
       objectives: arr<unknown>(raw.objectives).map(str).filter(Boolean),
       vocabulary: cleanVocab(raw.vocabulary),
+      standards: arr<unknown>(raw.standards).map(str).filter(Boolean),
     },
     slides: slides.length ? slides : [{ id: rid("sl"), layout: "title", title: req.topic }],
   };

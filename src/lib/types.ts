@@ -12,6 +12,7 @@ export interface LessonMeta {
   summary: string;
   objectives: string[];
   vocabulary: VocabItem[];
+  standards?: string[]; // curriculum standards this lesson aligns to
 }
 
 export interface VocabItem {
@@ -57,10 +58,65 @@ export interface Slide {
   quiz?: QuizQuestion[];
   imagePrompt?: string;
   imageAlt?: string;
-  imageUrl?: string; // generated illustration, stored as a data: URL
+  imageQuery?: string; // short keywords for stock-image search
+  gifQuery?: string; // concrete, visual keywords for GIF search (when a GIF fits)
+  imageUrl?: string; // generated illustration or searched image/GIF URL
   diagramSvg?: string; // Claude-generated, sanitized SVG diagram markup
   youtube?: { title: string; searchQuery: string };
+  elements?: CanvasElement[]; // freeform canvas layout (Canva/PPT-style editor)
+  background?: string; // slide background colour (hex)
 }
+
+// ---- Freeform canvas elements (Canva / PowerPoint-style editor) ----
+// Positions and sizes are PERCENTAGES of the slide canvas (0–100) so they scale
+// responsively across the editor, thumbnails, Present mode, and exports.
+
+export type CanvasElementType = "text" | "image" | "shape" | "youtube";
+
+interface CanvasElementBase {
+  id: string;
+  type: CanvasElementType;
+  x: number; // % from left of canvas
+  y: number; // % from top of canvas
+  w: number; // % width
+  h: number; // % height
+  z: number; // stacking order (higher = front)
+}
+
+export interface TextElement extends CanvasElementBase {
+  type: "text";
+  text: string;
+  fontSize: number; // % of canvas height (rendered via cqh units)
+  bold?: boolean;
+  italic?: boolean;
+  align?: "left" | "center" | "right";
+  color?: string; // hex
+  font?: "display" | "body";
+}
+
+export interface ImageElement extends CanvasElementBase {
+  type: "image";
+  src?: string; // data: or remote URL (raster)
+  svg?: string; // sanitized SVG diagram markup (alternative to src)
+  alt?: string;
+  radius?: number; // corner rounding %
+  opacity?: number; // 0–100
+}
+
+export interface ShapeElement extends CanvasElementBase {
+  type: "shape";
+  shape: "rect" | "ellipse";
+  fill: string; // hex
+  opacity?: number; // 0–100
+}
+
+export interface YoutubeElement extends CanvasElementBase {
+  type: "youtube";
+  videoId: string;
+  title?: string;
+}
+
+export type CanvasElement = TextElement | ImageElement | ShapeElement | YoutubeElement;
 
 export interface Lesson {
   id: string;
@@ -68,6 +124,7 @@ export interface Lesson {
   createdAt: number;
   meta: LessonMeta;
   slides: Slide[];
+  theme?: string; // deck theme id (see src/lib/themes.ts); defaults to "classic"
 }
 
 // ---- Worksheet ----
@@ -156,6 +213,8 @@ export interface GenerateRequest {
   includeAnswers?: boolean;
   tone?: string;
   notes?: string;
+  includeStandards?: boolean; // find & include curriculum standards (lessons)
+  autoImages?: boolean; // generate slide illustrations during creation
 }
 
 export type EditAction =

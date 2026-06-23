@@ -5,7 +5,28 @@
 // so requests go through a small Cloudflare Worker proxy (see worker/). The
 // proxy URL and the teacher's Gemini key live in localStorage (Settings).
 
-import { getImageConfig } from "./storage";
+import { getImageConfig, getImageStyle, getImageQuality, getImageProvider, getOpenAIKey } from "./storage";
+import { generateOpenAIImage } from "./openai";
+
+// AI illustration quality → Imagen tier. Ultra has the best prompt alignment.
+const QUALITY_MODEL: Record<string, string> = {
+  fast: "imagen-4.0-fast-generate-001",
+  standard: "imagen-4.0-generate-001",
+  ultra: "imagen-4.0-ultra-generate-001",
+};
+
+/**
+ * Wrap a plain subject into a full illustration prompt in the user's chosen
+ * style. Line art (default) renders cleanly, compresses small (fast to load),
+ * and prints well; both styles forbid in-image text, which raster models garble.
+ */
+export function illustrationPrompt(subject: string): string {
+  const base = subject.trim();
+  if (getImageStyle() === "color") {
+    return `${base}. Bright, friendly, age-appropriate educational illustration; clean flat style; no words or text in the image.`;
+  }
+  return `${base}. Black-and-white line art in a clean coloring-book style: bold, even black outlines on a plain white background, no shading, no grey fills, no colour. Simple, friendly and age-appropriate. Absolutely no words, letters, numbers, or text anywhere in the image.`;
+}
 
 function err(message: string, status?: number): Error & { status?: number } {
   const e = new Error(message) as Error & { status?: number };
@@ -22,11 +43,24 @@ export interface ImageOptions {
   aspectRatio?: AspectRatio;
 }
 
+/** Can we generate images with the current settings? Imagen needs the proxy;
+ *  OpenAI (gpt-image-1) needs the proxy plus an OpenAI key. */
+export function canGenerateImages(): boolean {
+  if (!getImageConfig().proxyUrl) return false;
+  if (getImageProvider() === "dalle") return !!getOpenAIKey();
+  return true;
+}
+
 /**
- * Generate an illustration from a text prompt via the Worker proxy (which
- * forwards to Google's Imagen API). Resolves to a `data:` URL.
+ * Generate an illustration from a text prompt. Routes to OpenAI's gpt-image-1 or
+ * Google's Imagen (via the proxy) per the user's chosen engine. Resolves to a
+ * `data:` URL.
  */
 export async function generateImage(prompt: string, opts: ImageOptions = {}): Promise<string> {
+  if (getImageProvider() === "dalle") {
+    return generateOpenAIImage(prompt, opts.aspectRatio ?? "16:9");
+  }
+
   const { proxyUrl, apiKey } = getImageConfig();
   if (!proxyUrl) throw err(NO_IMAGE_PROXY_MESSAGE, 401);
 
@@ -38,6 +72,7 @@ export async function generateImage(prompt: string, opts: ImageOptions = {}): Pr
       body: JSON.stringify({
         prompt,
         apiKey: apiKey || undefined,
+        model: QUALITY_MODEL[getImageQuality()],
         aspectRatio: opts.aspectRatio ?? "16:9",
       }),
     });

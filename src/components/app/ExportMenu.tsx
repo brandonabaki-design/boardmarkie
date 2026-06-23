@@ -1,9 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Download, ChevronDown, FileText, Presentation, Braces } from "lucide-react";
+import { Download, ChevronDown, FileText, Presentation, Braces, FileType } from "lucide-react";
 import type { Artifact } from "@/lib/types";
-import { downloadJSON, exportLessonToPptx, printDocument } from "@/lib/export";
+import {
+  downloadJSON,
+  exportLessonToPptx,
+  exportLessonToDocx,
+  exportWorksheetToDocx,
+  exportSeriesToDocx,
+  printDocument,
+} from "@/lib/export";
 
 export function ExportMenu({ artifact }: { artifact: Artifact }) {
   const [open, setOpen] = useState(false);
@@ -36,6 +43,39 @@ export function ExportMenu({ artifact }: { artifact: Artifact }) {
               subtitle="Opens in Slides & Keynote"
               onClick={() => {
                 exportLessonToPptx(artifact);
+                setOpen(false);
+              }}
+            />
+          )}
+          {artifact.kind === "lesson" && (
+            <Item
+              icon={FileType}
+              title="Word (.docx)"
+              subtitle="Editable lesson handout"
+              onClick={() => {
+                exportLessonToDocx(artifact);
+                setOpen(false);
+              }}
+            />
+          )}
+          {artifact.kind === "worksheet" && (
+            <Item
+              icon={FileType}
+              title="Word (.docx)"
+              subtitle="Editable, incl. answer key"
+              onClick={() => {
+                exportWorksheetToDocx(artifact);
+                setOpen(false);
+              }}
+            />
+          )}
+          {artifact.kind === "series" && (
+            <Item
+              icon={FileType}
+              title="Word (.docx)"
+              subtitle="Editable unit overview"
+              onClick={() => {
+                exportSeriesToDocx(artifact);
                 setOpen(false);
               }}
             />

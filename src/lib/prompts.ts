@@ -23,24 +23,38 @@ Follow this structure:
 1. A title slide (layout "title") with an inviting subtitle.
 2. A learning objectives slide (layout "objectives").
 3. A starter/hook, then a sequence of content slides that build understanding step by step. Use clear, age-appropriate bullets — never walls of text.
-4. At least one vocabulary slide (layout "vocabulary") with key terms and student-friendly definitions.
+4. At least one vocabulary slide (layout "vocabulary") with up to 5 key terms and short, student-friendly definitions. If there are more terms, use a second vocabulary slide rather than crowding one.
 5. At least one activity slide (layout "activity") with concrete, doable instructions, a grouping, and a time.
 6. A discussion slide (layout "discussion") with thought-provoking questions.
-7. Where it genuinely helps, suggest one relevant YouTube clip (give a title + a search query) on an appropriate slide.
+7. Include one slide with a relevant YouTube clip: set youtube.title and a precise youtube.searchQuery (specific enough to surface a good classroom video, e.g. "photosynthesis explained for kids"). Pick a topic with well-known educational videos.
 8. A short check-for-understanding (layout "quiz") with a few questions and answers.
 9. A plenary/exit slide (layout "plenary") that consolidates learning.
 
-For most slides, suggest a vivid imagePrompt describing a helpful illustration, plus concise imageAlt.
+Keep every slide uncluttered and skimmable — it must fit on screen without crowding. Hard limits per slide: at most ~5 short bullet points OR ~5 vocabulary terms, and keep each point/definition to roughly 12 words. If there is more to cover, split it across additional slides rather than overfilling one. Put extension/differentiation ideas, stretch tasks, model answers, and extra detail in teacherNotes — never in the on-slide body. One idea per slide; prefer more slides over dense ones.
+
+Emphasise only the most important word or two per slide using markdown: wrap key terms in **double asterisks** for bold and *single asterisks* for italics. Use it sparingly — genuinely key words only, never whole sentences.
+
+For most slides, suggest a vivid imagePrompt describing a helpful illustration, a concise imageAlt, and an imageQuery of 2-4 simple keywords for finding a stock PHOTO (e.g. "water cycle", "cell division", "ancient Rome").
+Also set gifQuery ONLY when a short looping GIF would genuinely help — and make it a 1-3 word CONCRETE, VISUAL subject that a mainstream GIF site actually has (real things, animals, actions, weather, space, reactions: e.g. "volcano erupting", "rain", "beating heart", "galaxy", "celebration"). Leave gifQuery as an empty string for abstract points, detailed processes, diagrams, or when a still photo is better — never force a GIF, and use only a few across the whole lesson.
 Always include practical teacherNotes on every slide.
+
+Curriculum standards (the "standards" field): identify the specific official standard(s) this lesson aligns to for the given subject, year group/grade and curriculum/region — each as its official code plus a short description (e.g. "NGSS 5-PS1-1: …", "CCSS.MATH.CONTENT.4.NF.B.3: …", "National Curriculum KS2 Science: …", "UAE MOE Science Gr.3: …"). Use the framework that matches the region. Only cite standards you are confident genuinely exist; if unsure of an exact code, give the standard's substance and framework without inventing a precise code. Give the 1-4 most relevant. If standards are not requested, leave the field as an empty array.
+
 Leave fields that don't apply to a slide as empty strings or empty arrays.`;
 }
 
 export function lessonUserPrompt(req: GenerateRequest): string {
   const slides = req.slideCount ?? 9;
   const duration = req.durationMinutes ?? 60;
+  const standards =
+    req.includeStandards === false
+      ? "Do not include curriculum standards — leave the standards field as an empty array."
+      : "Include the 1-4 most relevant official curriculum standards in the standards field, matched to the subject, year group and curriculum above.";
   return `Create a ${duration}-minute lesson with about ${slides} slides.
 
 ${context(req)}
+
+${standards}
 
 Make it accurate, well-paced and ready to teach.`;
 }
@@ -78,9 +92,15 @@ Make the questions purposeful and progressively challenging.`;
 export function diagramSystemPrompt(): string {
   return `${PERSONA}
 
-You create clear, accurate, classroom-ready diagrams as inline SVG. The diagram must be factually correct and clearly labelled — that is its whole purpose. Requirements:
+You create clear, accurate, classroom-ready diagrams as inline SVG. Factual and labelling accuracy is the whole point — get it right.
+
+Think first: plan the correct structure, the parts, and exactly where each label belongs before writing any SVG.
+
+Requirements:
 - Output ONE self-contained <svg> document with a viewBox (e.g. "0 0 800 600").
-- Use simple shapes (rect, circle, ellipse, line, path, polygon) and <text> labels at a legible font-size. Label every important part, spelled correctly and positioned to read cleanly.
+- Use simple shapes (rect, circle, ellipse, line, path, polygon) and <text> labels at a legible font-size.
+- ACCURACY: every label must be factually correct, correctly spelled, and placed on or directly beside the exact part it names. Verify the science/maths before drawing. Use a thin leader line from label to part when a label can't sit right on its part.
+- LAYOUT: nothing may overlap or be clipped. Give labels room, keep generous margins, and size the viewBox so all shapes AND text sit comfortably inside it. Anchor text so it never runs off an edge.
 - Use a clean, friendly palette. A teal accent (#0D9488) suits the Boardmarkie brand; use dark ink (#1B1B1F) for text on light fills.
 - Do NOT include <script>, <foreignObject>, external <image>, or web fonts — keep it dependency-free so it renders anywhere.
 - Prefer clarity over decoration. Pitch the complexity and labelling to the year group.`;
@@ -144,4 +164,67 @@ ${scope}
 
 Current lesson JSON:
 ${lessonJson}`;
+}
+
+export function editWorksheetSystemPrompt(): string {
+  return `${PERSONA}
+
+You are revising an existing worksheet. You will receive it as JSON and an instruction. Return the COMPLETE revised worksheet in the same JSON structure (all sections and questions, not just the changed ones). Preserve good content; only change what the instruction requires. Keep an answer/marking key for every question, vary question types appropriately, number questions sequentially across the whole worksheet, and leave inapplicable fields as empty strings or empty arrays.`;
+}
+
+export function editWorksheetUserPrompt(worksheetJson: string, instruction: string): string {
+  return `Instruction: ${instruction}
+
+Apply the change across the worksheet where relevant, then renumber all questions sequentially from 1.
+
+Current worksheet JSON:
+${worksheetJson}`;
+}
+
+export interface AskContext {
+  title?: string;
+  subject?: string;
+  yearGroup?: string;
+  region?: string;
+}
+
+export type AskEdit =
+  | { kind: "lesson"; slides: { number: number; title: string }[] }
+  | { kind: "worksheet" };
+
+export function askBoardmarkieSystemPrompt(ctx?: AskContext, edit?: AskEdit): string {
+  let prompt = `${PERSONA}
+
+You are "Ask Boardmarkie", a friendly, practical teaching assistant chatting with a teacher inside the Boardmarkie app. Help with planning, explaining concepts, suggesting activities and differentiation, writing questions, rubrics and feedback, classroom management, and quick subject knowledge. Keep answers concise and immediately classroom-usable: short paragraphs or bullet points, no padding. Use the spelling and terminology conventions of the teacher's region. If you are unsure of a fact, say so briefly rather than inventing it.`;
+
+  if (ctx && (ctx.title || ctx.subject)) {
+    const lines: string[] = [];
+    if (ctx.title) lines.push(`Title: ${ctx.title}`);
+    if (ctx.subject) lines.push(`Subject: ${ctx.subject}`);
+    if (ctx.yearGroup) lines.push(`Year group / grade: ${ctx.yearGroup}`);
+    if (ctx.region) lines.push(`Curriculum / region: ${ctx.region}`);
+    prompt += `
+
+The teacher currently has this ${edit?.kind === "worksheet" ? "worksheet" : "lesson"} open — tailor your help to it when relevant:
+${lines.join("\n")}`;
+  }
+
+  if (edit?.kind === "lesson") {
+    prompt += `
+
+You can EDIT this open presentation. For CONTENT changes (rewrite, simplify, expand, retitle, change wording, add/remove content), call the \`edit_presentation\` tool with a precise, self-contained instruction — set scope to "slide" (with the 1-based slideNumber) for a single slide, or "whole_lesson" otherwise. For purely STRUCTURAL changes to slide order or count — delete, duplicate, or move a slide — call the \`arrange_slides\` tool instead (it's instant and free, no rewriting).
+
+Only call a tool for actual changes to THIS presentation. For questions, advice, or content the teacher just wants to read, reply normally without a tool. Do not claim you've changed the presentation unless you called a tool.
+
+Current slides:
+${edit.slides.map((s) => `${s.number}. ${s.title || "(untitled)"}`).join("\n")}`;
+  } else if (edit?.kind === "worksheet") {
+    prompt += `
+
+You can EDIT this open worksheet. When the teacher asks to change, add, remove, reorder, or re-mark questions or sections, adjust difficulty, or rewrite content, call the \`edit_worksheet\` tool with a precise, self-contained instruction, e.g. "Add three harder short-answer questions about …", "Make question 2 multiple choice", "Add a model answer to every question".
+
+Only call the tool for actual changes to THIS worksheet. For questions or advice, reply normally without the tool. Do not claim you've changed the worksheet unless you called the tool.`;
+  }
+
+  return prompt;
 }

@@ -118,6 +118,16 @@ const slideSchema: JSONSchema = {
       type: "string",
       description: "Short alt text for the suggested image. Empty if no image.",
     },
+    imageQuery: {
+      type: "string",
+      description:
+        "2-4 plain keywords to find a stock PHOTO for this slide via image search (e.g. 'water cycle', 'volcano eruption', 'cheering students'). Empty string if the slide needs no image.",
+    },
+    gifQuery: {
+      type: "string",
+      description:
+        "1-3 word CONCRETE, VISUAL subject for a fun looping GIF, chosen so a mainstream GIF site (Giphy) is likely to actually have a good match — real-world things, animals, actions, weather, space, or reactions (e.g. 'volcano erupting', 'rain', 'beating heart', 'galaxy', 'celebration', 'thinking'). Use ONLY where a short GIF genuinely adds energy or illustrates the idea; LEAVE EMPTY ('') for abstract points, detailed processes, diagrams, or when a still photo is clearly better. Do NOT force a GIF onto every slide — a few per lesson at most.",
+    },
     youtube: {
       type: "object",
       additionalProperties: false,
@@ -147,6 +157,8 @@ const slideSchema: JSONSchema = {
     "quiz",
     "imagePrompt",
     "imageAlt",
+    "imageQuery",
+    "gifQuery",
     "youtube",
   ],
 };
@@ -170,13 +182,19 @@ export const lessonSchema: JSONSchema = {
       items: vocabItem,
       description: "Key vocabulary for the whole lesson.",
     },
+    standards: {
+      type: "array",
+      items: { type: "string" },
+      description:
+        "Official curriculum standard(s) this lesson aligns to for the given subject, year group/grade and region — each as its code plus a short description (e.g. 'NGSS 5-PS1-1: …', 'CCSS.MATH.CONTENT.4.NF.B.3: …', 'National Curriculum KS2 Science: …'). Empty array if standards were not requested.",
+    },
     slides: {
       type: "array",
       items: slideSchema,
       description: "The ordered slides that make up the lesson.",
     },
   },
-  required: ["title", "summary", "objectives", "vocabulary", "slides"],
+  required: ["title", "summary", "objectives", "vocabulary", "standards", "slides"],
 };
 
 export const worksheetSchema: JSONSchema = {
