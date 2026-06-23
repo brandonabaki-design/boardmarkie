@@ -1,6 +1,11 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Plus_Jakarta_Sans, Caveat } from "next/font/google";
 import "./globals.css";
+import { RegisterSW } from "@/components/RegisterSW";
+
+// Matches next.config's basePath ("" locally, "/boardmarkie" on Pages) so the
+// manifest, icons and service worker resolve correctly in both.
+const BASE = process.env.PAGES_BASE_PATH || "";
 
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
@@ -38,6 +43,16 @@ export const metadata: Metadata = {
       "Create classroom-ready lessons, worksheets and whole units in seconds.",
     type: "website",
   },
+  manifest: `${BASE}/manifest.webmanifest`,
+  appleWebApp: { capable: true, title: "Boardmarkie", statusBarStyle: "default" },
+  icons: {
+    icon: `${BASE}/icons/icon-192.png`,
+    apple: `${BASE}/icons/icon-192.png`,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0c8a78",
 };
 
 export default function RootLayout({
@@ -50,7 +65,10 @@ export default function RootLayout({
       lang="en"
       className={`${jakarta.variable} ${bricolage.variable} ${caveat.variable} h-full`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <RegisterSW base={BASE} />
+      </body>
     </html>
   );
 }
