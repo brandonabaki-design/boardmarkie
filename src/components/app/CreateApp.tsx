@@ -18,7 +18,7 @@ import { generateArtifact, editLesson } from "@/lib/client";
 import { generateImage, illustrationPrompt } from "@/lib/images";
 import { resolveYoutube } from "@/lib/youtube";
 import { ensureElements, slideToElements } from "@/lib/canvas";
-import { deleteArtifact, getImageConfig, getLibrary, saveArtifact } from "@/lib/storage";
+import { deleteArtifact, getArtifactFull, getImageConfig, getLibrary, saveArtifact } from "@/lib/storage";
 import { GeneratorForm } from "./GeneratorForm";
 import { GeneratingState } from "./GeneratingState";
 import { LessonSkeleton } from "./LessonSkeleton";
@@ -262,13 +262,15 @@ export function CreateApp() {
     }
   };
 
-  const openArtifact = (a: Artifact) => {
-    setCurrent(a.kind === "lesson" ? seedLesson(a) : a);
-    setPast([]);
-    setFuture([]);
+  const openArtifact = async (a: Artifact) => {
     setLibOpen(false);
     setError(null);
     window.scrollTo({ top: 0 });
+    // Pull the full copy (with images) from IndexedDB; fall back to the list item.
+    const full = (await getArtifactFull(a.id)) ?? a;
+    setCurrent(full.kind === "lesson" ? seedLesson(full) : full);
+    setPast([]);
+    setFuture([]);
   };
 
   const removeArtifact = (id: string) => {

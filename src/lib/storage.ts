@@ -141,22 +141,121 @@ export function saveArtifact(artifact: Artifact): void {
   try {
     window.localStorage.setItem(KEY_LIB, JSON.stringify(trimmed));
   } catch {
-    // Most likely a quota error from generated images. Persist everything
-    // except the heavy raster images rather than losing the whole library.
+    // localStorage caps at ~5MB; persist text/layout there and let IndexedDB
+    // (below) keep the heavy images.
     try {
       window.localStorage.setItem(KEY_LIB, JSON.stringify(dropRasterImages(trimmed)));
     } catch {
-      /* Give up persisting; the in-memory copy keeps images for this session. */
+      /* localStorage full; IndexedDB still holds the full copy. */
     }
   }
+  // Durable copy WITH images, so they survive a revisit.
+  idbPutDebounced(artifact);
 }
 
 export function deleteArtifact(id: string): void {
   if (typeof window === "undefined") return;
   const lib = getLibrary().filter((a) => a.id !== id);
   window.localStorage.setItem(KEY_LIB, JSON.stringify(lib));
+  void idbDelete(id);
 }
 
 export function getArtifact(id: string): Artifact | undefined {
   return getLibrary().find((a) => a.id === id);
+}
+
+/**
+ * Full artifact including images. Prefers the IndexedDB copy (which keeps the
+ * heavy base64 images); falls back to the localStorage copy (text/layout only).
+ */
+export async function getArtifactFull(id: string): Promise<Artifact | undefined> {
+  const full = await idbGet(id);
+  return full ?? getArtifact(id);
+}
+
+// ---- IndexedDB: durable store for full artifacts (incl. images) ----
+// localStorage tops out around 5MB; a deck of generated images blows past that,
+// so the full artifact (with image data URLs) lives here instead.
+
+const DB_NAME = "boardmarkie";
+const DB_STORE = "artifacts";
+let dbPromise: Promise<IDBDatabase | null> | null = null;
+
+function openDb(): Promise<IDBDatabase | null> {
+  return new Promise((resolve) => {
+    if (typeof indexedDB === "undefined") return resolve(null);
+    let req: IDBOpenDBRequest;
+    try {
+      req = indexedDB.open(DB_NAME, 1);
+    } catch {
+      return resolve(null);
+    }
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE, { keyPath: "id" });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(null);
+  });
+}
+
+function getDb(): Promise<IDBDatabase | null> {
+  return (dbPromise ??= openDb());
+}
+
+async function idbPut(artifact: Artifact): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await new Promise<void>((resolve) => {
+    try {
+      const tx = db.transaction(DB_STORE, "readwrite");
+      tx.objectStore(DB_STORE).put(artifact);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+      tx.onabort = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
+}
+
+async function idbGet(id: string): Promise<Artifact | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  return new Promise<Artifact | undefined>((resolve) => {
+    try {
+      const tx = db.transaction(DB_STORE, "readonly");
+      const r = tx.objectStore(DB_STORE).get(id);
+      r.onsuccess = () => resolve(r.result as Artifact | undefined);
+      r.onerror = () => resolve(undefined);
+    } catch {
+      resolve(undefined);
+    }
+  });
+}
+
+async function idbDelete(id: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await new Promise<void>((resolve) => {
+    try {
+      const tx = db.transaction(DB_STORE, "readwrite");
+      tx.objectStore(DB_STORE).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
+}
+
+// Coalesce rapid saves (drags, auto-image bursts) into one write per artifact.
+const idbTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+function idbPutDebounced(artifact: Artifact): void {
+  const id = artifact.id;
+  if (idbTimers[id]) clearTimeout(idbTimers[id]);
+  idbTimers[id] = setTimeout(() => {
+    delete idbTimers[id];
+    void idbPut(artifact);
+  }, 600);
 }
