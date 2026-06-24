@@ -122,14 +122,6 @@ async function giphy(q) {
   }
 }
 
-// Round-robin merge so every source contributes near the top.
-function interleave(lists) {
-  const out = [];
-  const max = lists.reduce((m, l) => Math.max(m, l.length), 0);
-  for (let i = 0; i < max; i++) for (const l of lists) if (l[i]) out.push(l[i]);
-  return out;
-}
-
 export default async function handler(req, res) {
   setCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
@@ -167,9 +159,11 @@ export default async function handler(req, res) {
     return res.status(200).json({ results });
   }
 
-  const lists = await Promise.all([openverse(q), pixabay(q), unsplash(q)]);
+  const [ov, px, us] = await Promise.all([openverse(q), pixabay(q), unsplash(q)]);
   const seen = new Set();
-  const results = interleave(lists)
+  // Curated stock first (Unsplash, then Pixabay) — far more relevant & reliable
+  // than Openverse, which only fills in behind them.
+  const results = [...us, ...px, ...ov]
     .filter((r) => r.url && !seen.has(r.url) && seen.add(r.url))
     .slice(0, 36);
   return res.status(200).json({ results });

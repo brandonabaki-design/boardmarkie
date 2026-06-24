@@ -127,12 +127,33 @@ async function unsplashSearch(q: string): Promise<ImageResult[]> {
   }
 }
 
-// Round-robin merge so every source contributes near the top of the results.
-function interleave(lists: ImageResult[][]): ImageResult[] {
-  const out: ImageResult[] = [];
-  const max = lists.reduce((m, l) => Math.max(m, l.length), 0);
-  for (let i = 0; i < max; i++) for (const l of lists) if (l[i]) out.push(l[i]);
-  return out;
+// Resolve to the first URL whose image actually loads, so auto-embed never
+// drops a dead / hotlink-blocked URL onto a slide as a broken image.
+export async function firstLoadableImage(urls: string[], timeoutMs = 5000): Promise<string | undefined> {
+  for (const url of urls) {
+    if (!url) continue;
+    const ok = await new Promise<boolean>((resolve) => {
+      if (typeof window === "undefined") return resolve(true);
+      const img = new Image();
+      const finish = (v: boolean) => {
+        img.onload = null;
+        img.onerror = null;
+        resolve(v);
+      };
+      const timer = setTimeout(() => finish(false), timeoutMs);
+      img.onload = () => {
+        clearTimeout(timer);
+        finish(true);
+      };
+      img.onerror = () => {
+        clearTimeout(timer);
+        finish(false);
+      };
+      img.src = url;
+    });
+    if (ok) return url;
+  }
+  return undefined;
 }
 
 // Hosted mode: one authed call to the proxy, which aggregates Openverse +
@@ -162,10 +183,16 @@ export async function searchImages(query: string): Promise<ImageResult[]> {
     return results.slice(0, 36);
   }
 
-  const lists = await Promise.all([openverseSearch(q), pixabaySearch(q), unsplashSearch(q)]);
+  const [openverse, pixabay, unsplash] = await Promise.all([
+    openverseSearch(q),
+    pixabaySearch(q),
+    unsplashSearch(q),
+  ]);
 
+  // Curated stock first — Unsplash then Pixabay are far more relevant and
+  // reliable than Openverse, which only fills in behind them.
   const seen = new Set<string>();
-  const merged = interleave(lists).filter((r) => {
+  const merged = [...unsplash, ...pixabay, ...openverse].filter((r) => {
     if (!r.url || seen.has(r.url)) return false;
     seen.add(r.url);
     return true;

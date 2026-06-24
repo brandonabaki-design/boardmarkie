@@ -359,6 +359,10 @@ function ElementContent({
         draggable={false}
         loading="lazy"
         decoding="async"
+        onError={(e) => {
+          // Hide a dead/blocked image URL rather than showing a broken icon.
+          e.currentTarget.style.display = "none";
+        }}
         // "contain" shows the whole image (never cropped/cut); boxes are sized ~16:9 to match.
         style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: `${el.radius ?? 4}%`, opacity: (el.opacity ?? 100) / 100 }}
       />

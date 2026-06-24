@@ -322,7 +322,18 @@ export function ImageSwap({
                         className="relative aspect-square overflow-hidden rounded-lg border border-line transition-colors hover:border-brand-400 disabled:opacity-50"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={r.thumb} alt={r.title} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                        <img
+                          src={r.thumb}
+                          alt={r.title}
+                          loading="lazy"
+                          decoding="async"
+                          onError={(e) => {
+                            // Drop a result whose thumbnail won't load.
+                            const b = e.currentTarget.parentElement;
+                            if (b) b.style.display = "none";
+                          }}
+                          className="h-full w-full object-cover"
+                        />
                         {src && (
                           <span className="pointer-events-none absolute bottom-1 left-1 rounded bg-ink/70 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">
                             {src}

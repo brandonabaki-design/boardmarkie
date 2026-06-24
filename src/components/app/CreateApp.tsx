@@ -18,7 +18,7 @@ import type {
 import { generateArtifact, generateOutline, editLesson, editWorksheet } from "@/lib/client";
 import { generateImage, illustrationPrompt, canGenerateImages } from "@/lib/images";
 import { resolveYoutube } from "@/lib/youtube";
-import { searchImages } from "@/lib/imageSearch";
+import { searchImages, firstLoadableImage } from "@/lib/imageSearch";
 import { searchGifs } from "@/lib/gifSearch";
 import { cid, ensureElements, slideToElements } from "@/lib/canvas";
 import {
@@ -102,8 +102,9 @@ export function CreateApp() {
   const [current, setCurrent] = useState<Artifact | null>(null);
   const [genMode, setGenMode] = useState<GenerationMode>(initialMode);
   const [loading, setLoading] = useState(false);
-  const [outlining, setOutlining] = useState(false);
-  const [refine, setRefine] = useState<{ req: GenerateRequest; outline: OutlineSlide[] } | null>(null);
+  // refine.outline === null means the outline is still generating (the refiner
+  // shows immediately with a loading state so the theme can be picked right away).
+  const [refine, setRefine] = useState<{ req: GenerateRequest; outline: OutlineSlide[] | null } | null>(null);
   const [editing, setEditing] = useState(false);
   const [expanding, setExpanding] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -182,20 +183,20 @@ export function CreateApp() {
     if (e.status === 401) openSettings("claude");
   };
 
-  // Lessons go through an outline-first wizard (Topic → Refine → Theme); other
-  // modes generate directly.
+  // Lessons go through an outline-first flow: show the theme picker + outline
+  // immediately, generate the outline in the background, then auto-build.
   const handleGenerate = async (req: GenerateRequest) => {
     setError(null);
     if (req.mode === "lesson") {
       setGenMode("lesson");
-      setOutlining(true);
+      setRefine({ req, outline: null }); // show the refiner right away (outline loading)
       try {
         const outline = await generateOutline(req);
-        setRefine({ req, outline });
+        // Ignore if the user navigated away / started a different generation.
+        setRefine((r) => (r && r.req === req ? { req, outline } : r));
       } catch (err) {
         handleError(err);
-      } finally {
-        setOutlining(false);
+        setRefine(null);
       }
       return;
     }
@@ -345,10 +346,17 @@ export function CreateApp() {
           const gq = (t.gifQuery || "").trim();
           // In GIF mode, embed a GIF only where the model chose a concrete
           // gifQuery; otherwise fall back to a relevant photo (never a random GIF).
-          if (kind === "gif" && gq) url = (await searchGifs(gq))[0]?.url;
+          // Pick the first result that actually loads so no broken images land.
+          if (kind === "gif" && gq) {
+            const gifs = await searchGifs(gq);
+            url = await firstLoadableImage(gifs.slice(0, 6).map((g) => g.url));
+          }
           if (!url) {
             const iq = slideQuery(t);
-            if (iq) url = (await searchImages(iq))[0]?.url;
+            if (iq) {
+              const imgs = await searchImages(iq);
+              url = await firstLoadableImage(imgs.slice(0, 8).map((r) => r.url));
+            }
           }
           if (url) {
             const cur = working.slides.find((s) => s.id === t.id) ?? t;
@@ -663,7 +671,7 @@ export function CreateApp() {
           <>
             {/* Form stays mounted (just hidden) during Refine so inputs are preserved on Back. */}
             <div className={refine ? "hidden" : ""}>
-              <GeneratorForm initialMode={initialMode} loading={outlining} onSubmit={handleGenerate} />
+              <GeneratorForm initialMode={initialMode} loading={false} onSubmit={handleGenerate} />
             </div>
             {refine && (
               <OutlineRefiner
