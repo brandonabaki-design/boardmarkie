@@ -11,27 +11,26 @@
 //
 // Debug: GET -> capability marker; POST { prompt, apiKey?, size?, quality? } -> { image }
 
+import { setCors, verifyAuth, authEnabled } from "../_auth.js";
+
 export const config = { maxDuration: 60 };
 
-const ALLOW_ORIGIN = "*";
 const DEFAULT_MODEL = "gpt-image-1";
 const ALLOWED_SIZES = new Set(["1024x1024", "1536x1024", "1024x1536", "auto"]);
 const ALLOWED_QUALITY = new Set(["low", "medium", "high", "auto"]);
 
-function setCors(res) {
-  res.setHeader("Access-Control-Allow-Origin", ALLOW_ORIGIN);
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  res.setHeader("Access-Control-Max-Age", "86400");
-}
-
 export default async function handler(req, res) {
-  setCors(res);
+  setCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method === "GET") {
     return res.status(200).json({ ok: true, endpoint: "openai-image", model: DEFAULT_MODEL });
   }
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST." });
+
+  if (authEnabled()) {
+    const auth = await verifyAuth(req);
+    if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+  }
 
   let payload = req.body;
   if (typeof payload === "string") {

@@ -32,6 +32,7 @@ import {
 } from "@/lib/storage";
 import { MODEL_OPTIONS } from "@/lib/anthropic";
 import { CHAT_MODEL, chatComplete } from "@/lib/openai";
+import { isHostedMode } from "@/lib/backend";
 import { Spinner } from "./ui";
 import { useDialog } from "./useDialog";
 import { SyncPanel } from "./SyncPanel";
@@ -99,6 +100,7 @@ export function SettingsModal({
   const [testing, setTesting] = useState(false);
   const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const dialogRef = useDialog(open, onClose);
+  const hosted = isHostedMode();
 
   useEffect(() => {
     if (open) {
@@ -164,9 +166,11 @@ export function SettingsModal({
   const inputCls =
     "mt-1.5 w-full rounded-xl border border-line px-3.5 py-2.5 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100";
 
+  // In hosted mode the keys live on the server, so the OpenAI (key-only) tab is
+  // hidden; Claude/Images keep their non-key preferences.
   const tabs: { id: Tab; label: string; icon: typeof KeyRound }[] = [
     { id: "claude", label: "Claude", icon: Zap },
-    { id: "openai", label: "OpenAI", icon: Bot },
+    ...(hosted ? [] : [{ id: "openai" as Tab, label: "OpenAI", icon: Bot }]),
     { id: "images", label: "Images", icon: ImagePlus },
     { id: "sync", label: "Sync", icon: Cloud },
   ];
@@ -194,7 +198,9 @@ export function SettingsModal({
 
         {/* tabs */}
         <div className="shrink-0 px-4 pt-3">
-          <div className="grid grid-cols-4 gap-1.5 rounded-2xl border border-line bg-paper p-1.5">
+          <div
+            className={`grid ${tabs.length >= 4 ? "grid-cols-4" : "grid-cols-3"} gap-1.5 rounded-2xl border border-line bg-paper p-1.5`}
+          >
             {tabs.map((t) => (
               <button
                 key={t.id}
@@ -213,32 +219,45 @@ export function SettingsModal({
 
         {/* scrollable body */}
         <div className="flex-1 overflow-auto px-6 py-5">
+          {hosted && (
+            <div className="mb-4 flex items-start gap-2 rounded-xl bg-mint px-3.5 py-3 text-xs text-brand-900">
+              <ShieldCheck size={16} className="mt-0.5 shrink-0 text-brand-600" />
+              Your school manages the API keys — there&apos;s nothing to enter here. Use the{" "}
+              <span className="font-semibold">Sync</span> tab for your account; the options below are
+              personal preferences.
+            </div>
+          )}
+
           {tab === "claude" && (
             <div>
-              <p className="text-sm text-muted">
-                Boardmarkie generates with Anthropic&apos;s Claude. If the site is hosted with a server key
-                you can leave this blank. Otherwise paste your own key — it&apos;s stored only in this browser
-                and sent directly with your requests.
-              </p>
+              {!hosted && (
+                <>
+                  <p className="text-sm text-muted">
+                    Boardmarkie generates with Anthropic&apos;s Claude. If the site is hosted with a server
+                    key you can leave this blank. Otherwise paste your own key — it&apos;s stored only in
+                    this browser and sent directly with your requests.
+                  </p>
 
-              <label className="mt-5 block">
-                <span className="text-sm font-semibold text-ink">Anthropic API key</span>
-                <SecretInput value={value} onChange={setValue} placeholder="sk-ant-…" />
-              </label>
+                  <label className="mt-5 block">
+                    <span className="text-sm font-semibold text-ink">Anthropic API key</span>
+                    <SecretInput value={value} onChange={setValue} placeholder="sk-ant-…" />
+                  </label>
 
-              <div className="mt-4 flex items-start gap-2 rounded-xl bg-mint px-3.5 py-3 text-xs text-brand-900">
-                <ShieldCheck size={16} className="mt-0.5 shrink-0 text-brand-600" />
-                Your key never touches our database — it stays in your browser&apos;s local storage.
-              </div>
+                  <div className="mt-4 flex items-start gap-2 rounded-xl bg-mint px-3.5 py-3 text-xs text-brand-900">
+                    <ShieldCheck size={16} className="mt-0.5 shrink-0 text-brand-600" />
+                    Your key never touches our database — it stays in your browser&apos;s local storage.
+                  </div>
 
-              <a
-                href="https://console.anthropic.com/settings/keys"
-                target="_blank"
-                rel="noreferrer"
-                className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline"
-              >
-                Get an Anthropic API key <ExternalLink size={13} />
-              </a>
+                  <a
+                    href="https://console.anthropic.com/settings/keys"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline"
+                  >
+                    Get an Anthropic API key <ExternalLink size={13} />
+                  </a>
+                </>
+              )}
 
               <div className="mt-6 border-t border-line pt-5">
                 <h3 className="flex items-center gap-2 text-sm font-bold text-ink">
@@ -394,34 +413,38 @@ export function SettingsModal({
                   : "Google Imagen runs through the proxy below. Diagrams are drawn by Claude and need nothing extra."}
               </p>
 
-              <label className="mt-3 block">
-                <span className="text-sm font-semibold text-ink">Image proxy URL</span>
-                <input
-                  type="url"
-                  value={proxyUrl}
-                  onChange={(e) => setProxyUrl(e.target.value)}
-                  placeholder="https://boardmarkie.vercel.app/api/image"
-                  autoComplete="off"
-                  className={inputCls}
-                />
-              </label>
+              {!hosted && (
+                <>
+                  <label className="mt-3 block">
+                    <span className="text-sm font-semibold text-ink">Image proxy URL</span>
+                    <input
+                      type="url"
+                      value={proxyUrl}
+                      onChange={(e) => setProxyUrl(e.target.value)}
+                      placeholder="https://boardmarkie.vercel.app/api/image"
+                      autoComplete="off"
+                      className={inputCls}
+                    />
+                  </label>
 
-              <label className="mt-3 block">
-                <span className="text-sm font-semibold text-ink">
-                  Gemini API key{" "}
-                  <span className="font-normal text-muted">(blank if the proxy holds a shared key)</span>
-                </span>
-                <SecretInput value={imageKey} onChange={setImageKey} placeholder="AIza…" />
-              </label>
+                  <label className="mt-3 block">
+                    <span className="text-sm font-semibold text-ink">
+                      Gemini API key{" "}
+                      <span className="font-normal text-muted">(blank if the proxy holds a shared key)</span>
+                    </span>
+                    <SecretInput value={imageKey} onChange={setImageKey} placeholder="AIza…" />
+                  </label>
 
-              <a
-                href="https://aistudio.google.com/apikey"
-                target="_blank"
-                rel="noreferrer"
-                className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline"
-              >
-                Get a Gemini API key <ExternalLink size={13} />
-              </a>
+                  <a
+                    href="https://aistudio.google.com/apikey"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline"
+                  >
+                    Get a Gemini API key <ExternalLink size={13} />
+                  </a>
+                </>
+              )}
 
               <div className="mt-4">
                 <span className="text-sm font-semibold text-ink">Illustration style</span>
@@ -477,6 +500,7 @@ export function SettingsModal({
                 </p>
               </div>
 
+              {!hosted && (
               <div className="mt-6 border-t border-line pt-5">
                 <h3 className="flex items-center gap-2 text-sm font-bold text-ink">
                   <Search size={16} className="text-brand-600" /> Image search
@@ -558,6 +582,7 @@ export function SettingsModal({
                   </a>
                 </div>
               </div>
+              )}
             </div>
           )}
 
@@ -566,15 +591,17 @@ export function SettingsModal({
 
         {/* pinned footer */}
         <div className="flex shrink-0 gap-3 border-t border-line bg-white px-6 py-4">
-          <button
-            onClick={() => {
-              setApiKey("");
-              setValue("");
-            }}
-            className="rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-paper"
-          >
-            Clear key
-          </button>
+          {!hosted && (
+            <button
+              onClick={() => {
+                setApiKey("");
+                setValue("");
+              }}
+              className="rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-paper"
+            >
+              Clear key
+            </button>
+          )}
           <button
             onClick={save}
             className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700"

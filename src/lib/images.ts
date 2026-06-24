@@ -7,6 +7,7 @@
 
 import { getImageConfig, getImageStyle, getImageQuality, getImageProvider, getOpenAIKey } from "./storage";
 import { generateOpenAIImage } from "./openai";
+import { isHostedMode, getBackendBase, authHeader } from "./backend";
 
 // AI illustration quality → Imagen tier. Ultra has the best prompt alignment.
 const QUALITY_MODEL: Record<string, string> = {
@@ -46,6 +47,7 @@ export interface ImageOptions {
 /** Can we generate images with the current settings? Imagen needs the proxy;
  *  OpenAI (gpt-image-1) needs the proxy plus an OpenAI key. */
 export function canGenerateImages(): boolean {
+  if (isHostedMode()) return true; // server holds the keys
   if (!getImageConfig().proxyUrl) return false;
   if (getImageProvider() === "dalle") return !!getOpenAIKey();
   return true;
@@ -61,17 +63,22 @@ export async function generateImage(prompt: string, opts: ImageOptions = {}): Pr
     return generateOpenAIImage(prompt, opts.aspectRatio ?? "16:9");
   }
 
+  const hosted = isHostedMode();
   const { proxyUrl, apiKey } = getImageConfig();
-  if (!proxyUrl) throw err(NO_IMAGE_PROXY_MESSAGE, 401);
+  const url = hosted ? `${getBackendBase()}/image` : proxyUrl;
+  if (!url) throw err(NO_IMAGE_PROXY_MESSAGE, 401);
+
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (hosted) Object.assign(headers, await authHeader());
 
   let res: Response;
   try {
-    res = await fetch(proxyUrl, {
+    res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({
         prompt,
-        apiKey: apiKey || undefined,
+        apiKey: hosted ? undefined : apiKey || undefined,
         model: QUALITY_MODEL[getImageQuality()],
         aspectRatio: opts.aspectRatio ?? "16:9",
       }),

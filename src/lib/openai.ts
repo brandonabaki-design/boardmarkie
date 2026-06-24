@@ -9,6 +9,7 @@
 // your own proxy.
 
 import { getImageConfig, getImageQuality, getOpenAIKey } from "./storage";
+import { isHostedMode, getBackendBase, authHeader } from "./backend";
 
 export const CHAT_MODEL = "gpt-4o";
 
@@ -42,8 +43,10 @@ async function proxyErrorMessage(res: Response, fallback: string): Promise<strin
   }
 }
 
-/** Is OpenAI usable right now (key + proxy both configured)? */
+/** Is OpenAI usable right now? In hosted mode the server holds the key, so it's
+ *  always ready; otherwise the user needs both their key and a proxy URL. */
 export function openAiReady(): boolean {
+  if (isHostedMode()) return true;
   return !!getOpenAIKey() && !!getImageConfig().proxyUrl;
 }
 
@@ -63,6 +66,7 @@ function requireOpenAIKey(): string {
 }
 
 function endpoint(name: "openai-chat" | "openai-image"): string {
+  if (isHostedMode()) return `${getBackendBase()}/${name}`;
   const { proxyUrl } = getImageConfig();
   if (!proxyUrl) throw err(NO_OPENAI_SETUP, 401);
   return proxyUrl.replace(/\/image\/?$/, `/${name}`);
@@ -94,15 +98,18 @@ export interface ChatResult {
  * decided to make (e.g. to edit the open presentation).
  */
 export async function chatComplete(messages: ChatMessage[], tools?: ChatTool[]): Promise<ChatResult> {
-  const apiKey = requireOpenAIKey();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const auth: Record<string, unknown> = {};
+  if (isHostedMode()) Object.assign(headers, await authHeader());
+  else auth.apiKey = requireOpenAIKey();
 
   let res: Response;
   try {
     res = await fetch(endpoint("openai-chat"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({
-        apiKey,
+        ...auth,
         model: CHAT_MODEL,
         messages,
         ...(tools && tools.length ? { tools } : {}),
@@ -139,7 +146,10 @@ export async function generateOpenAIImage(
   prompt: string,
   aspectRatio: AspectRatio = "16:9",
 ): Promise<string> {
-  const apiKey = requireOpenAIKey();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const auth: Record<string, unknown> = {};
+  if (isHostedMode()) Object.assign(headers, await authHeader());
+  else auth.apiKey = requireOpenAIKey();
 
   // gpt-image-1 sizes: square, landscape, or portrait.
   const size =
@@ -154,8 +164,8 @@ export async function generateOpenAIImage(
   try {
     res = await fetch(endpoint("openai-image"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ apiKey, prompt, size, quality }),
+      headers,
+      body: JSON.stringify({ ...auth, prompt, size, quality }),
     });
   } catch {
     throw err("Couldn't reach the image proxy. Check the URL in Settings.");

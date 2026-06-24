@@ -21,6 +21,7 @@ import {
   diagramUserPrompt,
 } from "./prompts";
 import { runStructured, toLesson, toOutline, toSeries, toWorksheet } from "./generate";
+import { isHostedMode, getBackendBase, getIdToken } from "./backend";
 import type { Artifact, EditRequest, GenerateRequest, Lesson, OutlineSlide, Worksheet } from "./types";
 
 function err(message: string, status?: number): Error & { status?: number } {
@@ -30,12 +31,29 @@ function err(message: string, status?: number): Error & { status?: number } {
 }
 
 /**
- * Build an Anthropic client that runs in the browser with the user's own key.
- * dangerouslyAllowBrowser is intended exactly for bring-your-own-key apps like
- * this one — the key is the user's, entered locally, and sent straight to
- * Anthropic over HTTPS.
+ * Build an Anthropic client for the current mode.
+ *
+ * Hosted ("school") mode: the SDK is pointed at our reverse proxy, which holds
+ * the shared key and verifies the user's Google sign-in token — so the key is
+ * never in the browser and generation requires sign-in.
+ *
+ * Bring-your-own mode (local/dev, no backend env): the client runs directly in
+ * the browser with the user's own key. dangerouslyAllowBrowser is intended
+ * exactly for BYO-key apps like this one.
  */
-function browserClient(): Anthropic {
+async function browserClient(): Promise<Anthropic> {
+  if (isHostedMode()) {
+    const token = await getIdToken(); // throws 401 (→ sign-in wall) if signed out
+    return new Anthropic({
+      baseURL: `${getBackendBase()}/anthropic`,
+      apiKey: "hosted", // ignored; the real key is injected by the proxy
+      dangerouslyAllowBrowser: true,
+      defaultHeaders: {
+        Authorization: `Bearer ${token}`,
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+    });
+  }
   const apiKey = getApiKey();
   if (!apiKey) throw err(NO_KEY_MESSAGE, 401);
   return new Anthropic({
@@ -58,7 +76,7 @@ function normalize(req: GenerateRequest): GenerateRequest {
 /** A fast, lightweight lesson outline for the teacher to refine before the full
  *  lesson is generated. Uses the user's chosen (default fast) model. */
 export async function generateOutline(input: GenerateRequest): Promise<OutlineSlide[]> {
-  const client = browserClient();
+  const client = await browserClient();
   const req = normalize(input);
   const raw = await runStructured<{ slides?: unknown }>({
     client,
@@ -72,7 +90,7 @@ export async function generateOutline(input: GenerateRequest): Promise<OutlineSl
 }
 
 export async function generateArtifact(input: GenerateRequest): Promise<Artifact> {
-  const client = browserClient();
+  const client = await browserClient();
   const req = normalize(input);
 
   if (req.mode === "worksheet") {
@@ -111,7 +129,7 @@ export async function generateArtifact(input: GenerateRequest): Promise<Artifact
 }
 
 export async function editLesson(input: EditRequest): Promise<Lesson> {
-  const client = browserClient();
+  const client = await browserClient();
   const { lesson, action, slideId, instruction } = input;
 
   const slideTitle = slideId ? lesson.slides.find((s) => s.id === slideId)?.title : undefined;
@@ -151,7 +169,7 @@ export async function editLesson(input: EditRequest): Promise<Lesson> {
 }
 
 export async function editWorksheet(input: { worksheet: Worksheet; instruction: string }): Promise<Worksheet> {
-  const client = browserClient();
+  const client = await browserClient();
   const { worksheet, instruction } = input;
 
   const worksheetForModel = {
@@ -200,7 +218,7 @@ export interface DiagramRequest {
 export async function generateDiagram(
   input: DiagramRequest,
 ): Promise<{ title: string; svg: string; alt: string }> {
-  const client = browserClient();
+  const client = await browserClient();
   const raw = await runStructured<{ title?: string; svg?: string; alt?: string }>({
     client,
     system: diagramSystemPrompt(),

@@ -1,33 +1,153 @@
-// Vercel serverless function — image search for Boardmarkie, backed by
-// Openverse (openverse.org): ~800M openly-licensed images aggregated from
-// Flickr, Wikimedia Commons, museums and more. No API key and no setup needed.
+// Vercel serverless function — image & GIF search for Boardmarkie.
 //
-// (Google's Custom Search JSON API is closed to new Google Cloud projects and
-// shuts down entirely on 2027-01-01, so it can no longer be used as a backend.)
+// Aggregates several free libraries server-side so the app needs no per-user
+// keys: Openverse (no key) + Pixabay + Unsplash for photos, Giphy for GIFs.
+// In hosted ("school") mode the keys live here as env vars and requests require
+// a valid Google sign-in token; in a bring-your-own deploy (no FIREBASE_PROJECT_ID)
+// it still works keyless via Openverse.
 //
-// Debug in a browser: https://<your-proxy>.vercel.app/api/imagesearch?q=tiger
+// Env on the Vercel project (all optional except as noted):
+//   PIXABAY_API_KEY, UNSPLASH_ACCESS_KEY, GIPHY_API_KEY
+//   FIREBASE_PROJECT_ID / ALLOWED_EMAIL_DOMAINS  (see _auth.js)
 //
-// Anonymous use is rate-limited (~1 request/second per IP). For higher limits
-// you can register a free Openverse application and send a Bearer token — see
-// https://docs.openverse.org/api/reference/authentication_and_throttling.html
+// Debug: GET ?q=tiger  or  ?q=cat&kind=gif   ->   { results: [{title,url,thumb,source}] }
 
-const ALLOW_ORIGIN = "*";
+import { setCors, verifyAuth, authEnabled } from "./_auth.js";
+
 const OPENVERSE = "https://api.openverse.org/v1/images/";
 
-function setCors(res) {
-  res.setHeader("Access-Control-Allow-Origin", ALLOW_ORIGIN);
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+async function openverse(q) {
+  try {
+    const url = `${OPENVERSE}?page_size=20&mature=false&q=${encodeURIComponent(q)}`;
+    const r = await fetch(url, { headers: { Accept: "application/json" } });
+    if (!r.ok) return [];
+    const data = await r.json();
+    return (Array.isArray(data.results) ? data.results : [])
+      .map((it) => ({
+        title: it.title || "",
+        url: it.url || it.thumbnail || "",
+        thumb: it.thumbnail || it.url || "",
+        source: "openverse",
+      }))
+      .filter((r) => r.url);
+  } catch {
+    return [];
+  }
+}
+
+async function pixabay(q) {
+  const key = (process.env.PIXABAY_API_KEY || "").trim();
+  if (!key) return [];
+  try {
+    const u = new URL("https://pixabay.com/api/");
+    u.searchParams.set("key", key);
+    u.searchParams.set("q", q);
+    u.searchParams.set("per_page", "15");
+    u.searchParams.set("safesearch", "true");
+    u.searchParams.set("image_type", "all");
+    const r = await fetch(u.toString());
+    if (!r.ok) return [];
+    const data = await r.json();
+    return (data.hits || [])
+      .map((h) => ({
+        title: h.tags || "",
+        url: h.largeImageURL || h.webformatURL || "",
+        thumb: h.webformatURL || h.previewURL || "",
+        source: "pixabay",
+      }))
+      .filter((r) => r.url);
+  } catch {
+    return [];
+  }
+}
+
+async function unsplash(q) {
+  const key = (process.env.UNSPLASH_ACCESS_KEY || "").trim();
+  if (!key) return [];
+  try {
+    const u = new URL("https://api.unsplash.com/search/photos");
+    u.searchParams.set("query", q);
+    u.searchParams.set("per_page", "12");
+    u.searchParams.set("content_filter", "high");
+    const r = await fetch(u.toString(), {
+      headers: { Authorization: `Client-ID ${key}`, "Accept-Version": "v1" },
+    });
+    if (!r.ok) return [];
+    const data = await r.json();
+    return (data.results || [])
+      .map((p) => ({
+        title: p.alt_description || p.description || "",
+        url: (p.urls && (p.urls.regular || p.urls.full)) || "",
+        thumb: (p.urls && (p.urls.small || p.urls.thumb)) || "",
+        source: "unsplash",
+      }))
+      .filter((r) => r.url);
+  } catch {
+    return [];
+  }
+}
+
+async function giphy(q) {
+  const key = (process.env.GIPHY_API_KEY || "").trim();
+  if (!key) return [];
+  try {
+    const u = new URL("https://api.giphy.com/v1/gifs/search");
+    u.searchParams.set("api_key", key);
+    u.searchParams.set("q", q);
+    u.searchParams.set("limit", "24");
+    u.searchParams.set("rating", "g");
+    u.searchParams.set("lang", "en");
+    u.searchParams.set("bundle", "messaging_non_clips");
+    const r = await fetch(u.toString());
+    if (!r.ok) return [];
+    const data = await r.json();
+    return (data.data || [])
+      .map((g) => {
+        const img = g.images || {};
+        const url =
+          (img.downsized_medium && img.downsized_medium.url) ||
+          (img.original && img.original.url) ||
+          (img.downsized && img.downsized.url) ||
+          "";
+        const thumb =
+          (img.fixed_width_small && img.fixed_width_small.url) ||
+          (img.fixed_width && img.fixed_width.url) ||
+          (img.preview_gif && img.preview_gif.url) ||
+          url;
+        return { title: g.title || "", url, thumb, source: "giphy" };
+      })
+      .filter((r) => r.url);
+  } catch {
+    return [];
+  }
+}
+
+// Round-robin merge so every source contributes near the top.
+function interleave(lists) {
+  const out = [];
+  const max = lists.reduce((m, l) => Math.max(m, l.length), 0);
+  for (let i = 0; i < max; i++) for (const l of lists) if (l[i]) out.push(l[i]);
+  return out;
 }
 
 export default async function handler(req, res) {
-  setCors(res);
+  setCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
+  if (req.method !== "GET" && req.method !== "POST") {
+    return res.status(405).json({ error: "Use GET ?q= or POST {q}." });
+  }
+
+  if (authEnabled()) {
+    const auth = await verifyAuth(req);
+    if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+  }
 
   let q = "";
+  let kind = "image";
   if (req.method === "GET") {
     q = String((req.query && req.query.q) || "").trim();
-  } else if (req.method === "POST") {
+    kind = String((req.query && req.query.kind) || "image").trim();
+  } else {
     let payload = req.body;
     if (typeof payload === "string") {
       try {
@@ -36,43 +156,21 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Invalid JSON body." });
       }
     }
-    q = String((payload || {}).q || "").trim();
-  } else {
-    return res.status(405).json({ error: "Use GET ?q= or POST {q}." });
+    payload = payload || {};
+    q = String(payload.q || "").trim();
+    kind = String(payload.kind || "image").trim();
   }
-
   if (!q) return res.status(400).json({ error: "Missing 'q'." });
 
-  const url = OPENVERSE + "?page_size=20&mature=false&q=" + encodeURIComponent(q);
-
-  let upstream;
-  try {
-    upstream = await fetch(url, { headers: { Accept: "application/json" } });
-  } catch {
-    return res.status(502).json({ results: [], error: "Could not reach image search." });
-  }
-  if (upstream.status === 429) {
-    return res
-      .status(429)
-      .json({ results: [], error: "Image search rate limit — try again in a moment." });
-  }
-  if (!upstream.ok) {
-    const detail = await upstream.text();
-    return res.status(upstream.status).json({
-      results: [],
-      error: `Image search error (${upstream.status}).`,
-      detail: detail.slice(0, 400),
-    });
+  if (kind === "gif") {
+    const results = await giphy(q);
+    return res.status(200).json({ results });
   }
 
-  const data = await upstream.json();
-  const results = (Array.isArray(data.results) ? data.results : [])
-    .map((it) => ({
-      title: it.title || "",
-      url: it.url || it.thumbnail || "",
-      thumb: it.thumbnail || it.url || "",
-    }))
-    .filter((r) => r.url);
-
+  const lists = await Promise.all([openverse(q), pixabay(q), unsplash(q)]);
+  const seen = new Set();
+  const results = interleave(lists)
+    .filter((r) => r.url && !seen.has(r.url) && seen.add(r.url))
+    .slice(0, 36);
   return res.status(200).json({ results });
 }

@@ -6,6 +6,7 @@
 // robin interleaved and de-duplicated so you get a broad, high-quality mix.
 
 import { getSearchKey, getUnsplashKey, getImageConfig } from "./storage";
+import { isHostedMode, getBackendBase, authHeader } from "./backend";
 
 export interface ImageResult {
   title: string;
@@ -134,9 +135,32 @@ function interleave(lists: ImageResult[][]): ImageResult[] {
   return out;
 }
 
+// Hosted mode: one authed call to the proxy, which aggregates Openverse +
+// Pixabay + Unsplash (and Giphy for kind="gif") using the server-held keys.
+export async function proxySearch(q: string, kind: "image" | "gif"): Promise<ImageResult[]> {
+  try {
+    const res = await fetch(`${getBackendBase()}/imagesearch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(await authHeader()) },
+      body: JSON.stringify({ q, kind }),
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { results?: ImageResult[] };
+    return data.results ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export async function searchImages(query: string): Promise<ImageResult[]> {
   const q = query.trim();
   if (!q) return [];
+
+  if (isHostedMode()) {
+    const results = await proxySearch(q, "image");
+    if (!results.length) throw new Error(NO_SEARCH_KEY);
+    return results.slice(0, 36);
+  }
 
   const lists = await Promise.all([openverseSearch(q), pixabaySearch(q), unsplashSearch(q)]);
 

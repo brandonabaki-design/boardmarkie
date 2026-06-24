@@ -31,10 +31,12 @@ import {
   saveArtifact,
   LIBRARY_EVENT,
 } from "@/lib/storage";
-import { onAuthChange, signInWithGoogle, type AppUser } from "@/lib/auth";
+import { onAuthChange, signInWithGoogle, signOutUser, type AppUser } from "@/lib/auth";
 import { firebaseConfigured } from "@/lib/firebase";
+import { isHostedMode, emailAllowed } from "@/lib/backend";
 import { installSyncHooks, removeSyncHooks, subscribeArtifacts, syncOnce } from "@/lib/sync";
 import { AccountButton } from "./AccountButton";
+import { SignInWall } from "./SignInWall";
 import { GeneratorForm } from "./GeneratorForm";
 import { GeneratingState } from "./GeneratingState";
 import { LessonSkeleton } from "./LessonSkeleton";
@@ -109,6 +111,7 @@ export function CreateApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("claude");
   const [user, setUser] = useState<AppUser | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [imageProgress, setImageProgress] = useState<{ done: number; total: number } | null>(null);
   const [past, setPast] = useState<Lesson[]>([]);
@@ -131,6 +134,15 @@ export function CreateApp() {
   useEffect(() => {
     let unsubSnap: (() => void) | null = null;
     const unsubAuth = onAuthChange((u) => {
+      setAuthReady(true);
+      // Hosted mode: enforce the email-domain allow-list client-side too (the
+      // backend enforces it as well). A wrong-domain account is signed straight
+      // back out, so it never reaches the tools.
+      if (u && isHostedMode() && !emailAllowed(u.email)) {
+        setError("Please sign in with your school account.");
+        void signOutUser();
+        return;
+      }
       setUser(u);
       unsubSnap?.();
       unsubSnap = null;
@@ -541,6 +553,17 @@ export function CreateApp() {
   };
 
   const busy = loading || editing || expanding !== null || imageProgress !== null;
+
+  // Hosted ("school") mode: sign-in is required to reach the creation tools.
+  if (isHostedMode() && !user) {
+    return authReady ? (
+      <SignInWall />
+    ) : (
+      <div className="grid min-h-screen place-items-center bg-paper">
+        <Spinner className="h-6 w-6 text-brand-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col">

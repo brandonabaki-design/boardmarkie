@@ -40,12 +40,20 @@ jobs:
         env:
           # Pages serves the project at /<repo>; base path must match.
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
-          # Optional: bake in a Firebase web config so cross-device sync needs no
-          # per-device setup. Unset → each browser pastes its config in
-          # Settings → Sync instead. (Not a secret: access is enforced by
+          # Optional: bake in a Firebase web config so sign-in + cross-device
+          # sync need no per-device setup. Unset → each browser pastes its config
+          # in Settings → Sync instead. (Not a secret: access is enforced by
           # Firestore security rules + Auth.) Set repo secret FIREBASE_CONFIG to
           # the firebaseConfig JSON to enable.
           NEXT_PUBLIC_FIREBASE_CONFIG: ${{ secrets.FIREBASE_CONFIG }}
+          # Hosted ("school") mode: set BACKEND_URL to the proxy's /api root
+          # (e.g. https://yourapp.vercel.app/api) to require sign-in and use the
+          # server-hosted keys. Leave unset for bring-your-own-key mode.
+          # ALLOWED_EMAIL_DOMAINS restricts sign-in (e.g. aisa.edu). These are
+          # not secrets, so they're repo *variables* (Settings → Secrets and
+          # variables → Actions → Variables).
+          NEXT_PUBLIC_BACKEND_URL: ${{ vars.BACKEND_URL }}
+          NEXT_PUBLIC_ALLOWED_EMAIL_DOMAINS: ${{ vars.ALLOWED_EMAIL_DOMAINS }}
 
       - name: Disable Jekyll (serve _next/* as-is)
         run: touch out/.nojekyll
