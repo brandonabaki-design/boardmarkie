@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main, claude/nice-rubin-1pgylk]
+    branches: [main]
   workflow_dispatch:
 
 # Allow the workflow to publish to GitHub Pages.
@@ -34,6 +34,14 @@ jobs:
         uses: actions/configure-pages@v5
         with:
           enablement: true
+
+      # Diagnostic only — prints whether the hosted-mode config is present at
+      # build time (booleans, never the values). hosted=true requires BACKEND_URL.
+      - name: Hosted-mode config check
+        run: |
+          echo "BACKEND_URL set:           ${{ vars.BACKEND_URL != '' }}"
+          echo "ALLOWED_EMAIL_DOMAINS set: ${{ vars.ALLOWED_EMAIL_DOMAINS != '' }}"
+          echo "FIREBASE_CONFIG set:       ${{ secrets.FIREBASE_CONFIG != '' }}"
 
       - name: Build static site
         run: npm run build
