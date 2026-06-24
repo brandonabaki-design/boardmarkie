@@ -29,7 +29,12 @@ import {
   getImageConfig,
   getLibrary,
   saveArtifact,
+  LIBRARY_EVENT,
 } from "@/lib/storage";
+import { onAuthChange, signInWithGoogle, type AppUser } from "@/lib/auth";
+import { firebaseConfigured } from "@/lib/firebase";
+import { installSyncHooks, removeSyncHooks, subscribeArtifacts, syncOnce } from "@/lib/sync";
+import { AccountButton } from "./AccountButton";
 import { GeneratorForm } from "./GeneratorForm";
 import { GeneratingState } from "./GeneratingState";
 import { LessonSkeleton } from "./LessonSkeleton";
@@ -47,6 +52,9 @@ import { Spinner } from "./ui";
 function isMode(v: string | null): v is GenerationMode {
   return v === "lesson" || v === "series" || v === "worksheet";
 }
+
+// Which Settings tab to open to (mirrors SettingsModal's internal Tab type).
+type SettingsTab = "claude" | "openai" | "images" | "sync";
 
 function patchSlide(lesson: Lesson, slideId: string, patch: Partial<Slide>): Lesson {
   return {
@@ -99,6 +107,8 @@ export function CreateApp() {
   const [error, setError] = useState<string | null>(null);
   const [libOpen, setLibOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("claude");
+  const [user, setUser] = useState<AppUser | null>(null);
   const [presenting, setPresenting] = useState(false);
   const [imageProgress, setImageProgress] = useState<{ done: number; total: number } | null>(null);
   const [past, setPast] = useState<Lesson[]>([]);
@@ -108,12 +118,56 @@ export function CreateApp() {
     setLibrary(getLibrary());
   }, []);
 
+  // Keep the library in sync with any local write (including changes pulled from
+  // another device by the cloud sync layer).
+  useEffect(() => {
+    const onLib = () => setLibrary(getLibrary());
+    window.addEventListener(LIBRARY_EVENT, onLib);
+    return () => window.removeEventListener(LIBRARY_EVENT, onLib);
+  }, []);
+
+  // Cross-device sync: when the teacher is signed in, mirror every save/delete to
+  // the cloud, reconcile both sides once, and stream in changes from other devices.
+  useEffect(() => {
+    let unsubSnap: (() => void) | null = null;
+    const unsubAuth = onAuthChange((u) => {
+      setUser(u);
+      unsubSnap?.();
+      unsubSnap = null;
+      if (u) {
+        installSyncHooks();
+        void syncOnce();
+        unsubSnap = subscribeArtifacts(() => setLibrary(getLibrary()));
+      } else {
+        removeSyncHooks();
+      }
+    });
+    return () => {
+      unsubAuth();
+      unsubSnap?.();
+      removeSyncHooks();
+    };
+  }, []);
+
   const refresh = () => setLibrary(getLibrary());
+
+  const openSettings = (t: SettingsTab = "claude") => {
+    setSettingsTab(t);
+    setSettingsOpen(true);
+  };
+
+  const handleSignIn = async () => {
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      handleError(err);
+    }
+  };
 
   const handleError = (err: unknown) => {
     const e = err as Error & { status?: number };
     setError(e.message || "Something went wrong.");
-    if (e.status === 401) setSettingsOpen(true);
+    if (e.status === 401) openSettings("claude");
   };
 
   // Lessons go through an outline-first wizard (Topic → Refine → Theme); other
@@ -513,6 +567,12 @@ export function CreateApp() {
                 </button>
               </>
             )}
+            <AccountButton
+              user={user}
+              configured={firebaseConfigured()}
+              onSignIn={handleSignIn}
+              onOpenSync={() => openSettings("sync")}
+            />
             <button
               onClick={() => setLibOpen(true)}
               className="grid h-10 w-10 place-items-center rounded-full border border-line bg-white text-ink transition-colors hover:border-brand-300"
@@ -522,7 +582,7 @@ export function CreateApp() {
               <FolderOpen size={18} />
             </button>
             <button
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => openSettings("claude")}
               className="grid h-10 w-10 place-items-center rounded-full border border-line bg-white text-ink transition-colors hover:border-brand-300"
               aria-label="Settings"
               title="Settings"
@@ -610,7 +670,11 @@ export function CreateApp() {
         onOpen={openArtifact}
         onDelete={removeArtifact}
       />
-      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        initialTab={settingsTab}
+      />
 
       <AskBoardmarkie
         context={
@@ -633,7 +697,7 @@ export function CreateApp() {
         }
         onEdit={askEdit}
         onArrange={askArrange}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSettings={() => openSettings("openai")}
       />
 
       {presenting && current && current.kind === "lesson" && (

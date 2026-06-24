@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, KeyRound, ShieldCheck, ExternalLink, Check, ImagePlus, Search, Zap, Sparkles, Bot, Film, Eye, EyeOff } from "lucide-react";
+import { X, KeyRound, ShieldCheck, ExternalLink, Check, ImagePlus, Search, Zap, Sparkles, Bot, Film, Eye, EyeOff, Cloud } from "lucide-react";
 import {
   getApiKey,
   setApiKey,
@@ -34,8 +34,9 @@ import { MODEL_OPTIONS } from "@/lib/anthropic";
 import { CHAT_MODEL, chatComplete } from "@/lib/openai";
 import { Spinner } from "./ui";
 import { useDialog } from "./useDialog";
+import { SyncPanel } from "./SyncPanel";
 
-type Tab = "claude" | "openai" | "images";
+type Tab = "claude" | "openai" | "images" | "sync";
 
 // Masked API-key input with a show/hide toggle, so keys can be verified.
 function SecretInput({
@@ -72,7 +73,15 @@ function SecretInput({
   );
 }
 
-export function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function SettingsModal({
+  open,
+  onClose,
+  initialTab = "claude",
+}: {
+  open: boolean;
+  onClose: () => void;
+  initialTab?: Tab;
+}) {
   const [tab, setTab] = useState<Tab>("claude");
   const [value, setValue] = useState("");
   const [proxyUrl, setProxyUrl] = useState("");
@@ -93,7 +102,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
   useEffect(() => {
     if (open) {
-      setTab("claude");
+      setTab(initialTab);
       setValue(getApiKey());
       const cfg = getImageConfig();
       setProxyUrl(cfg.proxyUrl);
@@ -109,7 +118,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
       setImgQuality(getImageQuality());
       setSaved(false);
     }
-  }, [open]);
+  }, [open, initialTab]);
 
   if (!open) return null;
 
@@ -159,6 +168,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
     { id: "claude", label: "Claude", icon: Zap },
     { id: "openai", label: "OpenAI", icon: Bot },
     { id: "images", label: "Images", icon: ImagePlus },
+    { id: "sync", label: "Sync", icon: Cloud },
   ];
 
   return (
@@ -184,13 +194,13 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
         {/* tabs */}
         <div className="shrink-0 px-4 pt-3">
-          <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-line bg-paper p-1.5">
+          <div className="grid grid-cols-4 gap-1.5 rounded-2xl border border-line bg-paper p-1.5">
             {tabs.map((t) => (
               <button
                 key={t.id}
                 type="button"
                 onClick={() => setTab(t.id)}
-                className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-sm font-semibold transition-all ${
+                className={`flex items-center justify-center gap-1.5 rounded-xl px-1.5 py-2 text-sm font-semibold transition-all ${
                   tab === t.id ? "bg-white text-brand-700 card-shadow" : "text-muted hover:text-ink"
                 }`}
               >
@@ -550,6 +560,8 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
               </div>
             </div>
           )}
+
+          {tab === "sync" && <SyncPanel />}
         </div>
 
         {/* pinned footer */}

@@ -125,6 +125,7 @@ export interface Lesson {
   id: string;
   kind: "lesson";
   createdAt: number;
+  updatedAt?: number; // last edit time; used for cross-device sync conflict resolution
   meta: LessonMeta;
   slides: Slide[];
   theme?: string; // deck theme id (see src/lib/themes.ts); defaults to "classic"
@@ -168,6 +169,7 @@ export interface Worksheet {
   id: string;
   kind: "worksheet";
   createdAt: number;
+  updatedAt?: number; // last edit time; used for cross-device sync conflict resolution
   meta: WorksheetMeta;
   sections: WorksheetSection[];
 }
@@ -195,6 +197,7 @@ export interface LessonSeries {
   id: string;
   kind: "series";
   createdAt: number;
+  updatedAt?: number; // last edit time; used for cross-device sync conflict resolution
   meta: SeriesMeta;
   lessons: SeriesLesson[];
 }

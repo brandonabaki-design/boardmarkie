@@ -174,6 +174,41 @@ export function setGiphyKey(value: string): void {
   else window.localStorage.removeItem(KEY_GIPHY);
 }
 
+// ---- Cross-device sync (Firebase) ----
+// The Firebase web config is NOT a secret (Google designs it to ship in client
+// code); access is enforced by Firestore security rules + Auth. Stored per
+// browser so each device points at the same project. firebase.ts also accepts a
+// build-time NEXT_PUBLIC_FIREBASE_* fallback for a zero-setup hosted deploy.
+export interface FirebaseConfig {
+  apiKey: string;
+  authDomain: string;
+  projectId: string;
+  storageBucket?: string;
+  messagingSenderId?: string;
+  appId: string;
+  measurementId?: string;
+}
+
+const KEY_FIREBASE = "boardmarkie.firebaseConfig";
+
+export function getFirebaseConfig(): FirebaseConfig | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(KEY_FIREBASE);
+    if (!raw) return null;
+    const cfg = JSON.parse(raw) as FirebaseConfig;
+    return cfg && cfg.apiKey && cfg.projectId && cfg.appId ? cfg : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setFirebaseConfig(cfg: FirebaseConfig | null): void {
+  if (typeof window === "undefined") return;
+  if (cfg) window.localStorage.setItem(KEY_FIREBASE, JSON.stringify(cfg));
+  else window.localStorage.removeItem(KEY_FIREBASE);
+}
+
 export function getLibrary(): Artifact[] {
   if (typeof window === "undefined") return [];
   try {
@@ -186,10 +221,10 @@ export function getLibrary(): Artifact[] {
   }
 }
 
-// Generated raster images (data: URLs) are large; localStorage caps at ~5MB.
-// Drop them from the persisted copy as a last resort so text + SVG diagrams
-// (which are small) still survive a quota error.
-function dropRasterImages(items: Artifact[]): Artifact[] {
+// Generated raster images (data: URLs) are large; localStorage caps at ~5MB and
+// a single Firestore doc caps at ~1MB. Drop the base64 image data so text + SVG
+// diagrams (which are small) still survive a quota error / sync write.
+export function stripHeavyImages(items: Artifact[]): Artifact[] {
   return items.map((a) =>
     a.kind === "lesson"
       ? {
@@ -208,7 +243,38 @@ function dropRasterImages(items: Artifact[]): Artifact[] {
   );
 }
 
-export function saveArtifact(artifact: Artifact): void {
+// Cloud-sync hooks. sync.ts registers these once the user signs in so every
+// save/delete also mirrors to Firestore. Kept as a registration (not a direct
+// import) so storage.ts has no dependency on firebase — sync.ts imports storage,
+// not the other way around, avoiding an import cycle.
+type SaveHook = (a: Artifact) => void;
+type DeleteHook = (id: string) => void;
+let onSaveHook: SaveHook | null = null;
+let onDeleteHook: DeleteHook | null = null;
+
+export function setStorageSyncHooks(hooks: { onSave?: SaveHook | null; onDelete?: DeleteHook | null }): void {
+  onSaveHook = hooks.onSave ?? null;
+  onDeleteHook = hooks.onDelete ?? null;
+}
+
+// Fires after any local library write so the UI can refresh (covers sync pulling
+// in changes from another device). Coalesced to one event per microtask so a
+// burst of writes — e.g. the sign-in reconcile loop — refreshes the UI once.
+export const LIBRARY_EVENT = "boardmarkie:library";
+let notifyScheduled = false;
+function notifyLibraryChanged(): void {
+  if (typeof window === "undefined" || notifyScheduled) return;
+  notifyScheduled = true;
+  queueMicrotask(() => {
+    notifyScheduled = false;
+    window.dispatchEvent(new Event(LIBRARY_EVENT));
+  });
+}
+
+// Persist to this browser only (localStorage + IndexedDB), WITHOUT firing the
+// cloud hook. Used by saveArtifact and by sync.ts when applying remote changes
+// (which must not bounce straight back to the cloud).
+export function putArtifactLocal(artifact: Artifact): void {
   if (typeof window === "undefined") return;
   const lib = getLibrary().filter((a) => a.id !== artifact.id);
   lib.unshift(artifact);
@@ -219,20 +285,36 @@ export function saveArtifact(artifact: Artifact): void {
     // localStorage caps at ~5MB; persist text/layout there and let IndexedDB
     // (below) keep the heavy images.
     try {
-      window.localStorage.setItem(KEY_LIB, JSON.stringify(dropRasterImages(trimmed)));
+      window.localStorage.setItem(KEY_LIB, JSON.stringify(stripHeavyImages(trimmed)));
     } catch {
       /* localStorage full; IndexedDB still holds the full copy. */
     }
   }
   // Durable copy WITH images, so they survive a revisit.
   idbPutDebounced(artifact);
+  notifyLibraryChanged();
 }
 
-export function deleteArtifact(id: string): void {
+export function removeArtifactLocal(id: string): void {
   if (typeof window === "undefined") return;
   const lib = getLibrary().filter((a) => a.id !== id);
   window.localStorage.setItem(KEY_LIB, JSON.stringify(lib));
   void idbDelete(id);
+  notifyLibraryChanged();
+}
+
+export function saveArtifact(artifact: Artifact): void {
+  if (typeof window === "undefined") return;
+  // Stamp the edit time so cross-device sync can resolve conflicts (newest wins).
+  const stamped = { ...artifact, updatedAt: Date.now() } as Artifact;
+  putArtifactLocal(stamped);
+  onSaveHook?.(stamped);
+}
+
+export function deleteArtifact(id: string): void {
+  if (typeof window === "undefined") return;
+  removeArtifactLocal(id);
+  onDeleteHook?.(id);
 }
 
 export function getArtifact(id: string): Artifact | undefined {

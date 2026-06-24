@@ -40,6 +40,12 @@ jobs:
         env:
           # Pages serves the project at /<repo>; base path must match.
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          # Optional: bake in a Firebase web config so cross-device sync needs no
+          # per-device setup. Unset → each browser pastes its config in
+          # Settings → Sync instead. (Not a secret: access is enforced by
+          # Firestore security rules + Auth.) Set repo secret FIREBASE_CONFIG to
+          # the firebaseConfig JSON to enable.
+          NEXT_PUBLIC_FIREBASE_CONFIG: ${{ secrets.FIREBASE_CONFIG }}
 
       - name: Disable Jekyll (serve _next/* as-is)
         run: touch out/.nojekyll

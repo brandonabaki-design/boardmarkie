@@ -23,6 +23,28 @@ React 19, TypeScript, Tailwind v4, Anthropic Claude.
   the landing page is `/`.
 - Saved work + the API key live in browser localStorage (`src/lib/storage.ts`).
 
+## Cross-device sync (Firebase) — optional, keeps the app static
+- Google sign-in + cross-device library sync run entirely client-side against the
+  user's **own Firebase project** (a managed backend), so `output: "export"` stays.
+  Nothing here runs at import time; all init is lazy + browser-guarded so the SSG
+  build never touches Firebase.
+- Layers: `src/lib/firebase.ts` (lazy app/auth/db init; config from localStorage,
+  with a `NEXT_PUBLIC_FIREBASE_*` build-time fallback; `ignoreUndefinedProperties`
+  on Firestore so artifacts' optional fields don't throw) → `src/lib/auth.ts`
+  (Google popup sign-in, `browserLocalPersistence` so sign-in lasts until sign-out)
+  → `src/lib/sync.ts` (per-user `users/{uid}/artifacts/{id}`; push/delete/pull/
+  `subscribeArtifacts` snapshot listener/`syncOnce` reconcile; last-write-wins by
+  `updatedAt`).
+- `storage.ts` stays Firebase-free to avoid an import cycle: it exposes
+  `setStorageSyncHooks` (sync.ts registers cloud push/delete), local-only writers
+  `putArtifactLocal`/`removeArtifactLocal` (sync applies remote changes without
+  echoing them back), and a coalesced `LIBRARY_EVENT` the UI listens to.
+- **Config is not a secret** (Google ships it in client code); access is enforced
+  by Firestore security rules (`request.auth.uid == uid`) + Auth authorized
+  domains. Setup UI + rules text live in `src/components/app/SyncPanel.tsx`
+  (Settings → Sync). Heavy base64 images are stripped before cloud writes (1MB doc
+  cap); text/layout/SVG/URL-media sync, AI-raster images stay on the source device.
+
 ## Build & deploy
 - Static export (`output: "export"` in `next.config.ts`); `basePath`/`assetPrefix`
   come from `PAGES_BASE_PATH` (empty locally, `/boardmarkie` on Pages).
