@@ -200,8 +200,16 @@ export function CreateApp() {
   // Generate slide illustrations concurrently (a small pool keeps it fast
   // without hammering the proxy), placing each onto the slide's canvas as it lands.
   const autoGenerateImages = async (lesson: Lesson) => {
-    // Skip slides that will get a video — don't fill them with an image.
-    const targets = lesson.slides.filter((s) => s.imagePrompt && !s.imageUrl && !s.youtube?.searchQuery);
+    // Skip video slides, and vocab/quiz slides (they use their own card/box
+    // templates rather than a slide-level image).
+    const targets = lesson.slides.filter(
+      (s) =>
+        s.imagePrompt &&
+        !s.imageUrl &&
+        !s.youtube?.searchQuery &&
+        s.layout !== "vocabulary" &&
+        s.layout !== "quiz",
+    );
     if (!targets.length) return lesson;
     setImageProgress({ done: 0, total: targets.length });
 
@@ -246,7 +254,12 @@ export function CreateApp() {
   // Embeds the result URL directly; the same concurrent-pool pattern keeps it fast.
   const autoSearchMedia = async (lesson: Lesson, kind: "search" | "gif") => {
     const targets = lesson.slides.filter(
-      (s) => (s.gifQuery || s.imageQuery || s.imageAlt || s.imagePrompt) && !s.imageUrl && !s.youtube?.searchQuery,
+      (s) =>
+        (s.gifQuery || s.imageQuery || s.imageAlt || s.imagePrompt) &&
+        !s.imageUrl &&
+        !s.youtube?.searchQuery &&
+        s.layout !== "vocabulary" &&
+        s.layout !== "quiz",
     );
     if (!targets.length) return lesson;
     setImageProgress({ done: 0, total: targets.length });

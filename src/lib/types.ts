@@ -106,8 +106,11 @@ export interface ImageElement extends CanvasElementBase {
 export interface ShapeElement extends CanvasElementBase {
   type: "shape";
   shape: "rect" | "ellipse";
-  fill: string; // hex
+  fill: string; // hex, or "transparent"
   opacity?: number; // 0–100
+  radius?: number; // corner radius in cqh (rect only)
+  stroke?: string; // border colour (hex)
+  strokeWidth?: number; // border width in cqh
 }
 
 export interface YoutubeElement extends CanvasElementBase {

@@ -309,7 +309,9 @@ function ElementContent({
           height: "100%",
           background: el.fill,
           opacity: (el.opacity ?? 100) / 100,
-          borderRadius: el.shape === "ellipse" ? "50%" : "8px",
+          borderRadius: el.shape === "ellipse" ? "50%" : el.radius != null ? `${el.radius}cqh` : "8px",
+          border: el.stroke ? `${el.strokeWidth ?? 0.4}cqh solid ${el.stroke}` : undefined,
+          boxSizing: "border-box",
         }}
       />
     );
