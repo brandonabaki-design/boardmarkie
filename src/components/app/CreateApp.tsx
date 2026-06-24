@@ -246,7 +246,7 @@ export function CreateApp() {
             setSettingsOpen(true);
           }
         } else if (source === "gif") {
-          if (getGiphyKey()) {
+          if (isHostedMode() || getGiphyKey()) {
             working = await autoSearchMedia(seeded, "gif");
           } else {
             setError(
@@ -357,8 +357,8 @@ export function CreateApp() {
             setCurrent(working);
             saveArtifact(working);
           }
-        } catch {
-          /* no result for this slide — skip it */
+        } catch (e) {
+          console.warn("[auto-media] no media for slide:", t.title, e);
         } finally {
           done++;
           setImageProgress({ done, total: targets.length });
@@ -389,8 +389,8 @@ export function CreateApp() {
         });
         setCurrent(working);
         saveArtifact(working);
-      } catch {
-        /* skip this one */
+      } catch (e) {
+        console.warn("[auto-youtube] failed for slide:", t.title, e);
       }
     }
     refresh();

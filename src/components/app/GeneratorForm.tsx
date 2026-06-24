@@ -41,7 +41,7 @@ export function GeneratorForm({
   const [lessonCount, setLessonCount] = useState(6);
   const [questionCount, setQuestionCount] = useState(10);
   const [includeStandards, setIncludeStandards] = useState(true);
-  const [autoImages, setAutoImages] = useState(false);
+  const [autoImages, setAutoImages] = useState(true);
 
   const region = useMemo(() => regionById(regionId), [regionId]);
 
