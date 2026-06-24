@@ -189,7 +189,7 @@ export function SlideCanvas({
           setEditingId(null);
         }
       }}
-      className={`relative aspect-video w-full overflow-hidden ${className}`}
+      className={`relative isolate aspect-video w-full overflow-hidden ${className}`}
     >
       {sorted.map((el) => {
         const b = boxOf(el);

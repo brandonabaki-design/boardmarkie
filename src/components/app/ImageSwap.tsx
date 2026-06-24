@@ -302,18 +302,26 @@ export function ImageSwap({
               </div>
               {results.length > 0 ? (
                 <div className="mt-3 grid grid-cols-3 gap-2">
-                  {results.map((r, i) => (
-                    <button
-                      key={i}
-                      onClick={() => pickResult(r)}
-                      disabled={busy}
-                      title={r.title}
-                      className="aspect-square overflow-hidden rounded-lg border border-line transition-colors hover:border-brand-400 disabled:opacity-50"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={r.thumb} alt={r.title} loading="lazy" decoding="async" className="h-full w-full object-cover" />
-                    </button>
-                  ))}
+                  {results.map((r, i) => {
+                    const src = searchKind === "gif" ? "giphy" : r.source;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => pickResult(r)}
+                        disabled={busy}
+                        title={r.title}
+                        className="relative aspect-square overflow-hidden rounded-lg border border-line transition-colors hover:border-brand-400 disabled:opacity-50"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={r.thumb} alt={r.title} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                        {src && (
+                          <span className="pointer-events-none absolute bottom-1 left-1 rounded bg-ink/70 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">
+                            {src}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               ) : (
                 !searching && (
