@@ -5,6 +5,7 @@ import { X, Search, Upload, Link2, Sparkles, PenTool, ImageIcon, ExternalLink } 
 import { searchImages, googleImagesUrl, type ImageResult } from "@/lib/imageSearch";
 import { searchGifs } from "@/lib/gifSearch";
 import { getImageConfig } from "@/lib/storage";
+import { isHostedMode, getBackendBase, authHeader } from "@/lib/backend";
 import { generateImage, illustrationPrompt } from "@/lib/images";
 import { generateDiagram } from "@/lib/client";
 import { Spinner } from "./ui";
@@ -42,12 +43,20 @@ async function toDataUrl(src: string): Promise<string> {
   } catch {
     /* fall through to the proxy */
   }
-  const { proxyUrl } = getImageConfig();
-  if (!proxyUrl) throw new Error("fetch failed");
-  const fetchUrl = proxyUrl.replace(/\/image\/?$/, "/fetch-image");
+  const hosted = isHostedMode();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  let fetchUrl: string;
+  if (hosted) {
+    fetchUrl = `${getBackendBase()}/fetch-image`;
+    Object.assign(headers, await authHeader());
+  } else {
+    const { proxyUrl } = getImageConfig();
+    if (!proxyUrl) throw new Error("fetch failed");
+    fetchUrl = proxyUrl.replace(/\/image\/?$/, "/fetch-image");
+  }
   const res = await fetch(fetchUrl, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ url: src }),
   });
   if (!res.ok) throw new Error("proxy fetch failed");

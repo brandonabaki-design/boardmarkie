@@ -232,7 +232,7 @@ export function CreateApp() {
     setLoading(false);
 
     if (seeded.kind === "lesson") {
-      const hasProxy = !!getImageConfig().proxyUrl;
+      const hasProxy = isHostedMode() || !!getImageConfig().proxyUrl;
       let working = seeded;
       if (req.autoImages) {
         const source = getAutoMediaSource();

@@ -5,19 +5,19 @@
 // doesn't send CORS headers. Used by the editor's "Swap → Search" so picked
 // images render instantly and embed cleanly into PowerPoint.
 
-const ALLOW_ORIGIN = "*";
+import { setCors, verifyAuth, authEnabled } from "./_auth.js";
+
 const MAX_BYTES = 8 * 1024 * 1024; // 8 MB cap
 
-function setCors(res) {
-  res.setHeader("Access-Control-Allow-Origin", ALLOW_ORIGIN);
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-}
-
 export default async function handler(req, res) {
-  setCors(res);
+  setCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST." });
+
+  if (authEnabled()) {
+    const auth = await verifyAuth(req);
+    if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+  }
 
   let payload = req.body;
   if (typeof payload === "string") {

@@ -5,18 +5,25 @@
 // its key isn't configured, so callers degrade gracefully.
 
 import { getImageConfig } from "./storage";
+import { isHostedMode, getBackendBase, authHeader } from "./backend";
 
 export async function resolveYoutube(query: string): Promise<{ videoId: string; title?: string } | null> {
-  const { proxyUrl } = getImageConfig();
   const q = query.trim();
-  if (!proxyUrl || !q) return null;
-  const url = proxyUrl.replace(/\/image\/?$/, "/youtube");
+  if (!q) return null;
   try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ q }),
-    });
+    const hosted = isHostedMode();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    let url: string;
+    if (hosted) {
+      url = `${getBackendBase()}/youtube`;
+      Object.assign(headers, await authHeader());
+    } else {
+      const { proxyUrl } = getImageConfig();
+      if (!proxyUrl) return null;
+      url = proxyUrl.replace(/\/image\/?$/, "/youtube");
+    }
+
+    const res = await fetch(url, { method: "POST", headers, body: JSON.stringify({ q }) });
     if (!res.ok) {
       console.warn("[youtube] proxy returned", res.status, await res.text().catch(() => ""));
       return null;
