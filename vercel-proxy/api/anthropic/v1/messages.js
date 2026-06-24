@@ -1,17 +1,18 @@
-// Vercel serverless function — authenticated reverse proxy to the Anthropic API.
+// Vercel serverless function — authenticated reverse proxy to Anthropic's
+// Messages API.
 //
-// The browser Anthropic SDK is pointed at this endpoint via `baseURL`
-// (…/api/anthropic), so the app keeps using the SDK's streaming + structured
-// outputs unchanged. We verify the user's Google sign-in token, then forward the
-// request to api.anthropic.com injecting the server-held ANTHROPIC_API_KEY. The
-// upstream response (including the SSE stream) is piped straight back.
+// The browser Anthropic SDK points its baseURL at …/api/anthropic, so it calls
+// …/api/anthropic/v1/messages — exactly this file (a fixed path, not a catch-all,
+// so routing is unambiguous). We verify the user's Google sign-in token, then
+// forward to api.anthropic.com with the server-held ANTHROPIC_API_KEY and stream
+// the response straight back (so the SDK's streaming + structured outputs work).
 //
 // Env on the Vercel project:
 //   ANTHROPIC_API_KEY      the shared Claude key (REQUIRED)
 //   FIREBASE_PROJECT_ID    enables sign-in checks (see _auth.js)
 //   ALLOWED_EMAIL_DOMAINS  optional domain allow-list
 
-import { setCors, verifyAuth } from "../_auth.js";
+import { setCors, verifyAuth } from "../../_auth.js";
 
 export const config = { maxDuration: 60 };
 
@@ -29,15 +30,6 @@ export default async function handler(req, res) {
   const key = (process.env.ANTHROPIC_API_KEY || "").trim();
   if (!key) return res.status(500).json({ error: "Server missing ANTHROPIC_API_KEY." });
 
-  const segs = Array.isArray(req.query.path)
-    ? req.query.path
-    : req.query.path
-      ? [req.query.path]
-      : [];
-  // Only allow the messages API surface through this proxy.
-  const path = segs.join("/");
-  if (!path.startsWith("v1/")) return res.status(404).json({ error: "Not found." });
-
   const headers = {
     "x-api-key": key,
     "anthropic-version": req.headers["anthropic-version"] || "2023-06-01",
@@ -50,7 +42,7 @@ export default async function handler(req, res) {
 
   let upstream;
   try {
-    upstream = await fetch(`https://api.anthropic.com/${path}`, {
+    upstream = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers,
       body,
@@ -66,8 +58,7 @@ export default async function handler(req, res) {
   if (!upstream.body) {
     return res.end(await upstream.text());
   }
-  // Pipe the (possibly SSE) response straight back, so the SDK's streaming +
-  // structured-output parsing works unchanged.
+  // Pipe the (possibly SSE) response straight back.
   try {
     const reader = upstream.body.getReader();
     for (;;) {
