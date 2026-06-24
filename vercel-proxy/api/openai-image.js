@@ -11,7 +11,7 @@
 //
 // Debug: GET -> capability marker; POST { prompt, apiKey?, size?, quality? } -> { image }
 
-import { setCors, verifyAuth, authEnabled } from "../_auth.js";
+import { setCors, verifyAuth, authEnabled } from "./_auth.js";
 
 export const config = { maxDuration: 60 };
 

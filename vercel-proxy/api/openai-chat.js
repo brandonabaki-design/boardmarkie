@@ -9,7 +9,7 @@
 //
 // Debug: POST {messages:[{role,content}], apiKey?} -> { content }
 
-import { setCors, verifyAuth, authEnabled } from "../_auth.js";
+import { setCors, verifyAuth, authEnabled } from "./_auth.js";
 
 export const config = { maxDuration: 60 };
 
