@@ -1,25 +1,23 @@
 "use client";
 
-// In-app image search backed by Openverse (openverse.org) — ~800M openly
-// licensed images aggregated from Flickr, Wikimedia Commons, museums and more,
-// with no API key and no setup. Tries the Vercel proxy first (avoids any CORS
-// surprises), then a direct browser call, then an optional Pixabay key.
-//
-// (Google's Custom Search JSON API is closed to new Google Cloud projects and
-// is being shut down on 2027-01-01, so it's no longer a usable backend.)
+// In-app image search across several free libraries at once and merged into one
+// result set: Openverse (no key needed), plus Pixabay and Unsplash when their
+// keys are set in Settings. Each source runs concurrently; results are round-
+// robin interleaved and de-duplicated so you get a broad, high-quality mix.
 
-import { getSearchKey, getImageConfig } from "./storage";
+import { getSearchKey, getUnsplashKey, getImageConfig } from "./storage";
 
 export interface ImageResult {
   title: string;
   url: string; // best-quality image URL
   thumb: string; // smaller URL for the results grid
+  source?: string; // "openverse" | "pixabay" | "unsplash"
 }
 
 const OPENVERSE = "https://api.openverse.org/v1/images/";
 
 export const NO_SEARCH_KEY =
-  "Image search is temporarily unavailable — check your connection, or add a free Pixabay API key in Settings as a backup.";
+  "No images found — try a different search, or add a free Unsplash / Pixabay key in Settings for more sources.";
 
 interface OpenverseItem {
   title?: string;
@@ -27,99 +25,130 @@ interface OpenverseItem {
   thumbnail?: string;
 }
 
-function mapOpenverse(items: OpenverseItem[] | undefined): ImageResult[] {
-  return (items ?? [])
-    .map((it) => ({
-      title: it.title ?? "",
-      url: it.url || it.thumbnail || "",
-      thumb: it.thumbnail || it.url || "",
-    }))
-    .filter((r) => r.url);
-}
+// ---- per-source searches: each resolves to [] on failure, never throws ----
 
-export async function searchImages(query: string): Promise<ImageResult[]> {
-  const q = query.trim();
-  if (!q) return [];
-
-  // 1) Openverse via the proxy (no key needed; sidesteps any CORS issues).
+async function openverseSearch(q: string): Promise<ImageResult[]> {
+  // Prefer the proxy (sidesteps any CORS surprises); fall back to a direct call.
   const { proxyUrl } = getImageConfig();
   if (proxyUrl) {
     try {
-      const url = proxyUrl.replace(/\/image\/?$/, "/imagesearch");
-      const res = await fetch(url, {
+      const res = await fetch(proxyUrl.replace(/\/image\/?$/, "/imagesearch"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ q }),
       });
       if (res.ok) {
-        const data = (await res.json()) as {
-          results?: ImageResult[];
-          error?: string;
-          detail?: string;
-        };
-        if (data.results && data.results.length) return data.results;
-        if (data.error) console.warn("[imagesearch] proxy:", data.error, data.detail || "");
+        const data = (await res.json()) as { results?: ImageResult[] };
+        if (data.results?.length) return data.results.map((r) => ({ ...r, source: "openverse" }));
       }
-    } catch (e) {
-      console.warn("[imagesearch] proxy request failed:", e);
+    } catch {
+      /* fall through to direct */
     }
   }
-
-  // 2) Openverse directly from the browser (CORS-friendly, no key, no proxy).
   try {
     const u = new URL(OPENVERSE);
     u.searchParams.set("q", q);
     u.searchParams.set("page_size", "20");
     u.searchParams.set("mature", "false");
     const res = await fetch(u.toString(), { headers: { Accept: "application/json" } });
-    if (res.ok) {
-      const data = (await res.json()) as { results?: OpenverseItem[] };
-      const mapped = mapOpenverse(data.results);
-      if (mapped.length) return mapped;
-    }
-  } catch (e) {
-    console.warn("[imagesearch] Openverse direct request failed:", e);
+    if (!res.ok) return [];
+    const data = (await res.json()) as { results?: OpenverseItem[] };
+    return (data.results ?? [])
+      .map((it) => ({
+        title: it.title ?? "",
+        url: it.url || it.thumbnail || "",
+        thumb: it.thumbnail || it.url || "",
+        source: "openverse",
+      }))
+      .filter((r) => r.url);
+  } catch {
+    return [];
   }
-
-  // 3) Pixabay fallback (bring-your-own key).
-  const key = getSearchKey();
-  if (key) return pixabaySearch(q, key);
-
-  const e = new Error(NO_SEARCH_KEY) as Error & { status?: number };
-  e.status = 401;
-  throw e;
 }
 
-async function pixabaySearch(query: string, key: string): Promise<ImageResult[]> {
-  const u = new URL("https://pixabay.com/api/");
-  u.searchParams.set("key", key);
-  u.searchParams.set("q", query);
-  u.searchParams.set("per_page", "15");
-  u.searchParams.set("safesearch", "true");
-  u.searchParams.set("image_type", "all");
-
-  let res: Response;
+async function pixabaySearch(q: string): Promise<ImageResult[]> {
+  const key = getSearchKey();
+  if (!key) return [];
   try {
-    res = await fetch(u.toString());
+    const u = new URL("https://pixabay.com/api/");
+    u.searchParams.set("key", key);
+    u.searchParams.set("q", q);
+    u.searchParams.set("per_page", "15");
+    u.searchParams.set("safesearch", "true");
+    u.searchParams.set("image_type", "all");
+    const res = await fetch(u.toString());
+    if (!res.ok) return [];
+    const data = (await res.json()) as {
+      hits?: Array<{ tags?: string; webformatURL?: string; largeImageURL?: string; previewURL?: string }>;
+    };
+    return (data.hits ?? [])
+      .map((h) => ({
+        title: h.tags ?? "",
+        url: h.largeImageURL || h.webformatURL || "",
+        thumb: h.webformatURL || h.previewURL || "",
+        source: "pixabay",
+      }))
+      .filter((r) => r.url);
   } catch {
-    throw new Error("Couldn't reach the image search service.");
+    return [];
   }
-  if (!res.ok) {
-    if (res.status === 400) throw new Error("Pixabay rejected the request — double-check your API key in Settings.");
-    if (res.status === 429) throw new Error("Pixabay rate limit hit — wait a moment and try again.");
-    throw new Error(`Image search failed (${res.status}).`);
-  }
+}
 
-  const data = (await res.json()) as {
-    hits?: Array<{ tags?: string; webformatURL?: string; largeImageURL?: string; previewURL?: string }>;
-  };
-  return (data.hits ?? [])
-    .map((h) => ({
-      title: h.tags ?? "",
-      url: h.largeImageURL || h.webformatURL || "",
-      thumb: h.webformatURL || h.previewURL || "",
-    }))
-    .filter((r) => r.url);
+async function unsplashSearch(q: string): Promise<ImageResult[]> {
+  const key = getUnsplashKey();
+  if (!key) return [];
+  try {
+    const u = new URL("https://api.unsplash.com/search/photos");
+    u.searchParams.set("query", q);
+    u.searchParams.set("per_page", "12");
+    u.searchParams.set("content_filter", "high");
+    const res = await fetch(u.toString(), {
+      headers: { Authorization: `Client-ID ${key}`, "Accept-Version": "v1" },
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as {
+      results?: Array<{
+        description?: string;
+        alt_description?: string;
+        urls?: { full?: string; regular?: string; small?: string; thumb?: string };
+      }>;
+    };
+    return (data.results ?? [])
+      .map((p) => ({
+        title: p.alt_description || p.description || "",
+        url: p.urls?.regular || p.urls?.full || "",
+        thumb: p.urls?.small || p.urls?.thumb || "",
+        source: "unsplash",
+      }))
+      .filter((r) => r.url);
+  } catch {
+    return [];
+  }
+}
+
+// Round-robin merge so every source contributes near the top of the results.
+function interleave(lists: ImageResult[][]): ImageResult[] {
+  const out: ImageResult[] = [];
+  const max = lists.reduce((m, l) => Math.max(m, l.length), 0);
+  for (let i = 0; i < max; i++) for (const l of lists) if (l[i]) out.push(l[i]);
+  return out;
+}
+
+export async function searchImages(query: string): Promise<ImageResult[]> {
+  const q = query.trim();
+  if (!q) return [];
+
+  const lists = await Promise.all([openverseSearch(q), pixabaySearch(q), unsplashSearch(q)]);
+
+  const seen = new Set<string>();
+  const merged = interleave(lists).filter((r) => {
+    if (!r.url || seen.has(r.url)) return false;
+    seen.add(r.url);
+    return true;
+  });
+
+  if (!merged.length) throw new Error(NO_SEARCH_KEY);
+  return merged.slice(0, 36);
 }
 
 /** Fallback link when a search fails: open Google Images in a new tab. */

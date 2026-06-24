@@ -9,6 +9,8 @@ import {
   setImageConfig,
   getSearchKey,
   setSearchKey,
+  getUnsplashKey,
+  setUnsplashKey,
   getModel,
   setModel,
   getImageStyle,
@@ -76,6 +78,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   const [proxyUrl, setProxyUrl] = useState("");
   const [imageKey, setImageKey] = useState("");
   const [pixabayKey, setPixabayKey] = useState("");
+  const [unsplashKey, setUnsplashKeyState] = useState("");
   const [giphyKey, setGiphyKeyState] = useState("");
   const [openaiKey, setOpenaiKeyState] = useState("");
   const [model, setModelState] = useState<string>("");
@@ -96,6 +99,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
       setProxyUrl(cfg.proxyUrl);
       setImageKey(cfg.apiKey);
       setPixabayKey(getSearchKey());
+      setUnsplashKeyState(getUnsplashKey());
       setGiphyKeyState(getGiphyKey());
       setOpenaiKeyState(getOpenAIKey());
       setModelState(getModel());
@@ -113,6 +117,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
     setApiKey(value);
     setImageConfig({ proxyUrl, apiKey: imageKey });
     setSearchKey(pixabayKey);
+    setUnsplashKey(unsplashKey);
     setGiphyKey(giphyKey);
     setOpenAIKey(openaiKey);
     setModel(model);
@@ -467,7 +472,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                   <Search size={16} className="text-brand-600" /> Image search
                 </h3>
                 <p className="mt-1.5 text-xs text-muted">
-                  <span className="font-semibold text-ink">Swap → Web search</span> uses{" "}
+                  <span className="font-semibold text-ink">Swap → Web search</span> searches{" "}
                   <a
                     href="https://openverse.org"
                     target="_blank"
@@ -476,8 +481,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                   >
                     Openverse
                   </a>{" "}
-                  — millions of openly-licensed images from Flickr, Wikimedia Commons, museums and more —
-                  with no key and no setup. A{" "}
+                  (no key) together with{" "}
                   <a
                     href="https://pixabay.com"
                     target="_blank"
@@ -486,10 +490,32 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                   >
                     Pixabay
                   </a>{" "}
-                  key (below) is an optional backup for extra stock photos.
+                  and{" "}
+                  <a
+                    href="https://unsplash.com/developers"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-brand-700 hover:underline"
+                  >
+                    Unsplash
+                  </a>{" "}
+                  when their keys are set — results from all sources are combined into one grid.
                 </p>
 
                 <label className="mt-3 block">
+                  <span className="text-sm font-semibold text-ink">Unsplash Access Key</span>
+                  <SecretInput value={unsplashKey} onChange={setUnsplashKeyState} placeholder="Unsplash Access Key…" />
+                </label>
+                <a
+                  href="https://unsplash.com/developers"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline"
+                >
+                  Get a free Unsplash key <ExternalLink size={13} />
+                </a>
+
+                <label className="mt-4 block">
                   <span className="text-sm font-semibold text-ink">Pixabay API key</span>
                   <SecretInput value={pixabayKey} onChange={setPixabayKey} placeholder="e.g. 12345678-abcdef…" />
                 </label>

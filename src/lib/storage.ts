@@ -53,6 +53,21 @@ export function setSearchKey(value: string): void {
   else window.localStorage.removeItem(KEY_SEARCH_KEY);
 }
 
+const KEY_UNSPLASH = "boardmarkie.unsplashKey";
+
+// Bring-your-own Unsplash Access Key (free from unsplash.com/developers).
+// Combined with Openverse + Pixabay in image search.
+export function getUnsplashKey(): string {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(KEY_UNSPLASH) ?? "";
+}
+
+export function setUnsplashKey(value: string): void {
+  if (typeof window === "undefined") return;
+  if (value.trim()) window.localStorage.setItem(KEY_UNSPLASH, value.trim());
+  else window.localStorage.removeItem(KEY_UNSPLASH);
+}
+
 const KEY_MODEL = "boardmarkie.model";
 
 // Which Claude model generates lessons (speed vs. quality). Defaults to the
