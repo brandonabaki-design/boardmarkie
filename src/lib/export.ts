@@ -4,6 +4,7 @@ import type { Artifact, ImageElement, Lesson, LessonSeries, Worksheet } from "./
 import type * as Docx from "docx";
 import { ensureElements } from "./canvas";
 import { getTheme } from "./themes";
+import { resolveBackgroundTheme, backgroundImageUrl, backgroundVariant } from "./backgroundThemes";
 
 function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "boardmarkie";
@@ -69,6 +70,25 @@ async function svgToPng(svg: string, targetW = 1600): Promise<VisualData> {
   ctx.fillRect(0, 0, w, h);
   ctx.drawImage(img, 0, 0, w, h);
   return { dataUrl: canvas.toDataURL("image/png"), w, h };
+}
+
+/** Rasterise a same-origin background image (our SVG subject themes) to a PNG
+ *  data URL for embedding as a PowerPoint slide background. */
+async function rasterizeBackground(url: string): Promise<string | null> {
+  try {
+    const img = await loadImage(url);
+    const w = 1920;
+    const h = 1080;
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL("image/png");
+  } catch {
+    return null;
+  }
 }
 
 async function encodeRemote(url: string): Promise<VisualData | null> {
@@ -182,11 +202,20 @@ export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
   const inX = (p: number) => (p / 100) * W;
   const inY = (p: number) => (p / 100) * H;
   const theme = getTheme(lesson.theme);
+  const bg = resolveBackgroundTheme(lesson);
+  const inkColor = bg?.ink ?? theme.ink;
+  const bgCache = new Map<string, string | null>(); // rasterise each variant once
 
   for (const raw of lesson.slides) {
     const slide = ensureElements(raw);
     const s = pptx.addSlide();
-    s.background = { color: hex(slide.background ?? theme.bg, "ffffff") };
+    let bgData: string | null = null;
+    if (bg) {
+      const url = backgroundImageUrl(bg.id, backgroundVariant(slide.layout));
+      if (!bgCache.has(url)) bgCache.set(url, await rasterizeBackground(url));
+      bgData = bgCache.get(url) ?? null;
+    }
+    s.background = bgData ? { data: bgData } : { color: hex(slide.background ?? theme.bg, "ffffff") };
 
     const els = [...(slide.elements ?? [])].sort((a, b) => a.z - b.z);
     for (const el of els) {
@@ -199,7 +228,7 @@ export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
           fontSize: Math.max(6, Math.round((el.fontSize / 100) * 540)), // cqh → pt (7.5in = 540pt)
           align: el.align ?? "left",
           valign: "top",
-          color: hex(el.color ?? theme.ink),
+          color: hex(el.color ?? inkColor),
           fontFace: "Arial",
         });
       } else if (el.type === "shape") {
