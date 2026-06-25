@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { FolderOpen, Settings, Plus, ArrowLeft, AlertCircle, X, Play, FlaskConical } from "lucide-react";
@@ -21,7 +21,7 @@ import { resolveYoutube } from "@/lib/youtube";
 import { searchImages, firstLoadableImage } from "@/lib/imageSearch";
 import { searchGifs } from "@/lib/gifSearch";
 import { cid, ensureElements, slideToElements } from "@/lib/canvas";
-import { makeTestLesson } from "@/lib/sampleLesson";
+import { TEST_LESSONS } from "@/lib/sampleLesson";
 import {
   deleteArtifact,
   getArtifactFull,
@@ -118,8 +118,10 @@ export function CreateApp() {
   const [imageProgress, setImageProgress] = useState<{ done: number; total: number } | null>(null);
   const [past, setPast] = useState<Lesson[]>([]);
   const [future, setFuture] = useState<Lesson[]>([]);
-  // True while the hardcoded sample lesson is being loaded (skips the AI calls).
+  // True while a hardcoded sample lesson is being loaded (skips the AI calls).
   const [testMode, setTestMode] = useState(false);
+  // The maker for the test lesson currently being loaded (chosen on the form).
+  const testMakerRef = useRef<(() => Lesson) | null>(null);
 
   useEffect(() => {
     setLibrary(getLibrary());
@@ -191,6 +193,7 @@ export function CreateApp() {
   const handleGenerate = async (req: GenerateRequest) => {
     setError(null);
     setTestMode(false); // a real generation supersedes any pending test load
+    testMakerRef.current = null;
     if (req.mode === "lesson") {
       setGenMode("lesson");
       setRefine({ req, outline: null }); // show the refiner right away (outline loading)
@@ -225,10 +228,11 @@ export function CreateApp() {
   // Testing affordance: load a ready-made lesson with NO AI generation (no Claude
   // credits), going through the usual outline + theme step first so the full flow
   // can be exercised. The req/outline are derived from the sample for display only.
-  const startTestLesson = () => {
+  const startTestLesson = (make: () => Lesson) => {
     setError(null);
     setGenMode("lesson");
-    const sample = makeTestLesson();
+    testMakerRef.current = make;
+    const sample = make();
     const req: GenerateRequest = {
       mode: "lesson",
       topic: sample.meta.topic,
@@ -246,14 +250,16 @@ export function CreateApp() {
     setTestMode(true);
   };
 
-  // Load the sample lesson into the editor without any AI call, then attach media
-  // with the FREE web search only (GIFs where available, else stock photos) — it
-  // never touches the paid AI-image path, so this costs no credits.
+  // Load the chosen sample lesson into the editor without any AI call, then attach
+  // media with the FREE web search only (GIFs where available, else stock photos)
+  // — it never touches the paid AI-image path, so this costs no credits.
   const runTestLesson = async (themeId?: string) => {
+    const make = testMakerRef.current;
+    if (!make) return;
     setError(null);
     setGenMode("lesson");
     setLoading(true);
-    let seeded = seedLesson(makeTestLesson());
+    let seeded = seedLesson(make());
     if (themeId) seeded = { ...seeded, theme: themeId };
     saveArtifact(seeded);
     setCurrent(seeded);
@@ -734,12 +740,20 @@ export function CreateApp() {
             <div className={refine ? "hidden" : ""}>
               <GeneratorForm initialMode={initialMode} loading={false} onSubmit={handleGenerate} />
               <div className="mx-auto mt-5 max-w-2xl text-center">
-                <button
-                  onClick={startTestLesson}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line bg-white px-4 py-2 text-xs font-semibold text-muted transition-colors hover:border-brand-300 hover:text-brand-700"
-                >
-                  <FlaskConical size={14} className="text-brand-600" /> Load test lesson (no AI · Photosynthesis, Grade 3)
-                </button>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+                  Test lessons · no AI
+                </p>
+                <div className="mt-2 flex flex-wrap justify-center gap-2">
+                  {TEST_LESSONS.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => startTestLesson(t.make)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line bg-white px-4 py-2 text-xs font-semibold text-muted transition-colors hover:border-brand-300 hover:text-brand-700"
+                    >
+                      <FlaskConical size={14} className="text-brand-600" /> {t.label}
+                    </button>
+                  ))}
+                </div>
                 <p className="mt-1.5 text-[11px] text-muted">
                   Loads a ready-made lesson without using Claude credits — still searches the web for GIFs/images.
                 </p>
@@ -753,6 +767,7 @@ export function CreateApp() {
                 onBack={() => {
                   setRefine(null);
                   setTestMode(false);
+                  testMakerRef.current = null;
                 }}
                 onConfirm={confirmOutline}
               />
