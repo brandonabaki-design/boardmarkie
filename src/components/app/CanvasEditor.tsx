@@ -24,6 +24,7 @@ import {
   GripVertical,
   LayoutGrid,
   Palette,
+  Sparkles,
 } from "lucide-react";
 import type { CanvasElement, EditAction, Lesson, Slide } from "@/lib/types";
 import {
@@ -42,6 +43,12 @@ import { SlideCanvas } from "./SlideCanvas";
 import { ImageSwap, type SwapMedia } from "./ImageSwap";
 import { Editable, Spinner } from "./ui";
 import { getTheme, THEMES } from "@/lib/themes";
+import {
+  deckRender,
+  BACKGROUND_THEMES,
+  autoBackgroundThemeId,
+  getBackgroundTheme,
+} from "@/lib/backgroundThemes";
 
 export function CanvasEditor({
   lesson,
@@ -89,6 +96,7 @@ export function CanvasEditor({
   const slide = ensureElements(lesson.slides[safeIdx]);
   const els = slide.elements ?? [];
   const theme = getTheme(lesson.theme);
+  const autoBgLabel = getBackgroundTheme(autoBackgroundThemeId(lesson.meta.subject))?.label;
 
   const writeSlide = (patch: Partial<Slide>) =>
     onChange({
@@ -364,10 +372,7 @@ export function CanvasEditor({
           <div className="overflow-hidden rounded-2xl border border-line bg-white card-shadow">
             <SlideCanvas
               elements={els}
-              background={slide.background ?? theme.bg}
-              ink={theme.ink}
-              muted={theme.muted}
-              displayFont={theme.displayFont}
+              {...deckRender(lesson, slide, theme)}
               editable
               selectedId={selectedId}
               onSelect={(id) => {
@@ -414,7 +419,7 @@ export function CanvasEditor({
               <LayoutGrid size={15} />
             </IconBtn>
             <span className="mx-1 h-5 w-px bg-line" />
-            <label className="inline-flex items-center gap-1.5" title="Deck theme">
+            <label className="inline-flex items-center gap-1.5" title="Deck theme (colours)">
               <Palette size={15} className="text-brand-600" />
               <select
                 value={lesson.theme ?? "classic"}
@@ -427,6 +432,24 @@ export function CanvasEditor({
                     {t.label}
                   </option>
                 ))}
+              </select>
+            </label>
+
+            <label className="inline-flex items-center gap-1.5" title="Subject background theme (AISA-branded)">
+              <Sparkles size={15} className="text-brand-600" />
+              <select
+                value={lesson.backgroundTheme ?? "auto"}
+                onChange={(e) => onChange({ ...lesson, backgroundTheme: e.target.value })}
+                aria-label="Subject background theme"
+                className="rounded-lg border border-line bg-white px-2 py-1 text-xs font-semibold text-ink outline-none focus:border-brand-400"
+              >
+                <option value="auto">{autoBgLabel ? `Auto · ${autoBgLabel}` : "Auto"}</option>
+                {BACKGROUND_THEMES.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+                <option value="none">No background</option>
               </select>
             </label>
 
@@ -541,7 +564,7 @@ export function CanvasEditor({
                     {i + 1}
                   </span>
                   <div className="pointer-events-none min-w-0 flex-1 overflow-hidden rounded-r-md">
-                    <SlideCanvas elements={thumb.elements ?? []} background={s.background ?? theme.bg} ink={theme.ink} muted={theme.muted} displayFont={theme.displayFont} />
+                    <SlideCanvas elements={thumb.elements ?? []} {...deckRender(lesson, thumb, theme)} />
                   </div>
                 </div>
               );
@@ -631,7 +654,7 @@ function PrintDeck({ lesson }: { lesson: Lesson }) {
         const slide = ensureElements(s);
         return (
           <div key={s.id} className="print-page">
-            <SlideCanvas elements={slide.elements ?? []} background={s.background ?? theme.bg} ink={theme.ink} muted={theme.muted} displayFont={theme.displayFont} />
+            <SlideCanvas elements={slide.elements ?? []} {...deckRender(lesson, slide, theme)} />
           </div>
         );
       })}

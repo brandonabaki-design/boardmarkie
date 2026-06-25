@@ -129,6 +129,9 @@ export interface Lesson {
   meta: LessonMeta;
   slides: Slide[];
   theme?: string; // deck theme id (see src/lib/themes.ts); defaults to "classic"
+  // Subject background theme (see src/lib/backgroundThemes.ts). Undefined/"auto"
+  // auto-selects by subject; "none" disables; otherwise an explicit theme id.
+  backgroundTheme?: string;
 }
 
 // ---- Worksheet ----

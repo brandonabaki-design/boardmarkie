@@ -5,6 +5,7 @@ import { X, ChevronLeft, ChevronRight, StickyNote, Play, Pause, RotateCcw } from
 import type { Lesson } from "@/lib/types";
 import { ensureElements } from "@/lib/canvas";
 import { getTheme } from "@/lib/themes";
+import { deckRender } from "@/lib/backgroundThemes";
 import { SlideCanvas } from "./SlideCanvas";
 
 function mmss(total: number): string {
@@ -113,7 +114,7 @@ export function PresentMode({ lesson, onClose }: { lesson: Lesson; onClose: () =
 
       <div className="relative flex flex-1 items-center justify-center px-4 pb-6">
         <div className="aspect-video max-h-full w-full max-w-6xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-          <SlideCanvas elements={slide.elements ?? []} background={slide.background ?? theme.bg} ink={theme.ink} muted={theme.muted} displayFont={theme.displayFont} interactive />
+          <SlideCanvas elements={slide.elements ?? []} {...deckRender(lesson, slide, theme)} interactive />
         </div>
 
         <button

@@ -10,6 +10,9 @@ const nextConfig: NextConfig = {
   output: "export",
   trailingSlash: true,
   images: { unoptimized: true },
+  // Inline the base path so client code (e.g. theme background image URLs) can
+  // resolve /public assets correctly under the Pages subpath.
+  env: { NEXT_PUBLIC_BASE_PATH: basePath },
   ...(basePath ? { basePath, assetPrefix: basePath } : {}),
 };
 

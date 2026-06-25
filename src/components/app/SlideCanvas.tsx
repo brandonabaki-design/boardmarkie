@@ -39,6 +39,7 @@ const TEXT_COLORS = ["#16181d", "#0c8a78", "#ff6f5e", "#f6a609", "#7c6cf0", "#ff
 export function SlideCanvas({
   elements,
   background = "#ffffff",
+  backgroundImage,
   ink = INK,
   muted = MUTED,
   displayFont = "var(--font-bricolage)",
@@ -52,6 +53,7 @@ export function SlideCanvas({
 }: {
   elements: CanvasElement[];
   background?: string;
+  backgroundImage?: string; // full-bleed subject background (from the background theme)
   ink?: string; // default text colour (from the deck theme)
   muted?: string; // secondary text colour (from the deck theme)
   displayFont?: string; // heading/title font family (from the deck theme)
@@ -177,7 +179,22 @@ export function SlideCanvas({
     return () => window.removeEventListener("keydown", onKey);
   }, [editable, editingId, selectedId, elements, onChange, onSelect]);
 
-  const stageStyle: React.CSSProperties = { background, containerType: "size", userSelect: live ? "none" : "auto" };
+  const stageStyle: React.CSSProperties = {
+    background, // colour fallback / base; the image (if any) layers on top
+    ...(backgroundImage
+      ? {
+          backgroundImage: `url("${backgroundImage}")`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+        }
+      : {}),
+    // Keep themed colours + background images when exporting to PDF / printing.
+    WebkitPrintColorAdjust: "exact",
+    printColorAdjust: "exact",
+    containerType: "size",
+    userSelect: live ? "none" : "auto",
+  };
 
   return (
     <div
