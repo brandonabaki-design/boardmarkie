@@ -6,9 +6,11 @@
 import type {
   CanvasElement,
   ImageElement,
+  QuizQuestion,
   ShapeElement,
   Slide,
   TextElement,
+  VocabItem,
   YoutubeElement,
 } from "./types";
 
@@ -73,6 +75,9 @@ export function shapeElement(p: Partial<ShapeElement> & Pick<ShapeElement, "x" |
     shape: p.shape ?? "rect",
     fill: p.fill ?? "#d2f6ec",
     opacity: p.opacity ?? 100,
+    radius: p.radius,
+    stroke: p.stroke,
+    strokeWidth: p.strokeWidth,
     x: p.x,
     y: p.y,
     w: p.w,
@@ -147,6 +152,104 @@ function bodyText(slide: Slide): string {
 }
 
 const ACCENT = "#14a892"; // brand-500
+const CARD_BORDER = "#c9d3e0"; // neutral outline that reads on light & dark themes
+
+// ---- purpose templates: distinct layouts per slide type ----
+
+// "Key words" grid — each term in its own outlined card (transparent fill so the
+// deck theme shows through; text stays themed via the ink/muted sentinels).
+function vocabCards(items: VocabItem[], top: number): CanvasElement[] {
+  const out: CanvasElement[] = [];
+  let z = 5;
+  const n = Math.min(items.length, 6);
+  const cols = n <= 1 ? 1 : 2;
+  const rows = Math.ceil(n / cols);
+  const gap = 3;
+  const regionH = 94 - top;
+  const cellW = (88 - gap * (cols - 1)) / cols;
+  const cellH = (regionH - gap * (rows - 1)) / rows;
+  const padX = 2.6;
+
+  items.slice(0, n).forEach((v, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const x = 6 + col * (cellW + gap);
+    const y = top + row * (cellH + gap);
+    out.push(
+      shapeElement({ x, y, w: cellW, h: cellH, z: z++, shape: "rect", fill: "transparent", stroke: CARD_BORDER, strokeWidth: 0.3, radius: 2 }),
+    );
+    const termH = Math.min(cellH * 0.4, 7);
+    out.push(
+      textElement({
+        text: v.term,
+        x: x + padX,
+        y: y + cellH * 0.1,
+        w: cellW - padX * 2,
+        h: termH,
+        fontSize: fitFontSize(v.term, cellW - padX * 2, termH, 3.6, 2),
+        bold: true,
+        font: "display",
+        z: z++,
+      }),
+    );
+    const defY = y + cellH * 0.1 + termH;
+    const defH = cellH - (defY - y) - cellH * 0.08;
+    out.push(
+      textElement({
+        text: v.definition,
+        x: x + padX,
+        y: defY,
+        w: cellW - padX * 2,
+        h: defH,
+        fontSize: fitFontSize(v.definition, cellW - padX * 2, defH, 2.8, 1.5),
+        color: MUTED,
+        z: z++,
+      }),
+    );
+  });
+  return out;
+}
+
+// "Quick check" — one question with each option in its own outlined box.
+function quizCard(q: QuizQuestion, top: number): CanvasElement[] {
+  const out: CanvasElement[] = [];
+  let z = 5;
+  const qH = 13;
+  out.push(
+    textElement({
+      text: q.question,
+      x: 6,
+      y: top,
+      w: 88,
+      h: qH,
+      fontSize: fitFontSize(q.question, 88, qH, 3.6, 2.2),
+      bold: true,
+      z: z++,
+    }),
+  );
+  const opts = q.options.slice(0, 5);
+  const startY = top + qH + 2;
+  const gap = 2.5;
+  const rowH = Math.min(11, (94 - startY - gap * (opts.length - 1)) / opts.length);
+  opts.forEach((o, i) => {
+    const y = startY + i * (rowH + gap);
+    out.push(
+      shapeElement({ x: 6, y, w: 88, h: rowH, z: z++, shape: "rect", fill: "transparent", stroke: CARD_BORDER, strokeWidth: 0.3, radius: 1.6 }),
+    );
+    out.push(
+      textElement({
+        text: `${String.fromCharCode(65 + i)})  ${o}`,
+        x: 9,
+        y: y + rowH * 0.22,
+        w: 82,
+        h: rowH * 0.7,
+        fontSize: fitFontSize(o, 82, rowH * 0.7, 3.2, 1.8),
+        z: z++,
+      }),
+    );
+  });
+  return out;
+}
 
 /** A slide's visual: an image/diagram from its own fields, or one supplied
  *  directly (e.g. a just-resolved YouTube video) by the generation pipeline. */
@@ -297,6 +400,16 @@ export function slideToElements(slide: Slide, extraVisual?: SlideVisual): Canvas
       }),
     );
     top = 28;
+  }
+
+  // Purpose templates (only when no slide-level visual would be displaced).
+  if (!visual && slide.layout === "vocabulary" && slide.vocabulary?.length) {
+    for (const e of vocabCards(slide.vocabulary, top)) els.push(e);
+    return els;
+  }
+  if (!visual && slide.layout === "quiz" && slide.quiz?.length === 1 && (slide.quiz[0].options?.length ?? 0) >= 2) {
+    for (const e of quizCard(slide.quiz[0], top)) els.push(e);
+    return els;
   }
 
   const body = bodyText(slide);

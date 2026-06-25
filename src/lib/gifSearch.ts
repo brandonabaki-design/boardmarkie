@@ -5,6 +5,8 @@
 // Results share the ImageResult shape so the picker can reuse the same grid.
 
 import { getGiphyKey } from "./storage";
+import { isHostedMode } from "./backend";
+import { proxySearch } from "./imageSearch";
 
 export interface GifResult {
   title: string;
@@ -29,6 +31,9 @@ interface GiphyImages {
 export async function searchGifs(query: string): Promise<GifResult[]> {
   const q = query.trim();
   if (!q) return [];
+
+  // Hosted mode: the proxy searches Giphy with the server-held key.
+  if (isHostedMode()) return proxySearch(q, "gif");
 
   const key = getGiphyKey();
   if (!key) {

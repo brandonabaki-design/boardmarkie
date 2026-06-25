@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Science lesson content background">
+  <defs>
+    <linearGradient id="bgb" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f3f9fc"/>
+      <stop offset="1" stop-color="#e6f1f8"/>
+    </linearGradient>
+    <radialGradient id="sphereb" cx="0.35" cy="0.3" r="0.85">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.4" stop-color="#bcd8ea"/>
+      <stop offset="1" stop-color="#7ba6c7"/>
+    </radialGradient>
+    <symbol id="atomb" viewBox="0 0 120 120">
+      <g fill="none" stroke="#6fa3c8" stroke-width="2.4">
+        <ellipse cx="60" cy="60" rx="52" ry="20"/>
+        <ellipse cx="60" cy="60" rx="52" ry="20" transform="rotate(60 60 60)"/>
+        <ellipse cx="60" cy="60" rx="52" ry="20" transform="rotate(120 60 60)"/>
+      </g>
+      <circle cx="60" cy="60" r="14" fill="url(#sphereb)"/>
+    </symbol>
+    <symbol id="aisaLogoB" viewBox="0 0 96 96">
+      <circle cx="48" cy="48" r="46" fill="#1b2a63"/>
+      <circle cx="48" cy="48" r="38" fill="none" stroke="#ffffff" stroke-width="1.4" opacity="0.45"/>
+      <text x="48" y="56" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="26" font-weight="700" letter-spacing="1.5" fill="#ffffff">AISA</text>
+    </symbol>
+  </defs>
+
+  <!-- background -->
+  <rect width="1920" height="1080" fill="url(#bgb)"/>
+
+  <!-- faint corner atoms only (decoration stays out of the content safe area) -->
+  <use href="#atomb" x="-70" y="-70" width="210" height="210" opacity="0.12"/>
+  <use href="#atomb" x="-40" y="900" width="230" height="230" opacity="0.12"/>
+  <use href="#atomb" x="1740" y="910" width="230" height="230" opacity="0.10"/>
+
+  <!-- faint DNA helix hugging the far-right edge -->
+  <g opacity="0.1" fill="none" stroke="#5b8fc0" stroke-width="5" stroke-linecap="round">
+    <path d="M1900,120 C1900,170 1840,170 1840,220 C1840,270 1900,270 1900,320 C1900,370 1840,370 1840,420 C1840,470 1900,470 1900,520 C1900,570 1840,570 1840,620 C1840,670 1900,670 1900,720 C1900,770 1840,770 1840,820 C1840,870 1900,870 1900,920 C1900,970 1840,970 1840,1000"/>
+    <path d="M1840,120 C1840,170 1900,170 1900,220 C1900,270 1840,270 1840,320 C1840,370 1900,370 1900,420 C1900,470 1840,470 1840,520 C1840,570 1900,570 1900,620 C1900,670 1840,670 1840,720 C1840,770 1900,770 1900,820 C1900,870 1840,870 1840,920 C1840,970 1900,970 1900,1000"/>
+  </g>
+
+  <!-- faint molecular line-and-node motif along the very bottom (out of the way of fine print) -->
+  <g opacity="0.12">
+    <g stroke="#8db6d6" stroke-width="2" fill="none">
+      <line x1="1180" y1="1024" x2="1320" y2="998"/>
+      <line x1="1320" y1="998" x2="1460" y2="1028"/>
+      <line x1="1460" y1="1028" x2="1600" y2="1000"/>
+    </g>
+    <g fill="#7fb0d2">
+      <circle cx="1180" cy="1024" r="6"/>
+      <circle cx="1320" cy="998" r="6"/>
+      <circle cx="1460" cy="1028" r="6"/>
+      <circle cx="1600" cy="1000" r="6"/>
+    </g>
+  </g>
+
+  <!-- ================= CONSTANT BRANDING LAYER (identical on every theme) ================= -->
+  <rect x="1662" y="34" width="200" height="100" rx="24" fill="#ffffff" opacity="0.5"/>
+  <use href="#aisaLogoB" x="1724" y="46" width="76" height="76"/>
+  <text x="115" y="1038" font-family="Arial, Helvetica, sans-serif" font-size="22" fill="#274868" opacity="0.72">American International School in Abu Dhabi&#160;&#160;·&#160;&#160;For AISA classroom use only</text>
+</svg>

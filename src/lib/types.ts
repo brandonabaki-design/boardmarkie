@@ -106,8 +106,11 @@ export interface ImageElement extends CanvasElementBase {
 export interface ShapeElement extends CanvasElementBase {
   type: "shape";
   shape: "rect" | "ellipse";
-  fill: string; // hex
+  fill: string; // hex, or "transparent"
   opacity?: number; // 0–100
+  radius?: number; // corner radius in cqh (rect only)
+  stroke?: string; // border colour (hex)
+  strokeWidth?: number; // border width in cqh
 }
 
 export interface YoutubeElement extends CanvasElementBase {
@@ -122,6 +125,7 @@ export interface Lesson {
   id: string;
   kind: "lesson";
   createdAt: number;
+  updatedAt?: number; // last edit time; used for cross-device sync conflict resolution
   meta: LessonMeta;
   slides: Slide[];
   theme?: string; // deck theme id (see src/lib/themes.ts); defaults to "classic"
@@ -165,6 +169,7 @@ export interface Worksheet {
   id: string;
   kind: "worksheet";
   createdAt: number;
+  updatedAt?: number; // last edit time; used for cross-device sync conflict resolution
   meta: WorksheetMeta;
   sections: WorksheetSection[];
 }
@@ -192,6 +197,7 @@ export interface LessonSeries {
   id: string;
   kind: "series";
   createdAt: number;
+  updatedAt?: number; // last edit time; used for cross-device sync conflict resolution
   meta: SeriesMeta;
   lessons: SeriesLesson[];
 }
@@ -206,6 +212,7 @@ export interface GenerateRequest {
   subject: string;
   yearGroup: string;
   region: string;
+  readingLevel?: string; // e.g. "At grade level", "Below grade level (simpler)"
   durationMinutes?: number;
   slideCount?: number;
   lessonCount?: number;
@@ -215,6 +222,15 @@ export interface GenerateRequest {
   notes?: string;
   includeStandards?: boolean; // find & include curriculum standards (lessons)
   autoImages?: boolean; // generate slide illustrations during creation
+  outline?: OutlineSlide[]; // approved outline to expand into a full lesson
+}
+
+// A lightweight, editable lesson plan produced before full generation
+// (the "Refine" step of the create wizard).
+export interface OutlineSlide {
+  title: string;
+  layout: SlideLayout;
+  summary: string;
 }
 
 export type EditAction =

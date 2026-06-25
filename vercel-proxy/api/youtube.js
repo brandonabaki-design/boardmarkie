@@ -11,17 +11,16 @@
 // key, API not enabled, etc.). If the key is missing it returns videoId:null
 // with a note; if YouTube rejects the key it returns the upstream error detail.
 
-const ALLOW_ORIGIN = "*";
-
-function setCors(res) {
-  res.setHeader("Access-Control-Allow-Origin", ALLOW_ORIGIN);
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-}
+import { setCors, verifyAuth, authEnabled } from "./_auth.js";
 
 export default async function handler(req, res) {
-  setCors(res);
+  setCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
+
+  if (authEnabled()) {
+    const auth = await verifyAuth(req);
+    if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+  }
 
   let q = "";
   if (req.method === "GET") {

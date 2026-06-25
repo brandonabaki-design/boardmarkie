@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, Plus_Jakarta_Sans, Caveat } from "next/font/google";
+import { Bricolage_Grotesque, Plus_Jakarta_Sans, Caveat, Fredoka } from "next/font/google";
 import "./globals.css";
 import { RegisterSW } from "@/components/RegisterSW";
 
@@ -24,6 +24,13 @@ const caveat = Caveat({
   subsets: ["latin"],
   display: "swap",
   weight: ["600", "700"],
+});
+
+// Rounded, playful display font used by some deck themes (e.g. Sunny).
+const fredoka = Fredoka({
+  variable: "--font-fredoka",
+  subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -63,7 +70,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${jakarta.variable} ${bricolage.variable} ${caveat.variable} h-full`}
+      className={`${jakarta.variable} ${bricolage.variable} ${caveat.variable} ${fredoka.variable} h-full`}
     >
       <body className="min-h-full flex flex-col">
         {children}

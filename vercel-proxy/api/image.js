@@ -13,25 +13,21 @@
 // Standard Imagen 4 is the fallback; the app sends an explicit tier per request
 // (fast / standard / ultra). NB: the imagen-4.0-* endpoints are slated for
 // shutdown on 2026-08-17 — swap to the successor model when it lands.
+import { setCors, verifyAuth, authEnabled } from "./_auth.js";
+
 const DEFAULT_MODEL = "imagen-4.0-generate-001";
 const ALLOWED_ASPECTS = new Set(["1:1", "3:4", "4:3", "9:16", "16:9"]);
 
-// Lock this to your site's origin in production, e.g.
-// "https://brandonabaki-design.github.io". "*" allows any origin.
-const ALLOW_ORIGIN = "*";
-
-function setCors(res) {
-  res.setHeader("Access-Control-Allow-Origin", ALLOW_ORIGIN);
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  res.setHeader("Access-Control-Max-Age", "86400");
-}
-
 export default async function handler(req, res) {
-  setCors(res);
+  setCors(req, res);
 
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST." });
+
+  if (authEnabled()) {
+    const auth = await verifyAuth(req);
+    if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+  }
 
   // Vercel auto-parses JSON bodies, but guard for string / empty just in case.
   let payload = req.body;

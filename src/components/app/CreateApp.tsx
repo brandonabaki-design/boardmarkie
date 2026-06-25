@@ -11,13 +11,14 @@ import type {
   GenerateRequest,
   GenerationMode,
   Lesson,
+  OutlineSlide,
   SeriesLesson,
   Slide,
 } from "@/lib/types";
-import { generateArtifact, editLesson, editWorksheet } from "@/lib/client";
+import { generateArtifact, generateOutline, editLesson, editWorksheet } from "@/lib/client";
 import { generateImage, illustrationPrompt, canGenerateImages } from "@/lib/images";
 import { resolveYoutube } from "@/lib/youtube";
-import { searchImages } from "@/lib/imageSearch";
+import { searchImages, firstLoadableImage } from "@/lib/imageSearch";
 import { searchGifs } from "@/lib/gifSearch";
 import { cid, ensureElements, slideToElements } from "@/lib/canvas";
 import {
@@ -28,10 +29,18 @@ import {
   getImageConfig,
   getLibrary,
   saveArtifact,
+  LIBRARY_EVENT,
 } from "@/lib/storage";
+import { onAuthChange, signInWithGoogle, signOutUser, type AppUser } from "@/lib/auth";
+import { firebaseConfigured } from "@/lib/firebase";
+import { isHostedMode, emailAllowed } from "@/lib/backend";
+import { installSyncHooks, removeSyncHooks, subscribeArtifacts, syncOnce } from "@/lib/sync";
+import { AccountButton } from "./AccountButton";
+import { SignInWall } from "./SignInWall";
 import { GeneratorForm } from "./GeneratorForm";
 import { GeneratingState } from "./GeneratingState";
 import { LessonSkeleton } from "./LessonSkeleton";
+import { OutlineRefiner } from "./OutlineRefiner";
 import { CanvasEditor } from "./CanvasEditor";
 import { AskBoardmarkie } from "./AskBoardmarkie";
 import { WorksheetView } from "./WorksheetView";
@@ -45,6 +54,9 @@ import { Spinner } from "./ui";
 function isMode(v: string | null): v is GenerationMode {
   return v === "lesson" || v === "series" || v === "worksheet";
 }
+
+// Which Settings tab to open to (mirrors SettingsModal's internal Tab type).
+type SettingsTab = "claude" | "openai" | "images" | "sync";
 
 function patchSlide(lesson: Lesson, slideId: string, patch: Partial<Slide>): Lesson {
   return {
@@ -90,11 +102,17 @@ export function CreateApp() {
   const [current, setCurrent] = useState<Artifact | null>(null);
   const [genMode, setGenMode] = useState<GenerationMode>(initialMode);
   const [loading, setLoading] = useState(false);
+  // refine.outline === null means the outline is still generating (the refiner
+  // shows immediately with a loading state so the theme can be picked right away).
+  const [refine, setRefine] = useState<{ req: GenerateRequest; outline: OutlineSlide[] | null } | null>(null);
   const [editing, setEditing] = useState(false);
   const [expanding, setExpanding] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [libOpen, setLibOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("claude");
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [imageProgress, setImageProgress] = useState<{ done: number; total: number } | null>(null);
   const [past, setPast] = useState<Lesson[]>([]);
@@ -104,15 +122,96 @@ export function CreateApp() {
     setLibrary(getLibrary());
   }, []);
 
+  // Keep the library in sync with any local write (including changes pulled from
+  // another device by the cloud sync layer).
+  useEffect(() => {
+    const onLib = () => setLibrary(getLibrary());
+    window.addEventListener(LIBRARY_EVENT, onLib);
+    return () => window.removeEventListener(LIBRARY_EVENT, onLib);
+  }, []);
+
+  // Cross-device sync: when the teacher is signed in, mirror every save/delete to
+  // the cloud, reconcile both sides once, and stream in changes from other devices.
+  useEffect(() => {
+    let unsubSnap: (() => void) | null = null;
+    const unsubAuth = onAuthChange((u) => {
+      setAuthReady(true);
+      // Hosted mode: enforce the email-domain allow-list client-side too (the
+      // backend enforces it as well). A wrong-domain account is signed straight
+      // back out, so it never reaches the tools.
+      if (u && isHostedMode() && !emailAllowed(u.email)) {
+        setError("Please sign in with your school account.");
+        void signOutUser();
+        return;
+      }
+      setUser(u);
+      unsubSnap?.();
+      unsubSnap = null;
+      if (u) {
+        installSyncHooks();
+        void syncOnce();
+        unsubSnap = subscribeArtifacts(() => setLibrary(getLibrary()));
+      } else {
+        removeSyncHooks();
+      }
+    });
+    return () => {
+      unsubAuth();
+      unsubSnap?.();
+      removeSyncHooks();
+    };
+  }, []);
+
   const refresh = () => setLibrary(getLibrary());
+
+  const openSettings = (t: SettingsTab = "claude") => {
+    setSettingsTab(t);
+    setSettingsOpen(true);
+  };
+
+  const handleSignIn = async () => {
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      handleError(err);
+    }
+  };
 
   const handleError = (err: unknown) => {
     const e = err as Error & { status?: number };
     setError(e.message || "Something went wrong.");
-    if (e.status === 401) setSettingsOpen(true);
+    if (e.status === 401) openSettings("claude");
   };
 
+  // Lessons go through an outline-first flow: show the theme picker + outline
+  // immediately, generate the outline in the background, then auto-build.
   const handleGenerate = async (req: GenerateRequest) => {
+    setError(null);
+    if (req.mode === "lesson") {
+      setGenMode("lesson");
+      setRefine({ req, outline: null }); // show the refiner right away (outline loading)
+      try {
+        const outline = await generateOutline(req);
+        // Ignore if the user navigated away / started a different generation.
+        setRefine((r) => (r && r.req === req ? { req, outline } : r));
+      } catch (err) {
+        handleError(err);
+        setRefine(null);
+      }
+      return;
+    }
+    await runGenerate(req);
+  };
+
+  // The refined outline + chosen theme were confirmed → expand to a full lesson.
+  const confirmOutline = (outline: OutlineSlide[], themeId: string) => {
+    if (!refine) return;
+    const req2: GenerateRequest = { ...refine.req, outline, slideCount: outline.length };
+    setRefine(null);
+    void runGenerate(req2, themeId);
+  };
+
+  const runGenerate = async (req: GenerateRequest, themeId?: string) => {
     setError(null);
     setGenMode(req.mode);
     setLoading(true);
@@ -124,7 +223,8 @@ export function CreateApp() {
       setLoading(false);
       return;
     }
-    const seeded = artifact.kind === "lesson" ? seedLesson(artifact) : artifact;
+    let seeded = artifact.kind === "lesson" ? seedLesson(artifact) : artifact;
+    if (themeId && seeded.kind === "lesson") seeded = { ...seeded, theme: themeId };
     saveArtifact(seeded);
     setCurrent(seeded);
     setPast([]);
@@ -133,7 +233,7 @@ export function CreateApp() {
     setLoading(false);
 
     if (seeded.kind === "lesson") {
-      const hasProxy = !!getImageConfig().proxyUrl;
+      const hasProxy = isHostedMode() || !!getImageConfig().proxyUrl;
       let working = seeded;
       if (req.autoImages) {
         const source = getAutoMediaSource();
@@ -147,7 +247,7 @@ export function CreateApp() {
             setSettingsOpen(true);
           }
         } else if (source === "gif") {
-          if (getGiphyKey()) {
+          if (isHostedMode() || getGiphyKey()) {
             working = await autoSearchMedia(seeded, "gif");
           } else {
             setError(
@@ -167,8 +267,16 @@ export function CreateApp() {
   // Generate slide illustrations concurrently (a small pool keeps it fast
   // without hammering the proxy), placing each onto the slide's canvas as it lands.
   const autoGenerateImages = async (lesson: Lesson) => {
-    // Skip slides that will get a video — don't fill them with an image.
-    const targets = lesson.slides.filter((s) => s.imagePrompt && !s.imageUrl && !s.youtube?.searchQuery);
+    // Skip video slides, and vocab/quiz slides (they use their own card/box
+    // templates rather than a slide-level image).
+    const targets = lesson.slides.filter(
+      (s) =>
+        s.imagePrompt &&
+        !s.imageUrl &&
+        !s.youtube?.searchQuery &&
+        s.layout !== "vocabulary" &&
+        s.layout !== "quiz",
+    );
     if (!targets.length) return lesson;
     setImageProgress({ done: 0, total: targets.length });
 
@@ -213,7 +321,12 @@ export function CreateApp() {
   // Embeds the result URL directly; the same concurrent-pool pattern keeps it fast.
   const autoSearchMedia = async (lesson: Lesson, kind: "search" | "gif") => {
     const targets = lesson.slides.filter(
-      (s) => (s.gifQuery || s.imageQuery || s.imageAlt || s.imagePrompt) && !s.imageUrl && !s.youtube?.searchQuery,
+      (s) =>
+        (s.gifQuery || s.imageQuery || s.imageAlt || s.imagePrompt) &&
+        !s.imageUrl &&
+        !s.youtube?.searchQuery &&
+        s.layout !== "vocabulary" &&
+        s.layout !== "quiz",
     );
     if (!targets.length) return lesson;
     setImageProgress({ done: 0, total: targets.length });
@@ -233,10 +346,17 @@ export function CreateApp() {
           const gq = (t.gifQuery || "").trim();
           // In GIF mode, embed a GIF only where the model chose a concrete
           // gifQuery; otherwise fall back to a relevant photo (never a random GIF).
-          if (kind === "gif" && gq) url = (await searchGifs(gq))[0]?.url;
+          // Pick the first result that actually loads so no broken images land.
+          if (kind === "gif" && gq) {
+            const gifs = await searchGifs(gq);
+            url = await firstLoadableImage(gifs.slice(0, 6).map((g) => g.url));
+          }
           if (!url) {
             const iq = slideQuery(t);
-            if (iq) url = (await searchImages(iq))[0]?.url;
+            if (iq) {
+              const imgs = await searchImages(iq);
+              url = await firstLoadableImage(imgs.slice(0, 8).map((r) => r.url));
+            }
           }
           if (url) {
             const cur = working.slides.find((s) => s.id === t.id) ?? t;
@@ -245,8 +365,8 @@ export function CreateApp() {
             setCurrent(working);
             saveArtifact(working);
           }
-        } catch {
-          /* no result for this slide — skip it */
+        } catch (e) {
+          console.warn("[auto-media] no media for slide:", t.title, e);
         } finally {
           done++;
           setImageProgress({ done, total: targets.length });
@@ -277,8 +397,8 @@ export function CreateApp() {
         });
         setCurrent(working);
         saveArtifact(working);
-      } catch {
-        /* skip this one */
+      } catch (e) {
+        console.warn("[auto-youtube] failed for slide:", t.title, e);
       }
     }
     refresh();
@@ -442,6 +562,17 @@ export function CreateApp() {
 
   const busy = loading || editing || expanding !== null || imageProgress !== null;
 
+  // Hosted ("school") mode: sign-in is required to reach the creation tools.
+  if (isHostedMode() && !user) {
+    return authReady ? (
+      <SignInWall />
+    ) : (
+      <div className="grid min-h-screen place-items-center bg-paper">
+        <Spinner className="h-6 w-6 text-brand-600" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="no-print sticky top-0 z-40 border-b border-line bg-white/85 backdrop-blur-md">
@@ -467,6 +598,12 @@ export function CreateApp() {
                 </button>
               </>
             )}
+            <AccountButton
+              user={user}
+              configured={firebaseConfigured()}
+              onSignIn={handleSignIn}
+              onOpenSync={() => openSettings("sync")}
+            />
             <button
               onClick={() => setLibOpen(true)}
               className="grid h-10 w-10 place-items-center rounded-full border border-line bg-white text-ink transition-colors hover:border-brand-300"
@@ -476,7 +613,7 @@ export function CreateApp() {
               <FolderOpen size={18} />
             </button>
             <button
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => openSettings("claude")}
               className="grid h-10 w-10 place-items-center rounded-full border border-line bg-white text-ink transition-colors hover:border-brand-300"
               aria-label="Settings"
               title="Settings"
@@ -504,11 +641,7 @@ export function CreateApp() {
           </div>
         )}
 
-        {loading && !current ? (
-          genMode === "lesson" ? <LessonSkeleton /> : <GeneratingState mode={genMode} />
-        ) : !current ? (
-          <GeneratorForm initialMode={initialMode} loading={loading} onSubmit={handleGenerate} />
-        ) : (
+        {current ? (
           <div>
             <button
               onClick={startNew}
@@ -532,6 +665,24 @@ export function CreateApp() {
             {current.kind === "worksheet" && <WorksheetView worksheet={current} />}
             {current.kind === "series" && <SeriesView series={current} busyLesson={expanding} onExpand={handleExpand} />}
           </div>
+        ) : loading ? (
+          genMode === "lesson" ? <LessonSkeleton /> : <GeneratingState mode={genMode} />
+        ) : (
+          <>
+            {/* Form stays mounted (just hidden) during Refine so inputs are preserved on Back. */}
+            <div className={refine ? "hidden" : ""}>
+              <GeneratorForm initialMode={initialMode} loading={false} onSubmit={handleGenerate} />
+            </div>
+            {refine && (
+              <OutlineRefiner
+                req={refine.req}
+                outline={refine.outline}
+                busy={loading}
+                onBack={() => setRefine(null)}
+                onConfirm={confirmOutline}
+              />
+            )}
+          </>
         )}
       </main>
 
@@ -550,7 +701,11 @@ export function CreateApp() {
         onOpen={openArtifact}
         onDelete={removeArtifact}
       />
-      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        initialTab={settingsTab}
+      />
 
       <AskBoardmarkie
         context={
@@ -573,7 +728,7 @@ export function CreateApp() {
         }
         onEdit={askEdit}
         onArrange={askArrange}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSettings={() => openSettings("openai")}
       />
 
       {presenting && current && current.kind === "lesson" && (

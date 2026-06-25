@@ -64,6 +64,8 @@ export function CanvasEditor({
 }) {
   const [idx, setIdx] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // True when the slide rail was the last thing clicked — gates arrow-key nav.
+  const [railActive, setRailActive] = useState(false);
   const [swapOpen, setSwapOpen] = useState(false);
   const [swapTarget, setSwapTarget] = useState<string | null>(null);
   const [ytOpen, setYtOpen] = useState(false);
@@ -222,6 +224,26 @@ export function CanvasEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [els, selectedId, onUndo, onRedo]);
 
+  // Up/Down arrows change slides — but only when the slide rail was the last
+  // thing clicked, and never while an element is selected or text is being edited.
+  useEffect(() => {
+    const onArrow = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+      if (!railActive || selectedId) return;
+      const ae = document.activeElement as HTMLElement | null;
+      const typing =
+        !!ae?.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(ae?.tagName ?? "");
+      if (typing || swapOpen || ytOpen) return;
+      const target = e.key === "ArrowUp" ? safeIdx - 1 : safeIdx + 1;
+      if (target < 0 || target >= lesson.slides.length) return;
+      e.preventDefault();
+      setIdx(target);
+      setSelectedId(null);
+    };
+    window.addEventListener("keydown", onArrow);
+    return () => window.removeEventListener("keydown", onArrow);
+  }, [railActive, selectedId, safeIdx, lesson.slides.length, swapOpen, ytOpen]);
+
   const context = {
     topic: lesson.meta.topic,
     subject: lesson.meta.subject,
@@ -345,9 +367,13 @@ export function CanvasEditor({
               background={slide.background ?? theme.bg}
               ink={theme.ink}
               muted={theme.muted}
+              displayFont={theme.displayFont}
               editable
               selectedId={selectedId}
-              onSelect={setSelectedId}
+              onSelect={(id) => {
+                setSelectedId(id);
+                setRailActive(false); // focus moved to the canvas
+              }}
               onChange={setElements}
               onRequestSwap={(id) => {
                 setSwapTarget(id);
@@ -464,8 +490,15 @@ export function CanvasEditor({
 
         {/* slide thumbnail rail */}
         <div className="no-print hidden w-44 shrink-0 lg:block">
-          <p className="mb-2 px-1 text-xs font-semibold text-muted">Slides · drag to reorder</p>
-          <div className="max-h-[70vh] space-y-2 overflow-auto pr-1">
+          <p className="mb-2 px-1 text-xs font-semibold text-muted">
+            Slides · drag to reorder{railActive ? " · ↑/↓ to switch" : ""}
+          </p>
+          <div
+            onClick={() => setRailActive(true)}
+            className={`max-h-[70vh] space-y-2 overflow-auto rounded-xl pr-1 ${
+              railActive ? "ring-2 ring-brand-200" : ""
+            }`}
+          >
             {lesson.slides.map((s, i) => {
               const thumb = ensureElements(s);
               return (
@@ -488,7 +521,10 @@ export function CanvasEditor({
                     setDragFrom(null);
                     setDragOver(null);
                   }}
-                  onClick={() => goTo(i)}
+                  onClick={() => {
+                    goTo(i);
+                    setRailActive(true);
+                  }}
                   title="Drag to reorder"
                   // Skip layout/paint for off-screen thumbnails (big win for long decks).
                   style={{ contentVisibility: "auto", containIntrinsicSize: "auto 104px" }}
@@ -505,7 +541,7 @@ export function CanvasEditor({
                     {i + 1}
                   </span>
                   <div className="pointer-events-none min-w-0 flex-1 overflow-hidden rounded-r-md">
-                    <SlideCanvas elements={thumb.elements ?? []} background={s.background ?? theme.bg} ink={theme.ink} muted={theme.muted} />
+                    <SlideCanvas elements={thumb.elements ?? []} background={s.background ?? theme.bg} ink={theme.ink} muted={theme.muted} displayFont={theme.displayFont} />
                   </div>
                 </div>
               );
@@ -595,7 +631,7 @@ function PrintDeck({ lesson }: { lesson: Lesson }) {
         const slide = ensureElements(s);
         return (
           <div key={s.id} className="print-page">
-            <SlideCanvas elements={slide.elements ?? []} background={s.background ?? theme.bg} ink={theme.ink} muted={theme.muted} />
+            <SlideCanvas elements={slide.elements ?? []} background={s.background ?? theme.bg} ink={theme.ink} muted={theme.muted} displayFont={theme.displayFont} />
           </div>
         );
       })}

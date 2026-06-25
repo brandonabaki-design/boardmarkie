@@ -197,6 +197,44 @@ export const lessonSchema: JSONSchema = {
   required: ["title", "summary", "objectives", "vocabulary", "standards", "slides"],
 };
 
+// A fast, lightweight lesson outline (titles + layout + one-line summary),
+// shown for the teacher to refine before the full lesson is generated.
+export const outlineSchema: JSONSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    slides: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          title: { type: "string", description: "Slide heading." },
+          layout: {
+            type: "string",
+            enum: [
+              "title",
+              "objectives",
+              "content",
+              "vocabulary",
+              "activity",
+              "discussion",
+              "video",
+              "quiz",
+              "plenary",
+            ],
+            description: "The purpose/format of the slide.",
+          },
+          summary: { type: "string", description: "One short sentence: what this slide covers." },
+        },
+        required: ["title", "layout", "summary"],
+      },
+      description: "The ordered slides that will make up the lesson.",
+    },
+  },
+  required: ["slides"],
+};
+
 export const worksheetSchema: JSONSchema = {
   type: "object",
   additionalProperties: false,

@@ -5,6 +5,7 @@ import { X, Search, Upload, Link2, Sparkles, PenTool, ImageIcon, ExternalLink } 
 import { searchImages, googleImagesUrl, type ImageResult } from "@/lib/imageSearch";
 import { searchGifs } from "@/lib/gifSearch";
 import { getImageConfig } from "@/lib/storage";
+import { isHostedMode, getBackendBase, authHeader } from "@/lib/backend";
 import { generateImage, illustrationPrompt } from "@/lib/images";
 import { generateDiagram } from "@/lib/client";
 import { Spinner } from "./ui";
@@ -42,12 +43,20 @@ async function toDataUrl(src: string): Promise<string> {
   } catch {
     /* fall through to the proxy */
   }
-  const { proxyUrl } = getImageConfig();
-  if (!proxyUrl) throw new Error("fetch failed");
-  const fetchUrl = proxyUrl.replace(/\/image\/?$/, "/fetch-image");
+  const hosted = isHostedMode();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  let fetchUrl: string;
+  if (hosted) {
+    fetchUrl = `${getBackendBase()}/fetch-image`;
+    Object.assign(headers, await authHeader());
+  } else {
+    const { proxyUrl } = getImageConfig();
+    if (!proxyUrl) throw new Error("fetch failed");
+    fetchUrl = proxyUrl.replace(/\/image\/?$/, "/fetch-image");
+  }
   const res = await fetch(fetchUrl, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ url: src }),
   });
   if (!res.ok) throw new Error("proxy fetch failed");
@@ -302,18 +311,37 @@ export function ImageSwap({
               </div>
               {results.length > 0 ? (
                 <div className="mt-3 grid grid-cols-3 gap-2">
-                  {results.map((r, i) => (
-                    <button
-                      key={i}
-                      onClick={() => pickResult(r)}
-                      disabled={busy}
-                      title={r.title}
-                      className="aspect-square overflow-hidden rounded-lg border border-line transition-colors hover:border-brand-400 disabled:opacity-50"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={r.thumb} alt={r.title} loading="lazy" decoding="async" className="h-full w-full object-cover" />
-                    </button>
-                  ))}
+                  {results.map((r, i) => {
+                    const src = searchKind === "gif" ? "giphy" : r.source;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => pickResult(r)}
+                        disabled={busy}
+                        title={r.title}
+                        className="relative aspect-square overflow-hidden rounded-lg border border-line transition-colors hover:border-brand-400 disabled:opacity-50"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={r.thumb}
+                          alt={r.title}
+                          loading="lazy"
+                          decoding="async"
+                          onError={(e) => {
+                            // Drop a result whose thumbnail won't load.
+                            const b = e.currentTarget.parentElement;
+                            if (b) b.style.display = "none";
+                          }}
+                          className="h-full w-full object-cover"
+                        />
+                        {src && (
+                          <span className="pointer-events-none absolute bottom-1 left-1 rounded bg-ink/70 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">
+                            {src}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               ) : (
                 !searching && (

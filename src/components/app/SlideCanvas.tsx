@@ -41,6 +41,7 @@ export function SlideCanvas({
   background = "#ffffff",
   ink = INK,
   muted = MUTED,
+  displayFont = "var(--font-bricolage)",
   editable = false,
   interactive = false,
   selectedId = null,
@@ -53,6 +54,7 @@ export function SlideCanvas({
   background?: string;
   ink?: string; // default text colour (from the deck theme)
   muted?: string; // secondary text colour (from the deck theme)
+  displayFont?: string; // heading/title font family (from the deck theme)
   editable?: boolean;
   interactive?: boolean; // allow iframe playback (Present mode)
   selectedId?: string | null;
@@ -187,7 +189,7 @@ export function SlideCanvas({
           setEditingId(null);
         }
       }}
-      className={`relative aspect-video w-full overflow-hidden ${className}`}
+      className={`relative isolate aspect-video w-full overflow-hidden ${className}`}
     >
       {sorted.map((el) => {
         const b = boxOf(el);
@@ -221,6 +223,7 @@ export function SlideCanvas({
               interactive={interactive}
               ink={ink}
               muted={muted}
+              displayFont={displayFont}
               onCommitText={(t) => {
                 update(el.id, { text: t });
                 setEditingId(null);
@@ -283,6 +286,7 @@ function ElementContent({
   interactive,
   ink,
   muted,
+  displayFont,
   onCommitText,
 }: {
   el: CanvasElement;
@@ -291,10 +295,11 @@ function ElementContent({
   interactive: boolean;
   ink: string;
   muted: string;
+  displayFont: string;
   onCommitText: (text: string) => void;
 }) {
   if (el.type === "text") {
-    return <TextBox el={el} editing={editing} onCommit={onCommitText} ink={ink} muted={muted} />;
+    return <TextBox el={el} editing={editing} onCommit={onCommitText} ink={ink} muted={muted} displayFont={displayFont} />;
   }
   if (el.type === "shape") {
     return (
@@ -304,7 +309,9 @@ function ElementContent({
           height: "100%",
           background: el.fill,
           opacity: (el.opacity ?? 100) / 100,
-          borderRadius: el.shape === "ellipse" ? "50%" : "8px",
+          borderRadius: el.shape === "ellipse" ? "50%" : el.radius != null ? `${el.radius}cqh` : "8px",
+          border: el.stroke ? `${el.strokeWidth ?? 0.4}cqh solid ${el.stroke}` : undefined,
+          boxSizing: "border-box",
         }}
       />
     );
@@ -352,6 +359,10 @@ function ElementContent({
         draggable={false}
         loading="lazy"
         decoding="async"
+        onError={(e) => {
+          // Hide a dead/blocked image URL rather than showing a broken icon.
+          e.currentTarget.style.display = "none";
+        }}
         // "contain" shows the whole image (never cropped/cut); boxes are sized ~16:9 to match.
         style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: `${el.radius ?? 4}%`, opacity: (el.opacity ?? 100) / 100 }}
       />
@@ -407,12 +418,14 @@ function TextBox({
   onCommit,
   ink = INK,
   muted = MUTED,
+  displayFont = "var(--font-bricolage)",
 }: {
   el: TextElement;
   editing: boolean;
   onCommit: (t: string) => void;
   ink?: string;
   muted?: string;
+  displayFont?: string;
 }) {
   // Map the canvas default ink/muted to the deck theme; explicit user colours stay.
   const color = !el.color || el.color === INK ? ink : el.color === MUTED ? muted : el.color;
@@ -466,6 +479,7 @@ function TextBox({
         fontStyle: el.italic ? "italic" : "normal",
         textAlign: el.align ?? "left",
         color,
+        fontFamily: el.font === "display" ? displayFont : undefined,
         letterSpacing: el.font === "display" ? "-0.01em" : undefined,
       }}
     />

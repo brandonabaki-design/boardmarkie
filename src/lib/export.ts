@@ -203,10 +203,16 @@ export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
           fontFace: "Arial",
         });
       } else if (el.type === "shape") {
-        s.addShape((el.shape === "ellipse" ? "ellipse" : "rect") as never, {
+        const shapeType = el.shape === "ellipse" ? "ellipse" : el.radius != null ? "roundRect" : "rect";
+        const fill =
+          el.fill === "transparent"
+            ? ({ type: "none" } as never)
+            : { color: hex(el.fill, "d2f6ec"), transparency: 100 - (el.opacity ?? 100) };
+        s.addShape(shapeType as never, {
           ...box,
-          fill: { color: hex(el.fill, "d2f6ec"), transparency: 100 - (el.opacity ?? 100) },
-          line: { type: "none" } as never,
+          fill,
+          line: el.stroke ? { color: hex(el.stroke), width: 1.25 } : ({ type: "none" } as never),
+          ...(el.radius != null ? { rectRadius: 0.1 } : {}),
         });
       } else if (el.type === "image") {
         const data = await imageData(el);

@@ -113,7 +113,7 @@ export function PresentMode({ lesson, onClose }: { lesson: Lesson; onClose: () =
 
       <div className="relative flex flex-1 items-center justify-center px-4 pb-6">
         <div className="aspect-video max-h-full w-full max-w-6xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-          <SlideCanvas elements={slide.elements ?? []} background={slide.background ?? theme.bg} ink={theme.ink} muted={theme.muted} interactive />
+          <SlideCanvas elements={slide.elements ?? []} background={slide.background ?? theme.bg} ink={theme.ink} muted={theme.muted} displayFont={theme.displayFont} interactive />
         </div>
 
         <button

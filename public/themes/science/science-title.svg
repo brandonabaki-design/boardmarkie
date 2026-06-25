@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Science lesson title background">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eef6fb"/>
+      <stop offset="0.55" stop-color="#dcecf6"/>
+      <stop offset="1" stop-color="#cfe3f1"/>
+    </linearGradient>
+    <radialGradient id="sphere" cx="0.35" cy="0.3" r="0.85">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.35" stop-color="#9fc6e0"/>
+      <stop offset="0.75" stop-color="#5f93bf"/>
+      <stop offset="1" stop-color="#3f6f9c"/>
+    </radialGradient>
+    <linearGradient id="strandBlue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9cc6e2"/><stop offset="1" stop-color="#5b8fc0"/>
+    </linearGradient>
+    <linearGradient id="strandGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e7cb96"/><stop offset="1" stop-color="#c6a062"/>
+    </linearGradient>
+    <symbol id="atom" viewBox="0 0 120 120">
+      <g fill="none" stroke="#6fa3c8" stroke-width="2.4" opacity="0.9">
+        <ellipse cx="60" cy="60" rx="52" ry="20"/>
+        <ellipse cx="60" cy="60" rx="52" ry="20" transform="rotate(60 60 60)"/>
+        <ellipse cx="60" cy="60" rx="52" ry="20" transform="rotate(120 60 60)"/>
+      </g>
+      <circle cx="11" cy="49" r="4.5" fill="#7fb0d2"/>
+      <circle cx="103" cy="74" r="4.5" fill="#7fb0d2"/>
+      <circle cx="76" cy="14" r="4.5" fill="#e6c894"/>
+      <circle cx="60" cy="60" r="15" fill="url(#sphere)"/>
+    </symbol>
+    <symbol id="spark" viewBox="-12 -12 24 24">
+      <path d="M0,-11 L3,-3 L11,0 L3,3 L0,11 L-3,3 L-11,0 L-3,-3 Z" fill="#ffffff"/>
+    </symbol>
+    <symbol id="aisaLogo" viewBox="0 0 96 96">
+      <circle cx="48" cy="48" r="46" fill="#1b2a63"/>
+      <circle cx="48" cy="48" r="38" fill="none" stroke="#ffffff" stroke-width="1.4" opacity="0.45"/>
+      <text x="48" y="56" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="26" font-weight="700" letter-spacing="1.5" fill="#ffffff">AISA</text>
+    </symbol>
+  </defs>
+
+  <!-- background -->
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <circle cx="1180" cy="560" r="380" fill="#ffffff" opacity="0.16"/>
+
+  <!-- molecular network (lower-left), kept below the title band -->
+  <g stroke="#8db6d6" stroke-width="2" opacity="0.5" fill="none">
+    <line x1="240" y1="580" x2="450" y2="690"/>
+    <line x1="240" y1="580" x2="545" y2="505"/>
+    <line x1="545" y1="505" x2="450" y2="690"/>
+    <line x1="240" y1="580" x2="140" y2="690"/>
+    <line x1="545" y1="505" x2="360" y2="460"/>
+  </g>
+  <g fill="#a9cce6" opacity="0.65">
+    <circle cx="140" cy="690" r="6"/>
+    <circle cx="360" cy="460" r="6"/>
+    <circle cx="450" cy="690" r="6"/>
+  </g>
+
+  <!-- atoms -->
+  <use href="#atom" x="-50" y="-60" width="240" height="240" opacity="0.5"/>
+  <use href="#atom" x="90" y="430" width="300" height="300" opacity="0.95"/>
+  <use href="#atom" x="360" y="600" width="180" height="180" opacity="0.8"/>
+  <use href="#atom" x="470" y="430" width="150" height="150" opacity="0.7"/>
+
+  <!-- dotted globe (center-right, lower) -->
+  <g opacity="0.45" stroke="#7ba8cb" fill="none">
+    <circle cx="1180" cy="560" r="240" stroke-width="1.6"/>
+    <g stroke-width="1.1" opacity="0.85">
+      <ellipse cx="1180" cy="400" rx="180" ry="29"/>
+      <ellipse cx="1180" cy="470" rx="222" ry="36"/>
+      <ellipse cx="1180" cy="560" rx="240" ry="40"/>
+      <ellipse cx="1180" cy="650" rx="222" ry="36"/>
+      <ellipse cx="1180" cy="720" rx="180" ry="29"/>
+      <ellipse cx="1180" cy="560" rx="80" ry="240"/>
+      <ellipse cx="1180" cy="560" rx="165" ry="240"/>
+      <line x1="1180" y1="320" x2="1180" y2="800"/>
+    </g>
+  </g>
+
+  <!-- DNA double helix (right edge) -->
+  <g opacity="0.8" fill="none" stroke-linecap="round">
+    <g stroke="#9bb8cf" stroke-width="6" opacity="0.55">
+      <line x1="1635" y1="120" x2="1745" y2="120"/>
+      <line x1="1635" y1="220" x2="1745" y2="220"/>
+      <line x1="1635" y1="320" x2="1745" y2="320"/>
+      <line x1="1635" y1="420" x2="1745" y2="420"/>
+      <line x1="1635" y1="520" x2="1745" y2="520"/>
+      <line x1="1635" y1="620" x2="1745" y2="620"/>
+      <line x1="1635" y1="720" x2="1745" y2="720"/>
+      <line x1="1635" y1="820" x2="1745" y2="820"/>
+      <line x1="1635" y1="920" x2="1745" y2="920"/>
+    </g>
+    <path stroke="url(#strandBlue)" stroke-width="9" d="M1760,120 C1760,170 1620,170 1620,220 C1620,270 1760,270 1760,320 C1760,370 1620,370 1620,420 C1620,470 1760,470 1760,520 C1760,570 1620,570 1620,620 C1620,670 1760,670 1760,720 C1760,770 1620,770 1620,820 C1620,870 1760,870 1760,920"/>
+    <path stroke="url(#strandGold)" stroke-width="9" d="M1620,120 C1620,170 1760,170 1760,220 C1760,270 1620,270 1620,320 C1620,370 1760,370 1760,420 C1760,470 1620,470 1620,520 C1620,570 1760,570 1760,620 C1760,670 1620,670 1620,720 C1620,770 1760,770 1760,820 C1760,870 1620,870 1620,920"/>
+  </g>
+
+  <!-- delicate science line-icons (bottom-center) -->
+  <g stroke="#5f8bb0" stroke-width="2.6" fill="none" opacity="0.45" stroke-linecap="round" stroke-linejoin="round">
+    <!-- ringed planet -->
+    <circle cx="660" cy="940" r="24"/>
+    <ellipse cx="660" cy="940" rx="44" ry="15" transform="rotate(-18 660 940)"/>
+    <!-- flask -->
+    <path d="M828,898 L828,924 L808,976 Q805,984 815,984 L851,984 Q861,984 858,976 L838,924 L838,898 Z"/>
+    <line x1="822" y1="898" x2="844" y2="898"/>
+    <!-- bar chart -->
+    <path d="M958,984 L1018,984"/>
+    <rect x="964" y="956" width="11" height="28"/>
+    <rect x="982" y="940" width="11" height="44"/>
+    <rect x="1000" y="950" width="11" height="34"/>
+  </g>
+
+  <!-- sparkles -->
+  <use href="#spark" x="1842" y="1006" width="26" height="26" opacity="0.85"/>
+  <use href="#spark" x="430" y="360" width="16" height="16" opacity="0.6"/>
+
+  <!-- ================= CONSTANT BRANDING LAYER (identical on every theme) ================= -->
+  <!-- AISA logo on frosted chip, top-right -->
+  <rect x="1662" y="34" width="200" height="100" rx="24" fill="#ffffff" opacity="0.5"/>
+  <use href="#aisaLogo" x="1724" y="46" width="76" height="76"/>
+  <!-- school fine print, bottom-left -->
+  <text x="115" y="1038" font-family="Arial, Helvetica, sans-serif" font-size="22" fill="#274868" opacity="0.72">American International School in Abu Dhabi&#160;&#160;·&#160;&#160;For AISA classroom use only</text>
+</svg>

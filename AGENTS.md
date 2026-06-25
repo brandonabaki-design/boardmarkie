@@ -23,6 +23,50 @@ React 19, TypeScript, Tailwind v4, Anthropic Claude.
   the landing page is `/`.
 - Saved work + the API key live in browser localStorage (`src/lib/storage.ts`).
 
+## Cross-device sync (Firebase) — optional, keeps the app static
+- Google sign-in + cross-device library sync run entirely client-side against the
+  user's **own Firebase project** (a managed backend), so `output: "export"` stays.
+  Nothing here runs at import time; all init is lazy + browser-guarded so the SSG
+  build never touches Firebase.
+- Layers: `src/lib/firebase.ts` (lazy app/auth/db init; config from localStorage,
+  with a `NEXT_PUBLIC_FIREBASE_*` build-time fallback; `ignoreUndefinedProperties`
+  on Firestore so artifacts' optional fields don't throw) → `src/lib/auth.ts`
+  (Google popup sign-in, `browserLocalPersistence` so sign-in lasts until sign-out)
+  → `src/lib/sync.ts` (per-user `users/{uid}/artifacts/{id}`; push/delete/pull/
+  `subscribeArtifacts` snapshot listener/`syncOnce` reconcile; last-write-wins by
+  `updatedAt`).
+- `storage.ts` stays Firebase-free to avoid an import cycle: it exposes
+  `setStorageSyncHooks` (sync.ts registers cloud push/delete), local-only writers
+  `putArtifactLocal`/`removeArtifactLocal` (sync applies remote changes without
+  echoing them back), and a coalesced `LIBRARY_EVENT` the UI listens to.
+- **Config is not a secret** (Google ships it in client code); access is enforced
+  by Firestore security rules (`request.auth.uid == uid`) + Auth authorized
+  domains. Setup UI + rules text live in `src/components/app/SyncPanel.tsx`
+  (Settings → Sync). Heavy base64 images are stripped before cloud writes (1MB doc
+  cap); text/layout/SVG/URL-media sync, AI-raster images stay on the source device.
+
+## Hosted ("school") mode — optional, gated + shared keys
+- Off by default (the app stays bring-your-own-key + static). Turned ON at BUILD
+  time by `NEXT_PUBLIC_BACKEND_URL` (the proxy's `/api` root). When on:
+  sign-in is **required** to reach `/create`, and all API keys live on the
+  backend so users enter nothing. `src/lib/backend.ts` is the single switch
+  (`isHostedMode`, `getBackendBase`, `getIdToken`, `emailAllowed`); every client
+  lib (`client.ts`, `openai.ts`, `images.ts`, `imageSearch.ts`, `gifSearch.ts`)
+  branches on it. Existing BYO/dev builds (env unset) are unaffected.
+- Claude keeps using the Anthropic SDK; in hosted mode its `baseURL` points at
+  `…/api/anthropic`, an **authed reverse proxy** that injects the server key and
+  streams responses straight back — so structured outputs/streaming are
+  unchanged. Note: serverless `maxDuration` caps generation at ~60s.
+- Auth/gating: `SignInWall` blocks `/create` until signed in; the email domain is
+  checked client-side (UX) **and** enforced server-side. The proxy verifies the
+  Firebase ID token with no firebase-admin dep — `vercel-proxy/api/_auth.js`
+  validates RS256 against Google's x509 certs + `aud`/`iss`/`exp`/`email_verified`
+  + `ALLOWED_EMAIL_DOMAINS`. Auth is enabled per-endpoint whenever
+  `FIREBASE_PROJECT_ID` is set on the project.
+- Proxy env vars (Vercel) + build vars (GitHub Actions `vars.BACKEND_URL`,
+  `vars.ALLOWED_EMAIL_DOMAINS`, `secrets.FIREBASE_CONFIG`) are documented in
+  `vercel-proxy/README.md`. Settings hides key fields in hosted mode.
+
 ## Build & deploy
 - Static export (`output: "export"` in `next.config.ts`); `basePath`/`assetPrefix`
   come from `PAGES_BASE_PATH` (empty locally, `/boardmarkie` on Pages).

@@ -9,6 +9,8 @@ function context(req: GenerateRequest): string {
     `Year group / grade: ${req.yearGroup}`,
     `Curriculum / region: ${req.region}`,
   ];
+  if (req.readingLevel)
+    lines.push(`Reading level: ${req.readingLevel} — match vocabulary, sentence length and scaffolding to this.`);
   if (req.tone) lines.push(`Tone: ${req.tone}`);
   if (req.notes) lines.push(`Extra teacher instructions: ${req.notes}`);
   return lines.join("\n");
@@ -34,7 +36,7 @@ Keep every slide uncluttered and skimmable — it must fit on screen without cro
 
 Emphasise only the most important word or two per slide using markdown: wrap key terms in **double asterisks** for bold and *single asterisks* for italics. Use it sparingly — genuinely key words only, never whole sentences.
 
-For most slides, suggest a vivid imagePrompt describing a helpful illustration, a concise imageAlt, and an imageQuery of 2-4 simple keywords for finding a stock PHOTO (e.g. "water cycle", "cell division", "ancient Rome").
+For most content slides, suggest a vivid imagePrompt describing a helpful illustration, a concise imageAlt, and an imageQuery for finding a relevant stock PHOTO. Make imageQuery 2-4 words naming a CONCRETE, PHOTOGRAPHABLE subject specific to THIS lesson, and disambiguate vague terms with the topic so a stock-photo site returns the right thing (e.g. for biology write "animal cell" not "cell"; "Roman Colosseum" not "ancient"; "rainforest canopy" not "layers"; "fraction pizza slices" not "fractions"). NEVER use abstract/structural words as the query (no "introduction", "summary", "key words", "objectives", "recap", "discussion") — for those slides reuse the lesson's real subject, or leave imageQuery empty if no concrete photo fits.
 Also set gifQuery ONLY when a short looping GIF would genuinely help — and make it a 1-3 word CONCRETE, VISUAL subject that a mainstream GIF site actually has (real things, animals, actions, weather, space, reactions: e.g. "volcano erupting", "rain", "beating heart", "galaxy", "celebration"). Leave gifQuery as an empty string for abstract points, detailed processes, diagrams, or when a still photo is better — never force a GIF, and use only a few across the whole lesson.
 Always include practical teacherNotes on every slide.
 
@@ -50,6 +52,25 @@ export function lessonUserPrompt(req: GenerateRequest): string {
     req.includeStandards === false
       ? "Do not include curriculum standards — leave the standards field as an empty array."
       : "Include the 1-4 most relevant official curriculum standards in the standards field, matched to the subject, year group and curriculum above.";
+
+  if (req.outline?.length) {
+    const list = req.outline
+      .map((o, i) => `${i + 1}. [${o.layout}] ${o.title} — ${o.summary}`)
+      .join("\n");
+    return `Build a ${duration}-minute lesson by fully expanding the teacher-approved outline below.
+
+${context(req)}
+
+${standards}
+
+Produce EXACTLY ${req.outline.length} slides — one per outline item, in this order — keeping each slide's title and layout. Flesh out each slide with complete, accurate, age-appropriate content (bullets, definitions, activities, questions, teacher notes, image/video suggestions as appropriate to its layout).
+
+Approved outline:
+${list}
+
+Make it accurate, well-paced and ready to teach.`;
+  }
+
   return `Create a ${duration}-minute lesson with about ${slides} slides.
 
 ${context(req)}
@@ -57,6 +78,24 @@ ${context(req)}
 ${standards}
 
 Make it accurate, well-paced and ready to teach.`;
+}
+
+export function outlineSystemPrompt(): string {
+  return `${PERSONA}
+
+You are sketching the OUTLINE of a single lesson delivered as slides — just the running order, not the full content yet. Produce an ordered list of slides; for each give a clear title, a layout, and a one-sentence summary of what it will cover.
+
+Follow this shape: a title slide, a learning-objectives slide, a starter/hook, content slides that build understanding step by step, at least one vocabulary slide, at least one activity slide, a discussion slide, one slide with a relevant video, a short quiz/check-for-understanding, and a plenary. Use these layout values exactly: title, objectives, content, vocabulary, activity, discussion, video, quiz, plenary. One idea per slide; keep summaries to a single short sentence.`;
+}
+
+export function outlineUserPrompt(req: GenerateRequest): string {
+  const slides = req.slideCount ?? 9;
+  const duration = req.durationMinutes ?? 60;
+  return `Outline a ${duration}-minute lesson of about ${slides} slides.
+
+${context(req)}
+
+Give the slide-by-slide running order.`;
 }
 
 export function seriesSystemPrompt(): string {

@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main, claude/nice-rubin-1pgylk]
+    branches: [main]
   workflow_dispatch:
 
 # Allow the workflow to publish to GitHub Pages.
@@ -35,11 +35,33 @@ jobs:
         with:
           enablement: true
 
+      # Diagnostic only — prints whether the hosted-mode config is present at
+      # build time (booleans, never the values). hosted=true requires BACKEND_URL.
+      - name: Hosted-mode config check
+        run: |
+          echo "BACKEND_URL set:           ${{ vars.BACKEND_URL != '' }}"
+          echo "ALLOWED_EMAIL_DOMAINS set: ${{ vars.ALLOWED_EMAIL_DOMAINS != '' }}"
+          echo "FIREBASE_CONFIG set:       ${{ secrets.FIREBASE_CONFIG != '' }}"
+
       - name: Build static site
         run: npm run build
         env:
           # Pages serves the project at /<repo>; base path must match.
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          # Optional: bake in a Firebase web config so sign-in + cross-device
+          # sync need no per-device setup. Unset → each browser pastes its config
+          # in Settings → Sync instead. (Not a secret: access is enforced by
+          # Firestore security rules + Auth.) Set repo secret FIREBASE_CONFIG to
+          # the firebaseConfig JSON to enable.
+          NEXT_PUBLIC_FIREBASE_CONFIG: ${{ secrets.FIREBASE_CONFIG }}
+          # Hosted ("school") mode: set BACKEND_URL to the proxy's /api root
+          # (e.g. https://yourapp.vercel.app/api) to require sign-in and use the
+          # server-hosted keys. Leave unset for bring-your-own-key mode.
+          # ALLOWED_EMAIL_DOMAINS restricts sign-in (e.g. aisa.edu). These are
+          # not secrets, so they're repo *variables* (Settings → Secrets and
+          # variables → Actions → Variables).
+          NEXT_PUBLIC_BACKEND_URL: ${{ vars.BACKEND_URL }}
+          NEXT_PUBLIC_ALLOWED_EMAIL_DOMAINS: ${{ vars.ALLOWED_EMAIL_DOMAINS }}
 
       - name: Disable Jekyll (serve _next/* as-is)
         run: touch out/.nojekyll

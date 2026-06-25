@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" role="img" aria-label="Theme branding + safe-zone overlay template">
+  <!--
+    SHARED OVERLAY TEMPLATE
+    Drop this on TOP of any per-subject artwork to guarantee the AISA logo and
+    fine print land in the exact same pixels on every theme. The dashed guides
+    show the content safe zones (the app fills these with text/images) — keep
+    decoration faint or absent inside them. The guides are for design only;
+    delete the `#guides` group before exporting a final asset.
+  -->
+  <defs>
+    <symbol id="aisaLogoT" viewBox="0 0 96 96">
+      <circle cx="48" cy="48" r="46" fill="#1b2a63"/>
+      <circle cx="48" cy="48" r="38" fill="none" stroke="#ffffff" stroke-width="1.4" opacity="0.45"/>
+      <text x="48" y="56" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="26" font-weight="700" letter-spacing="1.5" fill="#ffffff">AISA</text>
+    </symbol>
+  </defs>
+
+  <!-- ===== design-only safe-zone guides (delete before export) ===== -->
+  <g id="guides" fill="none" font-family="Arial, Helvetica, sans-serif" font-size="20">
+    <!-- title band 6,5,74,19 -->
+    <rect x="115" y="54" width="1421" height="205" stroke="#1f8a55" stroke-width="2" stroke-dasharray="10 8"/>
+    <text x="125" y="80" fill="#1f8a55">TITLE BAND — keep clear (both variants)</text>
+    <!-- body column 6,26,48,68 -->
+    <rect x="115" y="281" width="922" height="734" stroke="#2f6fd0" stroke-width="2" stroke-dasharray="10 8"/>
+    <text x="125" y="307" fill="#2f6fd0">BODY COLUMN — keep clear (body variant)</text>
+    <!-- image zone 57,26,37,50 -->
+    <rect x="1094" y="281" width="710" height="540" stroke="#9b51c0" stroke-width="2" stroke-dasharray="10 8"/>
+    <text x="1104" y="307" fill="#9b51c0">IMAGE ZONE — keep clear (body variant)</text>
+    <!-- logo reserve 87,4,10,8 -->
+    <rect x="1670" y="43" width="192" height="86" stroke="#c0392b" stroke-width="2" stroke-dasharray="6 5"/>
+    <!-- fine-print reserve 6,94,70,5 -->
+    <rect x="115" y="1015" width="1344" height="54" stroke="#c0392b" stroke-width="2" stroke-dasharray="6 5"/>
+  </g>
+
+  <!-- ===== CONSTANT BRANDING LAYER (this is the part you keep) ===== -->
+  <!-- AISA logo on frosted chip, top-right -->
+  <rect x="1662" y="34" width="200" height="100" rx="24" fill="#ffffff" opacity="0.5"/>
+  <use href="#aisaLogoT" x="1724" y="46" width="76" height="76"/>
+  <!-- school fine print, bottom-left -->
+  <text x="115" y="1038" font-family="Arial, Helvetica, sans-serif" font-size="22" fill="#274868" opacity="0.72">American International School in Abu Dhabi&#160;&#160;·&#160;&#160;For AISA classroom use only</text>
+</svg>

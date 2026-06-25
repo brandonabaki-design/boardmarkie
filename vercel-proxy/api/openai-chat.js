@@ -9,20 +9,14 @@
 //
 // Debug: POST {messages:[{role,content}], apiKey?} -> { content }
 
+import { setCors, verifyAuth, authEnabled } from "./_auth.js";
+
 export const config = { maxDuration: 60 };
 
-const ALLOW_ORIGIN = "*";
 const DEFAULT_MODEL = "gpt-4o";
 
-function setCors(res) {
-  res.setHeader("Access-Control-Allow-Origin", ALLOW_ORIGIN);
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  res.setHeader("Access-Control-Max-Age", "86400");
-}
-
 export default async function handler(req, res) {
-  setCors(res);
+  setCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
   // GET = capability check. If you see supports:["tools"] the tool-calling build
   // (needed for chat-to-slides editing) is live. If you still see "Use POST."
@@ -31,6 +25,11 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, endpoint: "openai-chat", supports: ["tools", "response_format"] });
   }
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST." });
+
+  if (authEnabled()) {
+    const auth = await verifyAuth(req);
+    if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+  }
 
   let payload = req.body;
   if (typeof payload === "string") {

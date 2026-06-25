@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, KeyRound, ShieldCheck, ExternalLink, Check, ImagePlus, Search, Zap, Sparkles, Bot, Film, Eye, EyeOff } from "lucide-react";
+import { X, KeyRound, ShieldCheck, ExternalLink, Check, ImagePlus, Search, Zap, Sparkles, Bot, Film, Eye, EyeOff, Cloud } from "lucide-react";
 import {
   getApiKey,
   setApiKey,
@@ -9,6 +9,8 @@ import {
   setImageConfig,
   getSearchKey,
   setSearchKey,
+  getUnsplashKey,
+  setUnsplashKey,
   getModel,
   setModel,
   getImageStyle,
@@ -30,10 +32,12 @@ import {
 } from "@/lib/storage";
 import { MODEL_OPTIONS } from "@/lib/anthropic";
 import { CHAT_MODEL, chatComplete } from "@/lib/openai";
+import { isHostedMode } from "@/lib/backend";
 import { Spinner } from "./ui";
 import { useDialog } from "./useDialog";
+import { SyncPanel } from "./SyncPanel";
 
-type Tab = "claude" | "openai" | "images";
+type Tab = "claude" | "openai" | "images" | "sync";
 
 // Masked API-key input with a show/hide toggle, so keys can be verified.
 function SecretInput({
@@ -70,12 +74,21 @@ function SecretInput({
   );
 }
 
-export function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function SettingsModal({
+  open,
+  onClose,
+  initialTab = "claude",
+}: {
+  open: boolean;
+  onClose: () => void;
+  initialTab?: Tab;
+}) {
   const [tab, setTab] = useState<Tab>("claude");
   const [value, setValue] = useState("");
   const [proxyUrl, setProxyUrl] = useState("");
   const [imageKey, setImageKey] = useState("");
   const [pixabayKey, setPixabayKey] = useState("");
+  const [unsplashKey, setUnsplashKeyState] = useState("");
   const [giphyKey, setGiphyKeyState] = useState("");
   const [openaiKey, setOpenaiKeyState] = useState("");
   const [model, setModelState] = useState<string>("");
@@ -87,15 +100,17 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   const [testing, setTesting] = useState(false);
   const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const dialogRef = useDialog(open, onClose);
+  const hosted = isHostedMode();
 
   useEffect(() => {
     if (open) {
-      setTab("claude");
+      setTab(initialTab);
       setValue(getApiKey());
       const cfg = getImageConfig();
       setProxyUrl(cfg.proxyUrl);
       setImageKey(cfg.apiKey);
       setPixabayKey(getSearchKey());
+      setUnsplashKeyState(getUnsplashKey());
       setGiphyKeyState(getGiphyKey());
       setOpenaiKeyState(getOpenAIKey());
       setModelState(getModel());
@@ -105,7 +120,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
       setImgQuality(getImageQuality());
       setSaved(false);
     }
-  }, [open]);
+  }, [open, initialTab]);
 
   if (!open) return null;
 
@@ -113,6 +128,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
     setApiKey(value);
     setImageConfig({ proxyUrl, apiKey: imageKey });
     setSearchKey(pixabayKey);
+    setUnsplashKey(unsplashKey);
     setGiphyKey(giphyKey);
     setOpenAIKey(openaiKey);
     setModel(model);
@@ -150,10 +166,13 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   const inputCls =
     "mt-1.5 w-full rounded-xl border border-line px-3.5 py-2.5 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100";
 
+  // In hosted mode the keys live on the server, so the OpenAI (key-only) tab is
+  // hidden; Claude/Images keep their non-key preferences.
   const tabs: { id: Tab; label: string; icon: typeof KeyRound }[] = [
     { id: "claude", label: "Claude", icon: Zap },
-    { id: "openai", label: "OpenAI", icon: Bot },
+    ...(hosted ? [] : [{ id: "openai" as Tab, label: "OpenAI", icon: Bot }]),
     { id: "images", label: "Images", icon: ImagePlus },
+    { id: "sync", label: "Sync", icon: Cloud },
   ];
 
   return (
@@ -179,13 +198,15 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
         {/* tabs */}
         <div className="shrink-0 px-4 pt-3">
-          <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-line bg-paper p-1.5">
+          <div
+            className={`grid ${tabs.length >= 4 ? "grid-cols-4" : "grid-cols-3"} gap-1.5 rounded-2xl border border-line bg-paper p-1.5`}
+          >
             {tabs.map((t) => (
               <button
                 key={t.id}
                 type="button"
                 onClick={() => setTab(t.id)}
-                className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-sm font-semibold transition-all ${
+                className={`flex items-center justify-center gap-1.5 rounded-xl px-1.5 py-2 text-sm font-semibold transition-all ${
                   tab === t.id ? "bg-white text-brand-700 card-shadow" : "text-muted hover:text-ink"
                 }`}
               >
@@ -198,32 +219,45 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
         {/* scrollable body */}
         <div className="flex-1 overflow-auto px-6 py-5">
+          {hosted && (
+            <div className="mb-4 flex items-start gap-2 rounded-xl bg-mint px-3.5 py-3 text-xs text-brand-900">
+              <ShieldCheck size={16} className="mt-0.5 shrink-0 text-brand-600" />
+              Your school manages the API keys — there&apos;s nothing to enter here. Use the{" "}
+              <span className="font-semibold">Sync</span> tab for your account; the options below are
+              personal preferences.
+            </div>
+          )}
+
           {tab === "claude" && (
             <div>
-              <p className="text-sm text-muted">
-                Boardmarkie generates with Anthropic&apos;s Claude. If the site is hosted with a server key
-                you can leave this blank. Otherwise paste your own key — it&apos;s stored only in this browser
-                and sent directly with your requests.
-              </p>
+              {!hosted && (
+                <>
+                  <p className="text-sm text-muted">
+                    Boardmarkie generates with Anthropic&apos;s Claude. If the site is hosted with a server
+                    key you can leave this blank. Otherwise paste your own key — it&apos;s stored only in
+                    this browser and sent directly with your requests.
+                  </p>
 
-              <label className="mt-5 block">
-                <span className="text-sm font-semibold text-ink">Anthropic API key</span>
-                <SecretInput value={value} onChange={setValue} placeholder="sk-ant-…" />
-              </label>
+                  <label className="mt-5 block">
+                    <span className="text-sm font-semibold text-ink">Anthropic API key</span>
+                    <SecretInput value={value} onChange={setValue} placeholder="sk-ant-…" />
+                  </label>
 
-              <div className="mt-4 flex items-start gap-2 rounded-xl bg-mint px-3.5 py-3 text-xs text-brand-900">
-                <ShieldCheck size={16} className="mt-0.5 shrink-0 text-brand-600" />
-                Your key never touches our database — it stays in your browser&apos;s local storage.
-              </div>
+                  <div className="mt-4 flex items-start gap-2 rounded-xl bg-mint px-3.5 py-3 text-xs text-brand-900">
+                    <ShieldCheck size={16} className="mt-0.5 shrink-0 text-brand-600" />
+                    Your key never touches our database — it stays in your browser&apos;s local storage.
+                  </div>
 
-              <a
-                href="https://console.anthropic.com/settings/keys"
-                target="_blank"
-                rel="noreferrer"
-                className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline"
-              >
-                Get an Anthropic API key <ExternalLink size={13} />
-              </a>
+                  <a
+                    href="https://console.anthropic.com/settings/keys"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline"
+                  >
+                    Get an Anthropic API key <ExternalLink size={13} />
+                  </a>
+                </>
+              )}
 
               <div className="mt-6 border-t border-line pt-5">
                 <h3 className="flex items-center gap-2 text-sm font-bold text-ink">
@@ -379,34 +413,38 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                   : "Google Imagen runs through the proxy below. Diagrams are drawn by Claude and need nothing extra."}
               </p>
 
-              <label className="mt-3 block">
-                <span className="text-sm font-semibold text-ink">Image proxy URL</span>
-                <input
-                  type="url"
-                  value={proxyUrl}
-                  onChange={(e) => setProxyUrl(e.target.value)}
-                  placeholder="https://boardmarkie.vercel.app/api/image"
-                  autoComplete="off"
-                  className={inputCls}
-                />
-              </label>
+              {!hosted && (
+                <>
+                  <label className="mt-3 block">
+                    <span className="text-sm font-semibold text-ink">Image proxy URL</span>
+                    <input
+                      type="url"
+                      value={proxyUrl}
+                      onChange={(e) => setProxyUrl(e.target.value)}
+                      placeholder="https://boardmarkie.vercel.app/api/image"
+                      autoComplete="off"
+                      className={inputCls}
+                    />
+                  </label>
 
-              <label className="mt-3 block">
-                <span className="text-sm font-semibold text-ink">
-                  Gemini API key{" "}
-                  <span className="font-normal text-muted">(blank if the proxy holds a shared key)</span>
-                </span>
-                <SecretInput value={imageKey} onChange={setImageKey} placeholder="AIza…" />
-              </label>
+                  <label className="mt-3 block">
+                    <span className="text-sm font-semibold text-ink">
+                      Gemini API key{" "}
+                      <span className="font-normal text-muted">(blank if the proxy holds a shared key)</span>
+                    </span>
+                    <SecretInput value={imageKey} onChange={setImageKey} placeholder="AIza…" />
+                  </label>
 
-              <a
-                href="https://aistudio.google.com/apikey"
-                target="_blank"
-                rel="noreferrer"
-                className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline"
-              >
-                Get a Gemini API key <ExternalLink size={13} />
-              </a>
+                  <a
+                    href="https://aistudio.google.com/apikey"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline"
+                  >
+                    Get a Gemini API key <ExternalLink size={13} />
+                  </a>
+                </>
+              )}
 
               <div className="mt-4">
                 <span className="text-sm font-semibold text-ink">Illustration style</span>
@@ -462,12 +500,13 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                 </p>
               </div>
 
+              {!hosted && (
               <div className="mt-6 border-t border-line pt-5">
                 <h3 className="flex items-center gap-2 text-sm font-bold text-ink">
                   <Search size={16} className="text-brand-600" /> Image search
                 </h3>
                 <p className="mt-1.5 text-xs text-muted">
-                  <span className="font-semibold text-ink">Swap → Web search</span> uses{" "}
+                  <span className="font-semibold text-ink">Swap → Web search</span> searches{" "}
                   <a
                     href="https://openverse.org"
                     target="_blank"
@@ -476,8 +515,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                   >
                     Openverse
                   </a>{" "}
-                  — millions of openly-licensed images from Flickr, Wikimedia Commons, museums and more —
-                  with no key and no setup. A{" "}
+                  (no key) together with{" "}
                   <a
                     href="https://pixabay.com"
                     target="_blank"
@@ -486,10 +524,32 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                   >
                     Pixabay
                   </a>{" "}
-                  key (below) is an optional backup for extra stock photos.
+                  and{" "}
+                  <a
+                    href="https://unsplash.com/developers"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-brand-700 hover:underline"
+                  >
+                    Unsplash
+                  </a>{" "}
+                  when their keys are set — results from all sources are combined into one grid.
                 </p>
 
                 <label className="mt-3 block">
+                  <span className="text-sm font-semibold text-ink">Unsplash Access Key</span>
+                  <SecretInput value={unsplashKey} onChange={setUnsplashKeyState} placeholder="Unsplash Access Key…" />
+                </label>
+                <a
+                  href="https://unsplash.com/developers"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline"
+                >
+                  Get a free Unsplash key <ExternalLink size={13} />
+                </a>
+
+                <label className="mt-4 block">
                   <span className="text-sm font-semibold text-ink">Pixabay API key</span>
                   <SecretInput value={pixabayKey} onChange={setPixabayKey} placeholder="e.g. 12345678-abcdef…" />
                 </label>
@@ -522,21 +582,26 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                   </a>
                 </div>
               </div>
+              )}
             </div>
           )}
+
+          {tab === "sync" && <SyncPanel />}
         </div>
 
         {/* pinned footer */}
         <div className="flex shrink-0 gap-3 border-t border-line bg-white px-6 py-4">
-          <button
-            onClick={() => {
-              setApiKey("");
-              setValue("");
-            }}
-            className="rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-paper"
-          >
-            Clear key
-          </button>
+          {!hosted && (
+            <button
+              onClick={() => {
+                setApiKey("");
+                setValue("");
+              }}
+              className="rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-paper"
+            >
+              Clear key
+            </button>
+          )}
           <button
             onClick={save}
             className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
