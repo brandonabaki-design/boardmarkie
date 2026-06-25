@@ -86,8 +86,10 @@ bottom strip, and the four corners.
 
 These never move between themes or variants:
 
-- **AISA logo** — top-right, inside box `x 87–97%, y 4–12%`, on a subtle frosted
-  white chip so it stays legible on any palette (light *or* dark themes).
+- **AISA logo** — top-right, inside box `x 87–97%, y 4–12%`. Asset:
+  `public/themes/_branding/aisa-logo.png` (dark navy mark, for **light** themes).
+  Dark themes use a white variant (`aisa-logo-white.png`, TBD). No backing chip is
+  needed because the logo-reserve zone is always kept clear of decoration.
 - **School fine print** — bottom-left, baseline at `y ≈ 96%`, starting at `x = 6%`:
   > `American International School in Abu Dhabi  ·  For AISA classroom use only`
   Small, muted, single line.
