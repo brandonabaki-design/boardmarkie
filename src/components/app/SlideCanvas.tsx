@@ -40,6 +40,7 @@ export function SlideCanvas({
   elements,
   background = "#ffffff",
   backgroundImage,
+  logoUrl,
   ink = INK,
   muted = MUTED,
   displayFont = "var(--font-bricolage)",
@@ -54,6 +55,7 @@ export function SlideCanvas({
   elements: CanvasElement[];
   background?: string;
   backgroundImage?: string; // full-bleed subject background (from the background theme)
+  logoUrl?: string; // AISA watermark overlay (only when no subject background carries it)
   ink?: string; // default text colour (from the deck theme)
   muted?: string; // secondary text colour (from the deck theme)
   displayFont?: string; // heading/title font family (from the deck theme)
@@ -270,6 +272,19 @@ export function SlideCanvas({
           </div>
         );
       })}
+
+      {logoUrl && (
+        // AISA watermark — always present; sits in the reserved top-right corner,
+        // non-interactive so it can't be selected, moved or deleted.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={logoUrl}
+          alt="AISA"
+          aria-hidden
+          draggable={false}
+          style={{ position: "absolute", left: "89.8%", top: "4.3%", width: "4%", height: "auto", zIndex: 900, pointerEvents: "none" }}
+        />
+      )}
 
       {selected && (
         <FloatingToolbar

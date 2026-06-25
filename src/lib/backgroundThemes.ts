@@ -58,16 +58,32 @@ export function backgroundImageUrl(themeId: string, variant: "title" | "body"): 
   return `${BASE}/themes/${themeId}/${themeId}-${variant}.svg`;
 }
 
+// AISA watermark logos. The subject background themes already bake the logo in,
+// so the overlay below is used only when no subject background is shown (plain
+// colour themes) — blue (navy) for light themes, white for dark themes.
+export const AISA_LOGO_BLUE = `${BASE}/themes/_branding/aisa-logo.png`;
+export const AISA_LOGO_WHITE = `${BASE}/themes/_branding/aisa-logo-white.png`;
+
+/** The AISA logo to overlay top-right when no subject background is shown, or
+ *  null when a subject background already carries the (baked-in) logo. */
+export function overlayLogoUrl(lesson: BgLesson, theme: Theme): string | null {
+  if (resolveBackgroundTheme(lesson)) return null; // baked into the subject background
+  return theme.dark ? AISA_LOGO_WHITE : AISA_LOGO_BLUE;
+}
+
 export interface DeckRender {
   background: string;
   backgroundImage?: string;
   ink: string;
   muted: string;
   displayFont: string;
+  logoUrl?: string; // AISA watermark overlay (only when no subject background)
 }
 
 /** Combined render props for a slide: the colour deck theme, with the subject
- *  background image + its text colours layered on when a background theme applies. */
+ *  background image + its text colours layered on when a background theme applies.
+ *  The AISA logo is always present — baked into the subject background, or added
+ *  as a top-right overlay (blue on light themes, white on dark) when there isn't one. */
 export function deckRender(lesson: BgLesson, slide: Slide, theme: Theme): DeckRender {
   const bg = resolveBackgroundTheme(lesson);
   return {
@@ -76,5 +92,6 @@ export function deckRender(lesson: BgLesson, slide: Slide, theme: Theme): DeckRe
     ink: bg?.ink ?? theme.ink,
     muted: bg?.muted ?? theme.muted,
     displayFont: theme.displayFont,
+    logoUrl: bg ? undefined : theme.dark ? AISA_LOGO_WHITE : AISA_LOGO_BLUE,
   };
 }
