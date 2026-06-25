@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { FolderOpen, Settings, Plus, ArrowLeft, AlertCircle, X, Play } from "lucide-react";
+import { FolderOpen, Settings, Plus, ArrowLeft, AlertCircle, X, Play, FlaskConical } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import type {
   Artifact,
@@ -21,6 +21,7 @@ import { resolveYoutube } from "@/lib/youtube";
 import { searchImages, firstLoadableImage } from "@/lib/imageSearch";
 import { searchGifs } from "@/lib/gifSearch";
 import { cid, ensureElements, slideToElements } from "@/lib/canvas";
+import { makeTestLesson } from "@/lib/sampleLesson";
 import {
   deleteArtifact,
   getArtifactFull,
@@ -117,6 +118,8 @@ export function CreateApp() {
   const [imageProgress, setImageProgress] = useState<{ done: number; total: number } | null>(null);
   const [past, setPast] = useState<Lesson[]>([]);
   const [future, setFuture] = useState<Lesson[]>([]);
+  // True while the hardcoded sample lesson is being loaded (skips the AI calls).
+  const [testMode, setTestMode] = useState(false);
 
   useEffect(() => {
     setLibrary(getLibrary());
@@ -187,6 +190,7 @@ export function CreateApp() {
   // immediately, generate the outline in the background, then auto-build.
   const handleGenerate = async (req: GenerateRequest) => {
     setError(null);
+    setTestMode(false); // a real generation supersedes any pending test load
     if (req.mode === "lesson") {
       setGenMode("lesson");
       setRefine({ req, outline: null }); // show the refiner right away (outline loading)
@@ -204,11 +208,68 @@ export function CreateApp() {
   };
 
   // The refined outline + chosen theme were confirmed → expand to a full lesson.
+  // In test mode, load the hardcoded sample lesson instead of calling the AI.
   const confirmOutline = (outline: OutlineSlide[], themeId: string) => {
     if (!refine) return;
+    if (testMode) {
+      setTestMode(false);
+      setRefine(null);
+      void runTestLesson(themeId);
+      return;
+    }
     const req2: GenerateRequest = { ...refine.req, outline, slideCount: outline.length };
     setRefine(null);
     void runGenerate(req2, themeId);
+  };
+
+  // Testing affordance: load a ready-made lesson with NO AI generation (no Claude
+  // credits), going through the usual outline + theme step first so the full flow
+  // can be exercised. The req/outline are derived from the sample for display only.
+  const startTestLesson = () => {
+    setError(null);
+    setGenMode("lesson");
+    const sample = makeTestLesson();
+    const req: GenerateRequest = {
+      mode: "lesson",
+      topic: sample.meta.topic,
+      subject: sample.meta.subject,
+      yearGroup: sample.meta.yearGroup,
+      region: sample.meta.region,
+      autoImages: true,
+    };
+    const outline: OutlineSlide[] = sample.slides.map((s) => ({
+      title: s.title,
+      layout: s.layout,
+      summary: s.subtitle || s.body || s.bullets?.[0] || "",
+    }));
+    setRefine({ req, outline });
+    setTestMode(true);
+  };
+
+  // Load the sample lesson into the editor without any AI call, then attach media
+  // with the FREE web search only (GIFs where available, else stock photos) — it
+  // never touches the paid AI-image path, so this costs no credits.
+  const runTestLesson = async (themeId?: string) => {
+    setError(null);
+    setGenMode("lesson");
+    setLoading(true);
+    let seeded = seedLesson(makeTestLesson());
+    if (themeId) seeded = { ...seeded, theme: themeId };
+    saveArtifact(seeded);
+    setCurrent(seeded);
+    setPast([]);
+    setFuture([]);
+    refresh();
+    setLoading(false);
+
+    let working = seeded;
+    if (isHostedMode() || getGiphyKey()) {
+      working = await autoSearchMedia(seeded, "gif");
+    } else {
+      working = await autoSearchMedia(seeded, "search");
+    }
+    const hasProxy = isHostedMode() || !!getImageConfig().proxyUrl;
+    if (hasProxy) await autoEmbedYoutube(working);
   };
 
   const runGenerate = async (req: GenerateRequest, themeId?: string) => {
@@ -672,13 +733,27 @@ export function CreateApp() {
             {/* Form stays mounted (just hidden) during Refine so inputs are preserved on Back. */}
             <div className={refine ? "hidden" : ""}>
               <GeneratorForm initialMode={initialMode} loading={false} onSubmit={handleGenerate} />
+              <div className="mx-auto mt-5 max-w-2xl text-center">
+                <button
+                  onClick={startTestLesson}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line bg-white px-4 py-2 text-xs font-semibold text-muted transition-colors hover:border-brand-300 hover:text-brand-700"
+                >
+                  <FlaskConical size={14} className="text-brand-600" /> Load test lesson (no AI · Photosynthesis, Grade 3)
+                </button>
+                <p className="mt-1.5 text-[11px] text-muted">
+                  Loads a ready-made lesson without using Claude credits — still searches the web for GIFs/images.
+                </p>
+              </div>
             </div>
             {refine && (
               <OutlineRefiner
                 req={refine.req}
                 outline={refine.outline}
                 busy={loading}
-                onBack={() => setRefine(null)}
+                onBack={() => {
+                  setRefine(null);
+                  setTestMode(false);
+                }}
                 onConfirm={confirmOutline}
               />
             )}
