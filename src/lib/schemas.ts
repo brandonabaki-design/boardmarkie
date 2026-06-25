@@ -175,7 +175,8 @@ export const lessonSchema: JSONSchema = {
     objectives: {
       type: "array",
       items: { type: "string" },
-      description: "Learning objectives written as 'I can…' or 'Students will…' statements.",
+      description:
+        "3–4 learning objectives ('I can…' / 'Students will…') that span three cognitive levels of Bloom's Taxonomy / DOK: at least one lower-order (Remember/Understand · DOK 1), one mid-order (Apply/Analyse · DOK 2), and one higher-order (Evaluate/Create · DOK 3); each starts with a measurable verb, ordered lower→higher.",
     },
     vocabulary: {
       type: "array",

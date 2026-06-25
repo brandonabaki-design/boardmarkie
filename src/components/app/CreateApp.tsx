@@ -50,6 +50,7 @@ import { SettingsModal } from "./SettingsModal";
 import { LibraryDrawer } from "./LibraryDrawer";
 import { ExportMenu } from "./ExportMenu";
 import { PresentMode } from "./PresentMode";
+import { EduSimButton } from "./EduSim";
 import { Spinner } from "./ui";
 
 function isMode(v: string | null): v is GenerationMode {
@@ -649,12 +650,15 @@ export function CreateApp() {
             {current && (
               <>
                 {current.kind === "lesson" && (
-                  <button
-                    onClick={() => setPresenting(true)}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
-                  >
-                    <Play size={16} /> <span className="hidden sm:inline">Present</span>
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setPresenting(true)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
+                    >
+                      <Play size={16} /> <span className="hidden sm:inline">Present</span>
+                    </button>
+                    <EduSimButton lesson={current as Lesson} />
+                  </>
                 )}
                 <ExportMenu artifact={current} />
                 <button
