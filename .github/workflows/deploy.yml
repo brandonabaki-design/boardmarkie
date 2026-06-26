@@ -62,6 +62,12 @@ jobs:
           # variables → Actions → Variables).
           NEXT_PUBLIC_BACKEND_URL: ${{ vars.BACKEND_URL }}
           NEXT_PUBLIC_ALLOWED_EMAIL_DOMAINS: ${{ vars.ALLOWED_EMAIL_DOMAINS }}
+          # EduSim + shared libraries (Supabase). Optional: committed defaults in
+          # src/lib/supabase.ts are used when unset. Set these repo *Variables*
+          # to point at a different Supabase project. The anon key is NOT a
+          # secret (access is enforced by RLS), so it's a variable, not a secret.
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
 
       - name: Disable Jekyll (serve _next/* as-is)
         run: touch out/.nojekyll
