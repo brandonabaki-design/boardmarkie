@@ -4,7 +4,7 @@ import type { Artifact, ImageElement, Lesson, LessonSeries, Worksheet } from "./
 import type * as Docx from "docx";
 import { ensureElements } from "./canvas";
 import { getTheme } from "./themes";
-import { resolveBackgroundTheme, backgroundImageUrl, backgroundVariant } from "./backgroundThemes";
+import { resolveBackgroundTheme, backgroundImageUrl, backgroundVariant, overlayLogoUrl } from "./backgroundThemes";
 
 function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "boardmarkie";
@@ -86,6 +86,22 @@ async function rasterizeBackground(url: string): Promise<string | null> {
     if (!ctx) return null;
     ctx.drawImage(img, 0, 0, w, h);
     return canvas.toDataURL("image/png");
+  } catch {
+    return null;
+  }
+}
+
+/** Load a same-origin PNG (e.g. the AISA logo) as a data URL for pptx embedding. */
+async function loadPngData(url: string): Promise<string | null> {
+  try {
+    const img = await loadImage(url);
+    const c = document.createElement("canvas");
+    c.width = img.naturalWidth || 256;
+    c.height = img.naturalHeight || 256;
+    const ctx = c.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0);
+    return c.toDataURL("image/png");
   } catch {
     return null;
   }
@@ -205,6 +221,9 @@ export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
   const bg = resolveBackgroundTheme(lesson);
   const inkColor = bg?.ink ?? theme.ink;
   const bgCache = new Map<string, string | null>(); // rasterise each variant once
+  // AISA watermark: subject backgrounds bake it in; otherwise overlay it per slide.
+  const logoUrl = overlayLogoUrl(lesson, theme);
+  const logoData = logoUrl ? await loadPngData(logoUrl) : null;
 
   for (const raw of lesson.slides) {
     const slide = ensureElements(raw);
@@ -265,6 +284,11 @@ export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
           });
         }
       }
+    }
+
+    if (logoData) {
+      // top-right reserved corner, matching the on-screen + baked-in logo position
+      s.addImage({ data: logoData, x: 11.97, y: 0.32, w: 0.53, h: 0.53 });
     }
 
     if (slide.teacherNotes) s.addNotes(slide.teacherNotes);

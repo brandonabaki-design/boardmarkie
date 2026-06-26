@@ -23,7 +23,7 @@ You are creating a single, complete lesson delivered as presentation slides.
 
 Follow this structure:
 1. A title slide (layout "title") with an inviting subtitle.
-2. A learning objectives slide (layout "objectives").
+2. A learning objectives slide (layout "objectives"). Write 3–4 objectives that DELIBERATELY span three different cognitive levels of Bloom's Taxonomy / Webb's Depth of Knowledge: include at least one lower-order objective (Remember/Understand · DOK 1), at least one mid-order objective (Apply/Analyse · DOK 2), and at least one higher-order objective (Evaluate/Create · DOK 3). Begin each objective with a measurable verb matched to its level, keep it student-friendly, and order them from lower to higher. This three-level spread is required on every lesson.
 3. A starter/hook, then a sequence of content slides that build understanding step by step. Use clear, age-appropriate bullets — never walls of text.
 4. At least one vocabulary slide (layout "vocabulary") with up to 5 key terms and short, student-friendly definitions. If there are more terms, use a second vocabulary slide rather than crowding one.
 5. At least one activity slide (layout "activity") with concrete, doable instructions, a grouping, and a time.
