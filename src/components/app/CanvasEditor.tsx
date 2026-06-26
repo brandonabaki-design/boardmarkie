@@ -25,6 +25,7 @@ import {
   LayoutGrid,
   Palette,
   Sparkles,
+  QrCode,
 } from "lucide-react";
 import type { CanvasElement, EditAction, Lesson, Slide } from "@/lib/types";
 import {
@@ -32,6 +33,7 @@ import {
   clamp,
   ensureElements,
   imageElement,
+  normalizeEduSimUrl,
   shapeElement,
   slideToElements,
   textElement,
@@ -39,6 +41,7 @@ import {
   youtubeElement,
   youtubeId,
 } from "@/lib/canvas";
+import { qrToSvg } from "@/lib/qr";
 import { SlideCanvas } from "./SlideCanvas";
 import { ImageSwap, type SwapMedia } from "./ImageSwap";
 import { Editable, Spinner } from "./ui";
@@ -78,6 +81,10 @@ export function CanvasEditor({
   const [ytOpen, setYtOpen] = useState(false);
   const [ytInput, setYtInput] = useState("");
   const [ytErr, setYtErr] = useState<string | null>(null);
+  const [esOpen, setEsOpen] = useState(false);
+  const [esInput, setEsInput] = useState("");
+  const [esErr, setEsErr] = useState<string | null>(null);
+  const [esBusy, setEsBusy] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [improveOpen, setImproveOpen] = useState(false);
   const [instruction, setInstruction] = useState("");
@@ -142,6 +149,29 @@ export function CanvasEditor({
     setYtOpen(false);
     setYtInput("");
     setYtErr(null);
+  };
+
+  // Paste an EduSim (simulation) link → embed a scannable QR code element.
+  // Stored as SVG (crisp, survives cross-device sync); the box is sized square in
+  // real pixels (w·16 ≈ h·9 on the 16:9 canvas) so the code never distorts.
+  const submitEduSim = async () => {
+    const url = normalizeEduSimUrl(esInput);
+    if (!url) {
+      setEsErr("That doesn't look like a valid link. Paste an EduSim link (https://…).");
+      return;
+    }
+    setEsBusy(true);
+    try {
+      const svg = await qrToSvg(url);
+      addAndSelect(imageElement({ svg, eduSimUrl: url, alt: "EduSim QR code", x: 73, y: 55, w: 18, h: 32, z: topZ(els) }));
+      setEsOpen(false);
+      setEsInput("");
+      setEsErr(null);
+    } catch {
+      setEsErr("Couldn't generate the QR code. Check the link and try again.");
+    } finally {
+      setEsBusy(false);
+    }
   };
 
   const goTo = (i: number) => {
@@ -241,7 +271,7 @@ export function CanvasEditor({
       const ae = document.activeElement as HTMLElement | null;
       const typing =
         !!ae?.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(ae?.tagName ?? "");
-      if (typing || swapOpen || ytOpen) return;
+      if (typing || swapOpen || ytOpen || esOpen) return;
       const target = e.key === "ArrowUp" ? safeIdx - 1 : safeIdx + 1;
       if (target < 0 || target >= lesson.slides.length) return;
       e.preventDefault();
@@ -250,7 +280,7 @@ export function CanvasEditor({
     };
     window.addEventListener("keydown", onArrow);
     return () => window.removeEventListener("keydown", onArrow);
-  }, [railActive, selectedId, safeIdx, lesson.slides.length, swapOpen, ytOpen]);
+  }, [railActive, selectedId, safeIdx, lesson.slides.length, swapOpen, ytOpen, esOpen]);
 
   const context = {
     topic: lesson.meta.topic,
@@ -265,6 +295,7 @@ export function CanvasEditor({
     { label: "Image", icon: ImagePlus, onClick: addImageNew },
     { label: "Shape", icon: Square, onClick: addShape },
     { label: "Video", icon: Video, onClick: () => setYtOpen(true) },
+    { label: "EduSim", icon: QrCode, onClick: () => setEsOpen(true) },
   ];
 
   const refineActions: { action: EditAction; label: string; icon: typeof Smile }[] = [
@@ -637,6 +668,44 @@ export function CanvasEditor({
               Add to slide
             </button>
             <p className="mt-2 text-xs text-muted">The video becomes a resizable element and plays in Present mode.</p>
+          </div>
+        </div>
+      )}
+
+      {esOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" onClick={() => setEsOpen(false)} />
+          <div className="relative w-full max-w-md rounded-2xl border border-line bg-white p-6 card-shadow">
+            <div className="flex items-center justify-between">
+              <h2 className="flex items-center gap-2 font-display text-xl font-bold text-ink">
+                <QrCode size={20} className="text-brand-600" /> Add EduSim
+              </h2>
+              <button onClick={() => setEsOpen(false)} className="text-muted hover:text-ink">
+                <X size={20} />
+              </button>
+            </div>
+            <input
+              value={esInput}
+              autoFocus
+              onChange={(e) => {
+                setEsInput(e.target.value);
+                setEsErr(null);
+              }}
+              onKeyDown={(e) => e.key === "Enter" && !esBusy && submitEduSim()}
+              placeholder="Paste an EduSim link…"
+              className="mt-4 w-full rounded-xl border border-line px-3.5 py-2.5 text-sm outline-none focus:border-brand-400"
+            />
+            {esErr && <p className="mt-2 text-xs text-coral">{esErr}</p>}
+            <button
+              onClick={submitEduSim}
+              disabled={!esInput.trim() || esBusy}
+              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
+            >
+              {esBusy ? <Spinner /> : null} Add QR code to slide
+            </button>
+            <p className="mt-2 text-xs text-muted">
+              Paste a simulation link from the EduSim library; we&apos;ll drop a scannable QR code onto this slide for students.
+            </p>
           </div>
         </div>
       )}

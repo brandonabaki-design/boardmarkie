@@ -60,6 +60,7 @@ export function imageElement(p: Partial<ImageElement> & Pick<ImageElement, "x" |
     alt: p.alt,
     radius: p.radius ?? 4,
     opacity: p.opacity ?? 100,
+    eduSimUrl: p.eduSimUrl,
     x: p.x,
     y: p.y,
     w: p.w,
@@ -130,6 +131,25 @@ export function youtubeId(input: string): string | null {
     /* not a URL */
   }
   return null;
+}
+
+// ---- EduSim link parsing ----
+
+/**
+ * Validate/normalise a pasted EduSim (simulation) link so it can be encoded into
+ * a QR code. Accepts a full URL or a bare host/path; returns the canonical URL
+ * string, or null if it isn't a usable http(s) link.
+ */
+export function normalizeEduSimUrl(input: string): string | null {
+  const s = input.trim();
+  if (!s) return null;
+  try {
+    const url = new URL(s.startsWith("http") ? s : `https://${s}`);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
 }
 
 // ---- auto-layout: turn a generated/template slide into canvas elements ----

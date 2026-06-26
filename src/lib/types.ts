@@ -101,6 +101,7 @@ export interface ImageElement extends CanvasElementBase {
   alt?: string;
   radius?: number; // corner rounding %
   opacity?: number; // 0–100
+  eduSimUrl?: string; // set when this image is an EduSim QR code (links to a simulation)
 }
 
 export interface ShapeElement extends CanvasElementBase {
