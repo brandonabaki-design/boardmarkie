@@ -63,8 +63,12 @@ export function useSupabaseUser() {
   return { user, loading };
 }
 
+// Return the sign-in round-trip to the page the user started from (so signing in
+// on /create stays on /create, and on /sims stays on /sims). basePath() is
+// already part of window.location.pathname under GitHub Pages.
 function redirectTo(): string {
-  return `${window.location.origin}${basePath()}/sims/`;
+  if (typeof window === "undefined") return basePath();
+  return `${window.location.origin}${window.location.pathname}`;
 }
 
 export function signInWithGoogle() {

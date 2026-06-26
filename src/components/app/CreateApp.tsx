@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { FolderOpen, Settings, Plus, ArrowLeft, AlertCircle, X, Play, FlaskConical } from "lucide-react";
+import { FolderOpen, Settings, Plus, ArrowLeft, AlertCircle, X, Play, FlaskConical, QrCode } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import type {
   Artifact,
@@ -50,6 +50,7 @@ import { SettingsModal } from "./SettingsModal";
 import { LibraryDrawer } from "./LibraryDrawer";
 import { ExportMenu } from "./ExportMenu";
 import { PresentMode } from "./PresentMode";
+import { EduSimWizard } from "./EduSimWizard";
 import { Spinner } from "./ui";
 
 function isMode(v: string | null): v is GenerationMode {
@@ -115,6 +116,7 @@ export function CreateApp() {
   const [user, setUser] = useState<AppUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [presenting, setPresenting] = useState(false);
+  const [eduSimOpen, setEduSimOpen] = useState(false);
   const [imageProgress, setImageProgress] = useState<{ done: number; total: number } | null>(null);
   const [past, setPast] = useState<Lesson[]>([]);
   const [future, setFuture] = useState<Lesson[]>([]);
@@ -643,12 +645,21 @@ export function CreateApp() {
             {current && (
               <>
                 {current.kind === "lesson" && (
-                  <button
-                    onClick={() => setPresenting(true)}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
-                  >
-                    <Play size={16} /> <span className="hidden sm:inline">Present</span>
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setPresenting(true)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
+                    >
+                      <Play size={16} /> <span className="hidden sm:inline">Present</span>
+                    </button>
+                    <button
+                      onClick={() => setEduSimOpen(true)}
+                      title="Create an interactive EduSim and add its QR to this deck"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
+                    >
+                      <QrCode size={16} className="text-brand-600" /> <span className="hidden sm:inline">EduSim</span>
+                    </button>
+                  </>
                 )}
                 <ExportMenu artifact={current} />
                 <button
@@ -808,6 +819,14 @@ export function CreateApp() {
 
       {presenting && current && current.kind === "lesson" && (
         <PresentMode lesson={current} onClose={() => setPresenting(false)} />
+      )}
+
+      {eduSimOpen && current && current.kind === "lesson" && (
+        <EduSimWizard
+          lesson={current}
+          onClose={() => setEduSimOpen(false)}
+          onInsert={(slide) => commitLesson({ ...current, slides: [...current.slides, slide] })}
+        />
       )}
     </div>
   );
