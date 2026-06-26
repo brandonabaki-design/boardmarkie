@@ -1,15 +1,18 @@
-// Hardcoded sample lesson for the "Load test lesson" button.
+// Hardcoded sample lessons for the "Test lesson" buttons.
 //
-// Loads a ready-made Grade-3 Photosynthesis lesson WITHOUT any AI generation, so
-// it costs no Claude credits — useful for testing the outline, themes, editor,
-// Present mode and exports. Content only: per-slide `elements` and `imageUrl`
-// are intentionally omitted so the canvas layout is rebuilt by ensureElements and
-// the create flow still searches the web for GIFs/images on load.
+// Each loads a ready-made lesson WITHOUT any AI generation, so it costs no Claude
+// credits — useful for testing the outline, subject themes, editor, Present mode
+// and exports. Content only: per-slide `elements` and `imageUrl` are omitted so
+// the canvas layout is rebuilt by ensureElements and the create flow still
+// searches the web for GIFs/images on load. Each lesson's `subject` is set so the
+// matching subject background theme auto-selects (Science / Maths / English).
 
 import type { Lesson, Slide } from "./types";
 import { cid } from "./canvas";
 
-const DATA: { meta: Lesson["meta"]; slides: Slide[] } = {
+type SampleData = { meta: Lesson["meta"]; slides: Slide[] };
+
+const SCIENCE: SampleData = {
   "meta": {
     "title": "Plants Make Their Own Food!",
     "subject": "Science",
@@ -266,13 +269,507 @@ const DATA: { meta: Lesson["meta"]; slides: Slide[] } = {
   ]
 };
 
-/** A fresh copy of the sample lesson (new ids; no elements/media yet). */
-export function makeTestLesson(): Lesson {
+const MATHS: SampleData = {
+  "meta": {
+    "title": "Fun with Fractions",
+    "subject": "Mathematics",
+    "topic": "Fractions",
+    "yearGroup": "Grade 3",
+    "region": "United States (Common Core / State Standards)",
+    "durationMinutes": 45,
+    "summary": "Students discover what fractions are by sharing everyday things—like pizza and chocolate—into equal parts. They learn to read a fraction, name the numerator and denominator, and spot fractions all around them.",
+    "objectives": [
+      "I can explain what a fraction is.",
+      "I can split a whole into equal parts.",
+      "I can name the numerator and denominator of a fraction.",
+      "I can find fractions in everyday life."
+    ],
+    "vocabulary": [
+      {
+        "term": "Fraction",
+        "definition": "A number that shows part of a whole."
+      },
+      {
+        "term": "Whole",
+        "definition": "One complete thing before it is split up."
+      },
+      {
+        "term": "Equal parts",
+        "definition": "Pieces that are exactly the same size."
+      },
+      {
+        "term": "Numerator",
+        "definition": "The top number—how many parts we have."
+      },
+      {
+        "term": "Denominator",
+        "definition": "The bottom number—how many equal parts in all."
+      }
+    ],
+    "standards": [
+      "CCSS.MATH.CONTENT.3.NF.A.1"
+    ]
+  },
+  "slides": [
+    {
+      "id": "m1",
+      "layout": "title",
+      "title": "Fun with Fractions",
+      "subtitle": "Let's share things into equal parts!",
+      "teacherNotes": "Hook the class: hold up a pretend pizza and ask how we'd share it fairly with 4 friends. Tell them today they become fraction experts.",
+      "imagePrompt": "a pizza cut into equal slices, friendly cartoon style",
+      "imageAlt": "A pizza cut into equal slices",
+      "imageQuery": "pizza cut into equal slices",
+      "gifQuery": "pizza slices"
+    },
+    {
+      "id": "m2",
+      "layout": "objectives",
+      "title": "What Will We Learn Today?",
+      "subtitle": "Our goals",
+      "bullets": [
+        "I can explain what a fraction is.",
+        "I can split a whole into equal parts.",
+        "I can name the numerator and denominator.",
+        "I can find fractions in everyday life."
+      ],
+      "teacherNotes": "Read each goal aloud. Tell students you'll check these off together at the end.",
+      "imageQuery": "learning goals checklist kids"
+    },
+    {
+      "id": "m3",
+      "layout": "vocabulary",
+      "title": "Key Words for Fractions",
+      "subtitle": "Words we'll use today",
+      "vocabulary": [
+        {
+          "term": "Fraction",
+          "definition": "A number that shows part of a whole."
+        },
+        {
+          "term": "Whole",
+          "definition": "One complete thing before it is split up."
+        },
+        {
+          "term": "Equal parts",
+          "definition": "Pieces that are exactly the same size."
+        },
+        {
+          "term": "Numerator",
+          "definition": "The top number—how many parts we have."
+        },
+        {
+          "term": "Denominator",
+          "definition": "The bottom number—how many equal parts in all."
+        }
+      ],
+      "teacherNotes": "Have students repeat each word. Emphasise EQUAL parts—this is the big idea."
+    },
+    {
+      "id": "m4",
+      "layout": "content",
+      "title": "What Is a Fraction?",
+      "subtitle": "Part of a whole",
+      "bullets": [
+        "A **fraction** is a part of a whole thing.",
+        "First we split the whole into **equal parts**.",
+        "Then a fraction tells us **how many** of those parts we have.",
+        "Half a sandwich is a fraction—**one half**!"
+      ],
+      "teacherNotes": "Use a real or drawn sandwich. Fold a paper square in half to show two equal parts.",
+      "imagePrompt": "a chocolate bar being broken into equal squares",
+      "imageAlt": "A chocolate bar split into equal squares",
+      "imageQuery": "chocolate bar equal squares",
+      "gifQuery": "chocolate bar breaking"
+    },
+    {
+      "id": "m5",
+      "layout": "content",
+      "title": "Numerator and Denominator",
+      "subtitle": "Top and bottom numbers",
+      "bullets": [
+        "A fraction has a **top** number and a **bottom** number.",
+        "The **denominator** (bottom) = how many equal parts in all.",
+        "The **numerator** (top) = how many parts we have.",
+        "In **1/4**, the 4 is the parts in all, and the 1 is our piece."
+      ],
+      "teacherNotes": "Draw 1/4 big. Point to top and bottom. Trick: Denominator is Down.",
+      "imagePrompt": "a diagram of the fraction one quarter with labels",
+      "imageAlt": "Fraction one quarter showing numerator and denominator",
+      "imageQuery": "fraction one quarter diagram"
+    },
+    {
+      "id": "m6",
+      "layout": "content",
+      "title": "Equal Parts Matter",
+      "subtitle": "Same size, every time",
+      "bullets": [
+        "Parts must be **the same size** to be a fraction.",
+        "Four equal slices of pizza = **quarters**.",
+        "Two big slices and two tiny slices are **not** fair—or fractions!",
+        "Equal parts keep sharing **fair**."
+      ],
+      "teacherNotes": "Show a 'bad cut' cake with uneven slices and ask if it's fair. Connect fairness to equal parts.",
+      "imageQuery": "cake cut into equal slices",
+      "gifQuery": "cutting cake"
+    },
+    {
+      "id": "m7",
+      "layout": "activity",
+      "title": "Pizza Fraction Fun",
+      "subtitle": "Hands-on practice",
+      "activity": {
+        "title": "Build a Fraction Pizza",
+        "instructions": "In pairs, cut a paper circle into equal parts (halves, then quarters). Colour in some slices and write the fraction you made, like 2/4. Swap with another pair and read each other's fractions.",
+        "durationMinutes": 12,
+        "grouping": "Pairs"
+      },
+      "teacherNotes": "Pre-cut circles for students who need support. Walk around and ask 'how many parts in all? how many coloured?'",
+      "imageQuery": "paper plate fraction activity classroom"
+    },
+    {
+      "id": "m8",
+      "layout": "discussion",
+      "title": "Fractions Around Us",
+      "subtitle": "Let's talk",
+      "discussionQuestions": [
+        "Where have you seen something cut into equal parts?",
+        "How do you share a snack fairly with a friend?",
+        "Is half of a big cookie bigger than half of a small cookie?",
+        "Why do the parts need to be equal?",
+        "What fraction of the day do you spend at school?"
+      ],
+      "teacherNotes": "Encourage think-pair-share. The big-cookie question surfaces that fractions are 'part of a whole'.",
+      "imageQuery": "children sharing food fairly"
+    },
+    {
+      "id": "m9",
+      "layout": "video",
+      "title": "Fractions in Action",
+      "subtitle": "Watch and learn",
+      "body": "Let's watch a short video that shows fractions with food and shapes. Look out for the numerator and denominator!",
+      "teacherNotes": "Pause the video when a fraction appears and ask the class to name the numerator and denominator.",
+      "imageQuery": "fractions for kids video",
+      "youtube": {
+        "title": "Fractions for Kids",
+        "searchQuery": "fractions for kids grade 3 numerator denominator"
+      }
+    },
+    {
+      "id": "m10",
+      "layout": "quiz",
+      "title": "Show What You Know",
+      "subtitle": "Quick check",
+      "quiz": [
+        {
+          "question": "What does the bottom number (denominator) tell us?",
+          "options": [
+            "How many equal parts are in the whole",
+            "How many parts we have",
+            "The biggest number",
+            "Nothing important"
+          ],
+          "answer": "How many equal parts are in the whole"
+        },
+        {
+          "question": "A pizza is cut into 4 equal slices and you eat 1. What fraction did you eat?",
+          "options": [
+            "1/4",
+            "4/1",
+            "1/2",
+            "4/4"
+          ],
+          "answer": "1/4"
+        },
+        {
+          "question": "Which one shows EQUAL parts?",
+          "options": [
+            "A chocolate bar split into same-size squares",
+            "A cake with big and small slices",
+            "A torn piece of paper",
+            "A melting ice cream"
+          ],
+          "answer": "A chocolate bar split into same-size squares"
+        }
+      ],
+      "teacherNotes": "Use thumbs-up/down or mini whiteboards so every child answers."
+    },
+    {
+      "id": "m11",
+      "layout": "plenary",
+      "title": "You're a Fraction Master!",
+      "subtitle": "Let's review",
+      "bullets": [
+        "A fraction is a part of a **whole**.",
+        "Parts must be **equal**.",
+        "The **numerator** is on top; the **denominator** is on the bottom.",
+        "Fractions are everywhere—at snack time, in pizza, and in sharing!"
+      ],
+      "teacherNotes": "Revisit the four goals from slide 2 and tick them off together. Celebrate!",
+      "imageQuery": "celebration kids math success",
+      "gifQuery": "celebration confetti"
+    }
+  ]
+};
+
+const ENGLISH: SampleData = {
+  "meta": {
+    "title": "Every Story Has Parts!",
+    "subject": "English / Literacy",
+    "topic": "Story Elements",
+    "yearGroup": "Grade 3",
+    "region": "United States (Common Core / State Standards)",
+    "durationMinutes": 45,
+    "summary": "Students learn that every story has a beginning, middle, and end, and discover the key parts of a story—characters, setting, problem, and solution. They practise spotting these parts and map out a story of their own.",
+    "objectives": [
+      "I can name the beginning, middle, and end of a story.",
+      "I can identify the characters and setting.",
+      "I can find the problem and solution in a story.",
+      "I can plan a story using its parts."
+    ],
+    "vocabulary": [
+      {
+        "term": "Character",
+        "definition": "A person or animal in the story."
+      },
+      {
+        "term": "Setting",
+        "definition": "Where and when the story happens."
+      },
+      {
+        "term": "Problem",
+        "definition": "The trouble the characters must solve."
+      },
+      {
+        "term": "Solution",
+        "definition": "How the problem gets fixed."
+      },
+      {
+        "term": "Plot",
+        "definition": "The order of events: beginning, middle, end."
+      }
+    ],
+    "standards": [
+      "CCSS.ELA-LITERACY.RL.3.3"
+    ]
+  },
+  "slides": [
+    {
+      "id": "e1",
+      "layout": "title",
+      "title": "Every Story Has Parts!",
+      "subtitle": "Beginning, middle, and end",
+      "teacherNotes": "Hold up a favourite picture book. Ask the class what happens first, next, and last to spark curiosity.",
+      "imagePrompt": "an open storybook with sparkles, warm and inviting",
+      "imageAlt": "An open storybook",
+      "imageQuery": "open storybook for children",
+      "gifQuery": "open book pages"
+    },
+    {
+      "id": "e2",
+      "layout": "objectives",
+      "title": "What Will We Learn Today?",
+      "subtitle": "Our goals",
+      "bullets": [
+        "I can name the beginning, middle, and end.",
+        "I can identify the characters and setting.",
+        "I can find the problem and solution.",
+        "I can plan a story using its parts."
+      ],
+      "teacherNotes": "Read goals aloud. Tell students they'll plan their own mini-story by the end.",
+      "imageQuery": "reading goals classroom"
+    },
+    {
+      "id": "e3",
+      "layout": "vocabulary",
+      "title": "Story Words to Know",
+      "subtitle": "Words we'll use today",
+      "vocabulary": [
+        {
+          "term": "Character",
+          "definition": "A person or animal in the story."
+        },
+        {
+          "term": "Setting",
+          "definition": "Where and when the story happens."
+        },
+        {
+          "term": "Problem",
+          "definition": "The trouble the characters must solve."
+        },
+        {
+          "term": "Solution",
+          "definition": "How the problem gets fixed."
+        },
+        {
+          "term": "Plot",
+          "definition": "The order of events: beginning, middle, end."
+        }
+      ],
+      "teacherNotes": "Have students act out 'character' and 'setting' with a quick example from a known story."
+    },
+    {
+      "id": "e4",
+      "layout": "content",
+      "title": "Beginning, Middle, and End",
+      "subtitle": "Every story is a journey",
+      "bullets": [
+        "The **beginning** introduces the characters and setting.",
+        "The **middle** is where the problem grows.",
+        "The **end** is where the problem is solved.",
+        "Together these are the **plot** of the story."
+      ],
+      "teacherNotes": "Map a familiar tale (e.g. The Three Little Pigs) onto beginning/middle/end on the board.",
+      "imagePrompt": "a simple story road from start to finish",
+      "imageAlt": "A story path showing beginning, middle, end",
+      "imageQuery": "story beginning middle end chart",
+      "gifQuery": "reading book"
+    },
+    {
+      "id": "e5",
+      "layout": "content",
+      "title": "Characters and Setting",
+      "subtitle": "Who, where, and when",
+      "bullets": [
+        "**Characters** are the people or animals in the story.",
+        "The **setting** is where and when it happens.",
+        "A setting could be a forest, a school, or outer space!",
+        "Good readers picture the characters and setting in their minds."
+      ],
+      "teacherNotes": "Ask students to describe the setting of their favourite book in one sentence.",
+      "imageQuery": "story characters and setting illustration"
+    },
+    {
+      "id": "e6",
+      "layout": "content",
+      "title": "Problem and Solution",
+      "subtitle": "The heart of the story",
+      "bullets": [
+        "The **problem** is the trouble the characters face.",
+        "The **solution** is how they fix it.",
+        "No problem, no story—the problem keeps us reading!",
+        "Most problems are solved by the **end**."
+      ],
+      "teacherNotes": "Give a quick example: a lost puppy (problem) is found by a kind child (solution).",
+      "imageQuery": "story problem solution kids"
+    },
+    {
+      "id": "e7",
+      "layout": "activity",
+      "title": "Make a Story Map",
+      "subtitle": "Plan your own story",
+      "activity": {
+        "title": "My Story Map",
+        "instructions": "On your story map, draw and label four boxes: Characters, Setting, Problem, and Solution. Plan a short story of your own—it can be silly or serious! Share your map with a partner and tell your story out loud.",
+        "durationMinutes": 12,
+        "grouping": "Individual, then pairs"
+      },
+      "teacherNotes": "Provide a printed story-map template. Sentence starters help students who get stuck.",
+      "imageQuery": "story map graphic organizer classroom"
+    },
+    {
+      "id": "e8",
+      "layout": "discussion",
+      "title": "Talk About Your Favourite Stories",
+      "subtitle": "Let's share",
+      "discussionQuestions": [
+        "Who is your favourite character, and why?",
+        "What was the problem in a story you love?",
+        "How was the problem solved?",
+        "Can a story have more than one setting?",
+        "What makes a beginning exciting?"
+      ],
+      "teacherNotes": "Use think-pair-share. Connect answers back to the vocabulary words.",
+      "imageQuery": "children talking about books"
+    },
+    {
+      "id": "e9",
+      "layout": "video",
+      "title": "Story Elements Song",
+      "subtitle": "Watch and sing along",
+      "body": "Let's watch a fun video about the parts of a story. Listen for the words character, setting, problem, and solution!",
+      "teacherNotes": "Pause and ask students to give an example of each story element they hear.",
+      "imageQuery": "story elements for kids video",
+      "youtube": {
+        "title": "Story Elements for Kids",
+        "searchQuery": "story elements for kids characters setting problem solution"
+      }
+    },
+    {
+      "id": "e10",
+      "layout": "quiz",
+      "title": "Show What You Know",
+      "subtitle": "Quick check",
+      "quiz": [
+        {
+          "question": "Where do we usually meet the characters and learn the problem?",
+          "options": [
+            "The beginning",
+            "The middle",
+            "The end",
+            "The cover"
+          ],
+          "answer": "The beginning"
+        },
+        {
+          "question": "The WHERE and WHEN a story happens is called the…",
+          "options": [
+            "Setting",
+            "Character",
+            "Problem",
+            "Title"
+          ],
+          "answer": "Setting"
+        },
+        {
+          "question": "What usually happens at the END of a story?",
+          "options": [
+            "The problem is solved",
+            "A brand-new problem starts",
+            "We first meet the characters",
+            "Nothing happens"
+          ],
+          "answer": "The problem is solved"
+        }
+      ],
+      "teacherNotes": "Mini whiteboards or thumbs-up keep every child involved."
+    },
+    {
+      "id": "e11",
+      "layout": "plenary",
+      "title": "You're a Storyteller!",
+      "subtitle": "Let's review",
+      "bullets": [
+        "Every story has a **beginning, middle, and end**.",
+        "**Characters** and **setting** tell us who, where, and when.",
+        "The **problem** and **solution** are the heart of the story.",
+        "Now you can plan stories of your very own!"
+      ],
+      "teacherNotes": "Tick off the four goals together. Invite one or two students to share their story map.",
+      "imageQuery": "happy child storyteller",
+      "gifQuery": "thumbs up kids"
+    }
+  ]
+};
+
+function make(data: SampleData): Lesson {
   return {
     id: cid("lesson"),
     kind: "lesson",
     createdAt: Date.now(),
-    meta: structuredClone(DATA.meta),
-    slides: DATA.slides.map((s) => ({ ...structuredClone(s), id: cid("sl") })),
+    meta: structuredClone(data.meta),
+    slides: data.slides.map((s) => ({ ...structuredClone(s), id: cid("sl") })),
   };
 }
+
+export interface TestLesson {
+  id: string;
+  label: string;
+  make: () => Lesson;
+}
+
+export const TEST_LESSONS: TestLesson[] = [
+  { id: "science", label: "Science · Photosynthesis", make: () => make(SCIENCE) },
+  { id: "maths", label: "Maths · Fractions", make: () => make(MATHS) },
+  { id: "english", label: "English · Story Elements", make: () => make(ENGLISH) },
+];

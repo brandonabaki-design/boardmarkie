@@ -12,34 +12,46 @@ import { useSupabaseUser } from "@/lib/supabaseAuth";
 import { SimSignIn } from "./SimSignIn";
 import { Spinner, TextArea } from "./ui";
 
-const GEMINI_URL = "https://gemini.google.com/app";
+// The AISA "EduSim" gem on Gemini — turns a lesson into a student-facing,
+// simulation-based learning experience (it codes the simulation HTML for you).
+const EDUSIM_GEM_URL = "https://gemini.google.com/gem/11QD4AkTJjpXVgEGw8SJ74nq99ntDfv8V?usp=sharing";
 
-// A compact, Gemini-friendly view of the lesson (drops ids / canvas layout).
-function lessonForGemini(lesson: Lesson) {
-  return {
-    title: lesson.meta.title,
-    subject: lesson.meta.subject,
-    gradeLevel: lesson.meta.yearGroup,
-    topic: lesson.meta.topic,
-    summary: lesson.meta.summary,
-    objectives: lesson.meta.objectives,
-    standards: lesson.meta.standards ?? [],
-    slides: lesson.slides.map((s) => ({
-      title: s.title,
-      subtitle: s.subtitle,
-      bullets: s.bullets,
-      body: s.body,
-      vocabulary: s.vocabulary,
-      activity: s.activity,
-      discussionQuestions: s.discussionQuestions,
-      quiz: s.quiz,
-    })),
-  };
+// Serialise a lesson to clean, paste-ready text for the EduSim gem.
+function lessonToText(lesson: Lesson): string {
+  const m = lesson.meta;
+  const out: string[] = [];
+  out.push(`# ${m.title}`);
+  out.push(`${m.subject} · ${m.yearGroup} · ${m.durationMinutes} min · ${m.region}`);
+  if (m.summary) out.push("", m.summary);
+  if (m.objectives?.length) {
+    out.push("", "## Learning objectives");
+    m.objectives.forEach((o) => out.push(`- ${o}`));
+  }
+  if (m.vocabulary?.length) {
+    out.push("", "## Key vocabulary");
+    m.vocabulary.forEach((v) => out.push(`- ${v.term}: ${v.definition}`));
+  }
+  out.push("", "## Slides");
+  lesson.slides.forEach((s, i) => {
+    out.push("", `### ${i + 1}. ${s.title} [${s.layout}]`);
+    if (s.subtitle) out.push(s.subtitle);
+    if (s.body) out.push(s.body);
+    (s.bullets ?? []).forEach((b) => out.push(`- ${b}`));
+    (s.vocabulary ?? []).forEach((v) => out.push(`- ${v.term}: ${v.definition}`));
+    if (s.activity)
+      out.push(
+        `Activity — ${s.activity.title} (${s.activity.grouping}, ${s.activity.durationMinutes} min): ${s.activity.instructions}`,
+      );
+    (s.discussionQuestions ?? []).forEach((q) => out.push(`- ${q}`));
+    (s.quiz ?? []).forEach((q) => {
+      out.push(`Q: ${q.question}`);
+      (q.options ?? []).forEach((o) => out.push(`   - ${o}`));
+      if (q.answer) out.push(`   Answer: ${q.answer}`);
+    });
+    if (s.teacherNotes) out.push(`Teacher notes: ${s.teacherNotes}`);
+  });
+  return out.join("\n");
 }
-
-const PROMPT = `Build a single self-contained, interactive HTML simulation for the lesson below.
-Requirements: one HTML file, all CSS/JS inline, no external network requests, works offline,
-mobile-friendly and engaging for students. Output ONLY the HTML. Lesson JSON:`;
 
 // A dedicated "Try the Simulation" slide carrying the QR for the unique link.
 function buildEduSimSlide(link: string, qrSvg: string, simTitle: string): Slide {
@@ -86,7 +98,7 @@ export function EduSimWizard({
   const [error, setError] = useState("");
 
   const copyJson = async () => {
-    const payload = `${PROMPT}\n\n${JSON.stringify(lessonForGemini(lesson), null, 2)}`;
+    const payload = lessonToText(lesson);
     try {
       await navigator.clipboard.writeText(payload);
       setCopied(true);
@@ -162,10 +174,10 @@ export function EduSimWizard({
           <>
             <ol className="mt-5 space-y-4 text-sm">
               <li>
-                <p className="font-semibold text-ink">1. Copy your lesson, then open Gemini</p>
+                <p className="font-semibold text-ink">1. Copy your lesson, then open EduSim</p>
                 <p className="mt-0.5 text-muted">
-                  We copy the lesson (with a ready-made prompt). Paste it into Gemini and let it build an interactive HTML
-                  simulation.
+                  Copies this lesson as clean text. Paste it into AISA&apos;s EduSim gem on Gemini and it codes an
+                  interactive simulation for your students.
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button
@@ -173,15 +185,15 @@ export function EduSimWizard({
                     className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
                   >
                     {copied ? <Check size={15} className="text-brand-600" /> : <Copy size={15} />}
-                    {copied ? "Copied!" : "Copy lesson + prompt"}
+                    {copied ? "Copied!" : "Copy lesson"}
                   </button>
                   <a
-                    href={GEMINI_URL}
+                    href={EDUSIM_GEM_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
                   >
-                    <ExternalLink size={15} className="text-brand-600" /> Open Gemini
+                    <ExternalLink size={15} className="text-brand-600" /> Open EduSim
                   </a>
                 </div>
               </li>
