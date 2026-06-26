@@ -333,6 +333,43 @@ export const diagramSchema: JSONSchema = {
   required: ["title", "svg", "alt"],
 };
 
+// Auto-categorise a pasted simulation: infer catalogue metadata from its HTML.
+// All fields required (project convention); the mapper validates grade/subject
+// against the controlled lists and prunes blanks.
+export const simExtractSchema: JSONSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    title: { type: "string", description: "A short, classroom-friendly title for the simulation." },
+    description: {
+      type: "string",
+      description: "One or two sentences on what students explore/do. Empty string if it cannot be determined.",
+    },
+    grade_level: {
+      type: "string",
+      description:
+        "Best-fit grade band from the controlled list provided in the user message (e.g. 'K','3','8','Higher Ed'). Empty string if unclear.",
+    },
+    subject: {
+      type: "string",
+      description:
+        "Best-fit subject from the controlled list provided in the user message (e.g. 'Science','Physics','Mathematics'). Empty string if unclear.",
+    },
+    concepts: {
+      type: "array",
+      items: { type: "string" },
+      description: "2–5 short topic/concept phrases the simulation teaches (e.g. 'photosynthesis', 'projectile motion').",
+    },
+    standards: {
+      type: "array",
+      items: { type: "string" },
+      description:
+        "Curriculum standard codes if clearly identifiable (e.g. 'NGSS MS-PS1-1', 'CCSS.MATH.CONTENT.4.NF.B.3'). Empty array if none are evident.",
+    },
+  },
+  required: ["title", "description", "grade_level", "subject", "concepts", "standards"],
+};
+
 export function jsonFormat(schema: JSONSchema) {
   return { type: "json_schema" as const, schema };
 }
