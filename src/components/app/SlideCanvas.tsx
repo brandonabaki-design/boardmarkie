@@ -13,6 +13,7 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
+  ExternalLink,
 } from "lucide-react";
 import type { CanvasElement, TextElement } from "@/lib/types";
 import { clamp, INK, MUTED } from "@/lib/canvas";
@@ -525,6 +526,9 @@ function FloatingToolbar({
   onDelete: () => void;
 }) {
   const above = box.y > 14;
+  // EduSim QR images get an "open link" action instead of "swap" — so a teacher
+  // can't accidentally replace the scannable code with an arbitrary picture.
+  const eduSimUrl = el.type === "image" ? el.eduSimUrl : undefined;
   return (
     <div
       onPointerDown={(e) => e.stopPropagation()}
@@ -537,7 +541,16 @@ function FloatingToolbar({
       }}
       className="flex items-center gap-0.5 rounded-xl border border-line bg-white px-1 py-1 card-shadow"
     >
-      {el.type === "image" && <TBtn title="Swap image" onClick={onSwap}><Replace size={15} /></TBtn>}
+      {el.type === "image" &&
+        (eduSimUrl ? (
+          <TBtn title="Open EduSim link" onClick={() => window.open(eduSimUrl, "_blank", "noopener,noreferrer")}>
+            <ExternalLink size={15} />
+          </TBtn>
+        ) : (
+          <TBtn title="Swap image" onClick={onSwap}>
+            <Replace size={15} />
+          </TBtn>
+        ))}
 
       {el.type === "text" && (
         <>

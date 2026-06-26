@@ -3,7 +3,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { DIAGRAM_MODEL, NO_KEY_MESSAGE } from "./anthropic";
 import { getApiKey, getModel } from "./storage";
-import { diagramSchema, lessonSchema, outlineSchema, seriesSchema, worksheetSchema } from "./schemas";
+import { diagramSchema, lessonSchema, outlineSchema, seriesSchema, simExtractSchema, worksheetSchema } from "./schemas";
+import { GRADE_LEVELS, SUBJECTS } from "./taxonomy";
 import {
   lessonSystemPrompt,
   lessonUserPrompt,
@@ -237,6 +238,96 @@ export async function generateDiagram(
     title: typeof raw.title === "string" ? raw.title : "",
     svg,
     alt: typeof raw.alt === "string" ? raw.alt : "",
+  };
+}
+
+// ---- EduSim: auto-categorise a pasted simulation ----
+
+export interface SimMetadata {
+  title: string;
+  description: string;
+  grade_level: string;
+  subject: string;
+  concepts: string[];
+  standards: string[];
+}
+
+export interface SimMetadataContext {
+  topic?: string;
+  subject?: string;
+  yearGroup?: string;
+}
+
+const cleanStr = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
+const cleanArr = (v: unknown): string[] =>
+  Array.isArray(v) ? v.map(cleanStr).filter(Boolean) : [];
+
+/** Match a model-supplied value to a controlled-vocabulary list (lenient). */
+function matchVocab(value: string, list: readonly string[]): string {
+  const v = value.trim().toLowerCase();
+  if (!v) return "";
+  const exact = list.find((o) => o.toLowerCase() === v);
+  if (exact) return exact;
+  const partial = list.find((o) => {
+    const lo = o.toLowerCase();
+    return lo.startsWith(v) || v.startsWith(lo) || lo.includes(v) || v.includes(lo);
+  });
+  return partial ?? "";
+}
+
+/**
+ * Read the HTML of a pasted simulation and infer catalogue metadata (title,
+ * description, grade, subject, concepts, standards) via Claude structured output.
+ * grade/subject are validated against the controlled lists. Optional lesson
+ * context nudges the model toward the right classification.
+ */
+export async function extractSimMetadata(
+  html: string,
+  context: SimMetadataContext = {},
+): Promise<SimMetadata> {
+  const client = await browserClient();
+
+  const system =
+    "You are a meticulous teacher's aide cataloguing interactive classroom simulations. " +
+    "Given the HTML source of a simulation, infer concise, accurate metadata so it can be " +
+    "filed in a shared library. Choose grade_level and subject ONLY from the controlled lists " +
+    "in the user message; if you genuinely cannot tell, return an empty string. Keep concepts to " +
+    "2–5 short topic phrases. Include standards only when clearly identifiable.";
+
+  // Cap the HTML so we don't blow the token budget; titles/labels/headings (the
+  // most informative parts) almost always sit near the top of the document.
+  const trimmed = html.slice(0, 60000);
+  const hints = [
+    context.topic ? `Lesson topic (hint): ${context.topic}` : "",
+    context.subject ? `Lesson subject (hint): ${context.subject}` : "",
+    context.yearGroup ? `Lesson grade/year (hint): ${context.yearGroup}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const user =
+    `Controlled grade levels: ${GRADE_LEVELS.join(", ")}\n` +
+    `Controlled subjects: ${SUBJECTS.join(", ")}\n` +
+    (hints ? `${hints}\n` : "") +
+    `\nSimulation HTML:\n${trimmed}`;
+
+  const raw = await runStructured<Partial<SimMetadata>>({
+    client,
+    system,
+    user,
+    schema: simExtractSchema,
+    maxTokens: 1500,
+    effort: "low",
+    model: getModel(),
+  });
+
+  return {
+    title: cleanStr(raw.title),
+    description: cleanStr(raw.description),
+    grade_level: matchVocab(cleanStr(raw.grade_level), GRADE_LEVELS),
+    subject: matchVocab(cleanStr(raw.subject), SUBJECTS),
+    concepts: cleanArr(raw.concepts).slice(0, 8),
+    standards: cleanArr(raw.standards).slice(0, 12),
   };
 }
 

@@ -67,6 +67,27 @@ React 19, TypeScript, Tailwind v4, Anthropic Claude.
   `vars.ALLOWED_EMAIL_DOMAINS`, `secrets.FIREBASE_CONFIG`) are documented in
   `vercel-proxy/README.md`. Settings hides key fields in hosted mode.
 
+## EduSim + shared libraries (Supabase) — see `docs/EDUSIM.md`
+- The standalone EduSim Hub (`html-viewer`) is folded in as native routes backed
+  by **Supabase** (browser anon key + RLS; stays a static export). `src/lib/
+  supabase.ts` (client + `eduSimLink`), `src/lib/sims.ts` (simulations data
+  layer), `src/lib/lessonsLib.ts` (shared lessons), `src/lib/supabaseAuth.ts`
+  (Google + magic-link sign-in). DB setup: `supabase/schema.sql` (idempotent).
+- Routes: `/sims` (library), `/sim/?id=` (sandboxed viewer + QR), `/sims/new|edit`
+  (paste-from-Gemini editor with Claude auto-categorize), `/sims/me`, `/lessons`
+  (shared lesson catalogue). Untrusted sim HTML renders only via
+  `SandboxedHtml.tsx` (`iframe srcdoc`, `sandbox="allow-scripts"`, no same-origin).
+- Auto-categorize: `extractSimMetadata` (`client.ts`) + `simExtractSchema`
+  (`schemas.ts`) — same structured-output convention as lessons.
+- Canvas: the **EduSim** toolbar tool embeds a sim link as a QR (`ImageElement`
+  with an `eduSimUrl` marker + SVG QR from `src/lib/qr.ts`); renders/exports with
+  no extra code. The lesson **EduSim** button (copy JSON → Gemini → paste →
+  auto-create sim → QR slide) and **Share** button (publish lesson) live in
+  `CreateApp`.
+- **Additive**: Firebase auth + per-user lesson sync are unchanged; Supabase
+  powers EduSim + shared-lesson publishing. The planned single-sign-in (retire
+  Firebase) is scoped in `docs/EDUSIM.md`.
+
 ## Build & deploy
 - Static export (`output: "export"` in `next.config.ts`); `basePath`/`assetPrefix`
   come from `PAGES_BASE_PATH` (empty locally, `/boardmarkie` on Pages).
