@@ -51,9 +51,28 @@ export default async function handler(req, res) {
     return res.status(502).json({ error: "Could not reach Anthropic." });
   }
 
+  // Surface an upstream error as readable JSON. Otherwise the SDK (in streaming
+  // mode) receives a non-SSE error body, the stream never completes, and it throws
+  // the opaque "stream ended without producing a Message with role=assistant".
+  if (!upstream.ok) {
+    const text = await upstream.text().catch(() => "");
+    let parsed = null;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      /* not JSON */
+    }
+    return res.status(upstream.status).json(parsed || { error: text || "Anthropic request failed." });
+  }
+
   res.status(upstream.status);
   const ct = upstream.headers.get("content-type");
   if (ct) res.setHeader("Content-Type", ct);
+  // Keep the SSE flowing chunk-by-chunk (defeat any proxy/CDN buffering), so the
+  // SDK can assemble the message instead of waiting for a buffer that never flushes.
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("X-Accel-Buffering", "no");
+  if (typeof res.flushHeaders === "function") res.flushHeaders();
 
   if (!upstream.body) {
     return res.end(await upstream.text());
@@ -65,6 +84,7 @@ export default async function handler(req, res) {
       const { done, value } = await reader.read();
       if (done) break;
       res.write(Buffer.from(value));
+      if (typeof res.flush === "function") res.flush();
     }
     res.end();
   } catch {
