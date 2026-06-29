@@ -1,6 +1,7 @@
 "use client";
 
-import { X, Presentation, Layers, ClipboardList, Trash2, FolderOpen } from "lucide-react";
+import Link from "next/link";
+import { X, Presentation, Layers, ClipboardList, Trash2, FolderOpen, BookOpen, FlaskConical, ChevronRight } from "lucide-react";
 import type { Artifact } from "@/lib/types";
 import { useDialog } from "./useDialog";
 
@@ -57,7 +58,34 @@ export function LibraryDrawer({
           </button>
         </div>
 
+        {/* Browse the shared libraries (all teachers' work) */}
+        <nav className="space-y-1 border-b border-line p-3">
+          <Link
+            href="/lessons/"
+            onClick={onClose}
+            className="flex items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-paper"
+          >
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-paper text-brand-700">
+              <BookOpen size={16} />
+            </span>
+            Shared lessons
+            <ChevronRight size={16} className="ml-auto text-muted" />
+          </Link>
+          <Link
+            href="/sims/"
+            onClick={onClose}
+            className="flex items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-paper"
+          >
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-paper text-brand-700">
+              <FlaskConical size={16} />
+            </span>
+            EduSim library
+            <ChevronRight size={16} className="ml-auto text-muted" />
+          </Link>
+        </nav>
+
         <div className="flex-1 overflow-y-auto p-4">
+          <p className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-muted">Your work</p>
           {items.length === 0 ? (
             <div className="mt-16 text-center text-sm text-muted">
               <p>Nothing saved yet.</p>

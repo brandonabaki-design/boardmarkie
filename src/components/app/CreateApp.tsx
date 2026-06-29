@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { FolderOpen, Settings, Plus, ArrowLeft, AlertCircle, X, Play, FlaskConical, QrCode, BookOpen, Share2 } from "lucide-react";
+import { FolderOpen, Settings, Plus, ArrowLeft, AlertCircle, X, Play, FlaskConical, Share2 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import type {
   Artifact,
@@ -49,7 +49,6 @@ import { SettingsModal } from "./SettingsModal";
 import { LibraryDrawer } from "./LibraryDrawer";
 import { ExportMenu } from "./ExportMenu";
 import { PresentMode } from "./PresentMode";
-import { EduSimWizard } from "./EduSimWizard";
 import { ShareLessonDialog } from "./ShareLessonDialog";
 import { getSharedLesson } from "@/lib/lessonsLib";
 import { Spinner } from "./ui";
@@ -117,7 +116,6 @@ export function CreateApp() {
   const [user, setUser] = useState<AppUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [presenting, setPresenting] = useState(false);
-  const [eduSimOpen, setEduSimOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [imageProgress, setImageProgress] = useState<{ done: number; total: number } | null>(null);
   const [past, setPast] = useState<Lesson[]>([]);
@@ -679,13 +677,6 @@ export function CreateApp() {
                       <Play size={16} /> <span className="hidden sm:inline">Present</span>
                     </button>
                     <button
-                      onClick={() => setEduSimOpen(true)}
-                      title="Create an interactive EduSim and add its QR to this deck"
-                      className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
-                    >
-                      <QrCode size={16} className="text-brand-600" /> <span className="hidden sm:inline">EduSim</span>
-                    </button>
-                    <button
                       onClick={() => setShareOpen(true)}
                       title="Publish this lesson to the shared library"
                       className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
@@ -703,20 +694,6 @@ export function CreateApp() {
                 </button>
               </>
             )}
-            <Link
-              href="/lessons/"
-              title="Shared lessons library"
-              className="hidden h-10 w-10 place-items-center rounded-full border border-line bg-white text-ink transition-colors hover:border-brand-300 sm:grid"
-            >
-              <BookOpen size={18} />
-            </Link>
-            <Link
-              href="/sims/"
-              title="EduSim library"
-              className="hidden h-10 w-10 place-items-center rounded-full border border-line bg-white text-ink transition-colors hover:border-brand-300 sm:grid"
-            >
-              <FlaskConical size={18} />
-            </Link>
             <AccountButton
               user={user}
               configured
@@ -875,14 +852,6 @@ export function CreateApp() {
 
       {presenting && current && current.kind === "lesson" && (
         <PresentMode lesson={current} onClose={() => setPresenting(false)} />
-      )}
-
-      {eduSimOpen && current && current.kind === "lesson" && (
-        <EduSimWizard
-          lesson={current}
-          onClose={() => setEduSimOpen(false)}
-          onInsert={(slide) => commitLesson({ ...current, slides: [...current.slides, slide] })}
-        />
       )}
 
       {shareOpen && current && current.kind === "lesson" && (
