@@ -12,7 +12,15 @@ import {
   printDocument,
 } from "@/lib/export";
 
-export function ExportMenu({ artifact }: { artifact: Artifact }) {
+export function ExportMenu({
+  artifact,
+  variant = "primary",
+  direction = "down",
+}: {
+  artifact: Artifact;
+  variant?: "primary" | "secondary";
+  direction?: "up" | "down";
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -24,18 +32,27 @@ export function ExportMenu({ artifact }: { artifact: Artifact }) {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
+  const btnClass =
+    variant === "secondary"
+      ? "inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
+      : "inline-flex items-center gap-1.5 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700";
+
   return (
     <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1.5 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
-      >
+      <button onClick={() => setOpen((v) => !v)} className={btnClass}>
         <Download size={16} /> Export
-        <ChevronDown size={15} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown
+          size={15}
+          className={`transition-transform ${open ? "rotate-180" : ""} ${direction === "up" ? "rotate-180" : ""}`}
+        />
       </button>
 
       {open && (
-        <div className="absolute right-0 z-30 mt-2 w-60 rounded-2xl border border-line bg-white p-1.5 card-shadow">
+        <div
+          className={`absolute right-0 z-30 w-60 rounded-2xl border border-line bg-white p-1.5 card-shadow ${
+            direction === "up" ? "bottom-full mb-2" : "mt-2"
+          }`}
+        >
           {artifact.kind === "lesson" && (
             <Item
               icon={Presentation}

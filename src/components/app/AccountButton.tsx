@@ -36,11 +36,11 @@ export function AccountButton({
       <div className="relative">
         <button
           onClick={() => setOpen((o) => !o)}
-          className="flex items-center gap-1.5 rounded-full border border-line bg-white py-1 pl-1 pr-2.5 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
-          title={`Signed in as ${user.email || user.name}`}
+          className="flex items-center gap-1 rounded-full border border-line bg-white p-1 pr-1.5 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
+          title={`Signed in as ${user.name}${user.email ? ` (${user.email})` : ""}`}
+          aria-label="Account menu"
         >
           {avatar}
-          <span className="hidden max-w-[8rem] truncate sm:inline">{first}</span>
           <ChevronDown size={14} className="text-muted" />
         </button>
 

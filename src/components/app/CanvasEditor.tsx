@@ -26,6 +26,8 @@ import {
   Palette,
   Sparkles,
   QrCode,
+  Play,
+  Share2,
 } from "lucide-react";
 import type { CanvasElement, EditAction, Lesson, Slide } from "@/lib/types";
 import {
@@ -41,6 +43,7 @@ import {
   youtubeId,
 } from "@/lib/canvas";
 import { EduSimModal } from "./EduSimModal";
+import { ExportMenu } from "./ExportMenu";
 import { SlideCanvas } from "./SlideCanvas";
 import { ImageSwap, type SwapMedia } from "./ImageSwap";
 import { Editable, Spinner } from "./ui";
@@ -61,6 +64,8 @@ export function CanvasEditor({
   onRedo,
   canUndo,
   canRedo,
+  onPresent,
+  onPublish,
 }: {
   lesson: Lesson;
   busy: boolean;
@@ -70,6 +75,8 @@ export function CanvasEditor({
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  onPresent: () => void;
+  onPublish: () => void;
 }) {
   const [idx, setIdx] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -470,62 +477,77 @@ export function CanvasEditor({
               </select>
             </label>
 
-            <div className="relative ml-auto">
-              <button
-                onClick={() => setImproveOpen((v) => !v)}
-                disabled={busy}
-                className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-brand-300 disabled:opacity-50"
-              >
-                {busy ? <Spinner /> : <Wand2 size={14} className="text-brand-600" />} Improve slide
-              </button>
-              {improveOpen && (
-                <div className="absolute right-0 z-30 mt-2 w-64 rounded-2xl border border-line bg-white p-2 card-shadow">
-                  <div className="flex items-center justify-between px-2 py-1">
-                    <span className="text-xs font-semibold text-muted">Improve this slide</span>
-                    <button onClick={() => setImproveOpen(false)} className="text-muted hover:text-ink">
-                      <X size={14} />
-                    </button>
-                  </div>
-                  {([
-                    { action: "make_fun" as EditAction, label: "Make it more fun" },
-                    { action: "simplify" as EditAction, label: "Simplify" },
-                    { action: "advance" as EditAction, label: "Stretch & challenge" },
-                  ]).map((a) => (
-                    <button
-                      key={a.action}
-                      onClick={() => {
-                        setImproveOpen(false);
-                        onEdit(a.action, undefined, slide.id);
-                      }}
-                      className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-ink transition-colors hover:bg-paper"
-                    >
-                      {a.label}
-                    </button>
-                  ))}
-                  <div className="mt-1 border-t border-line p-2">
-                    <input
-                      value={instruction}
-                      onChange={(e) => setInstruction(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && instruction.trim()) {
-                          onEdit("rewrite", instruction.trim(), slide.id);
-                          setInstruction("");
+            <div className="ml-auto flex flex-wrap items-center gap-1.5">
+              <div className="relative">
+                <button
+                  onClick={() => setImproveOpen((v) => !v)}
+                  disabled={busy}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-brand-300 disabled:opacity-50"
+                >
+                  {busy ? <Spinner /> : <Wand2 size={14} className="text-brand-600" />} Improve slide
+                </button>
+                {improveOpen && (
+                  <div className="absolute bottom-full right-0 z-30 mb-2 w-64 rounded-2xl border border-line bg-white p-2 card-shadow">
+                    <div className="flex items-center justify-between px-2 py-1">
+                      <span className="text-xs font-semibold text-muted">Improve this slide</span>
+                      <button onClick={() => setImproveOpen(false)} className="text-muted hover:text-ink">
+                        <X size={14} />
+                      </button>
+                    </div>
+                    {([
+                      { action: "make_fun" as EditAction, label: "Make it more fun" },
+                      { action: "simplify" as EditAction, label: "Simplify" },
+                      { action: "advance" as EditAction, label: "Stretch & challenge" },
+                    ]).map((a) => (
+                      <button
+                        key={a.action}
+                        onClick={() => {
                           setImproveOpen(false);
-                        }
-                      }}
-                      placeholder="Or tell it what to change…"
-                      className="w-full rounded-lg border border-line px-2.5 py-2 text-sm outline-none focus:border-brand-400"
-                    />
+                          onEdit(a.action, undefined, slide.id);
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-ink transition-colors hover:bg-paper"
+                      >
+                        {a.label}
+                      </button>
+                    ))}
+                    <div className="mt-1 border-t border-line p-2">
+                      <input
+                        value={instruction}
+                        onChange={(e) => setInstruction(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && instruction.trim()) {
+                            onEdit("rewrite", instruction.trim(), slide.id);
+                            setInstruction("");
+                            setImproveOpen(false);
+                          }
+                        }}
+                        placeholder="Or tell it what to change…"
+                        className="w-full rounded-lg border border-line px-2.5 py-2 text-sm outline-none focus:border-brand-400"
+                      />
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
+
+              <span className="mx-1 hidden h-6 w-px bg-line sm:block" />
+
+              {/* Document actions — kept with the deck, not in the site header */}
+              <button
+                onClick={onPresent}
+                className="inline-flex items-center gap-1.5 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
+              >
+                <Play size={16} /> Present
+              </button>
+              <button
+                onClick={onPublish}
+                title="Publish this lesson to the shared library"
+                className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
+              >
+                <Share2 size={16} className="text-brand-600" /> Publish
+              </button>
+              <ExportMenu artifact={lesson} variant="secondary" direction="up" />
             </div>
           </div>
-          <p className="no-print mt-2 text-xs text-muted">
-            Click to select · drag to move · handles to resize · double-click text to edit ·{" "}
-            <span className="whitespace-nowrap">⌘C/⌘X/⌘V copy/cut/paste</span> ·{" "}
-            <span className="whitespace-nowrap">⌘Z undo</span>
-          </p>
         </div>
 
         {/* slide thumbnail rail */}

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { FolderOpen, Settings, Plus, ArrowLeft, AlertCircle, X, Play, FlaskConical, Share2, BookOpen } from "lucide-react";
+import { FolderOpen, Settings, Plus, ArrowLeft, AlertCircle, X, FlaskConical, BookOpen } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import type {
   Artifact,
@@ -682,25 +682,12 @@ export function CreateApp() {
             </nav>
           </div>
           <div className="flex items-center gap-2">
-            {current && (
+            {/* Worksheets/series have no bottom workspace bar, so their document
+                actions stay here. Lessons get Present/Publish/Export in the bottom
+                deck bar (CanvasEditor) — keeping the site header free of per-deck
+                actions so it clearly reads as app navigation. */}
+            {current && current.kind !== "lesson" && (
               <>
-                {current.kind === "lesson" && (
-                  <>
-                    <button
-                      onClick={() => setPresenting(true)}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
-                    >
-                      <Play size={16} /> <span className="hidden sm:inline">Present</span>
-                    </button>
-                    <button
-                      onClick={() => setShareOpen(true)}
-                      title="Publish this lesson to the shared library"
-                      className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
-                    >
-                      <Share2 size={16} className="text-brand-600" /> <span className="hidden sm:inline">Publish</span>
-                    </button>
-                  </>
-                )}
                 <ExportMenu artifact={current} />
                 <button
                   onClick={startNew}
@@ -772,6 +759,8 @@ export function CreateApp() {
                 onRedo={redo}
                 canUndo={past.length > 0}
                 canRedo={future.length > 0}
+                onPresent={() => setPresenting(true)}
+                onPublish={() => setShareOpen(true)}
               />
             )}
             {current.kind === "worksheet" && <WorksheetView worksheet={current} />}
@@ -853,13 +842,6 @@ export function CreateApp() {
           </>
         )}
       </main>
-
-      <footer className="no-print border-t border-line py-6 text-center text-sm text-muted">
-        <Link href="/" className="hover:text-brand-700">
-          Boardmarkie
-        </Link>{" "}
-        · Plan less, teach more.
-      </footer>
 
       <LibraryDrawer
         open={libOpen}
