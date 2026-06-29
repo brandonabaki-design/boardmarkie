@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Check, Share2, Trash2 } from "lucide-react";
+import { X, Check, Share2, Trash2, Copy, Link2 } from "lucide-react";
 import type { Lesson } from "@/lib/types";
 import { publishLesson, unpublishLesson, getMyPublishedIds } from "@/lib/lessonsLib";
+import { lessonLink } from "@/lib/supabase";
 import { useSupabaseUser } from "@/lib/supabaseAuth";
 import { SimSignIn } from "./SimSignIn";
 import { Spinner } from "./ui";
@@ -15,6 +16,17 @@ export function ShareLessonDialog({ lesson, onClose }: { lesson: Lesson; onClose
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(lessonLink(lesson.id));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      /* clipboard blocked */
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -60,7 +72,7 @@ export function ShareLessonDialog({ lesson, onClose }: { lesson: Lesson; onClose
       <div className="relative w-full max-w-md rounded-2xl border border-line bg-white p-6 card-shadow">
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 font-display text-xl font-bold text-ink">
-            <Share2 size={20} className="text-brand-600" /> Share to library
+            <Share2 size={20} className="text-brand-600" /> Publish to library
           </h2>
           <button onClick={onClose} disabled={busy} className="text-muted hover:text-ink disabled:opacity-40">
             <X size={20} />
@@ -106,6 +118,30 @@ export function ShareLessonDialog({ lesson, onClose }: { lesson: Lesson; onClose
                 </button>
               )}
             </div>
+
+            {published && (
+              <div className="mt-4 rounded-xl border border-line bg-paper/50 p-3">
+                <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-muted">
+                  <Link2 size={13} /> Shareable presentation link
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    readOnly
+                    value={lessonLink(lesson.id)}
+                    onFocus={(e) => e.currentTarget.select()}
+                    className="min-w-0 flex-1 rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs text-muted outline-none"
+                  />
+                  <button
+                    onClick={copyLink}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-brand-300"
+                  >
+                    {copied ? <Check size={13} className="text-brand-600" /> : <Copy size={13} />}
+                    {copied ? "Copied" : "Copy link"}
+                  </button>
+                </div>
+                <p className="mt-1.5 text-[11px] text-muted">Anyone with the link can view this presentation (read-only).</p>
+              </div>
+            )}
           </>
         )}
       </div>

@@ -29,6 +29,17 @@ export function SharedLessonCard({ lesson }: { lesson: SharedLessonMeta }) {
           </span>
         )}
       </div>
+      {(lesson.standards || []).length > 0 && (
+        <div className="flex flex-wrap items-center gap-1 text-[10px] text-muted">
+          <span className="font-semibold uppercase tracking-wide">Standards:</span>
+          {(lesson.standards || []).slice(0, 2).map((s) => (
+            <span key={s} className="rounded bg-paper px-1.5 py-0.5 font-medium">
+              {s}
+            </span>
+          ))}
+          {(lesson.standards || []).length > 2 && <span>+{(lesson.standards || []).length - 2}</span>}
+        </div>
+      )}
       <div className="mt-auto flex items-center justify-between pt-1 text-xs text-muted">
         <span>{lesson.author_name || "A teacher"}</span>
         <span className="inline-flex items-center gap-1 font-semibold text-brand-700">

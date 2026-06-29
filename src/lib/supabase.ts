@@ -41,3 +41,9 @@ export function eduSimLink(id: string): string {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   return `${origin}${basePath()}/sim/?id=${encodeURIComponent(id)}`;
 }
+
+/** Shareable read-only link to a published lesson presentation (the /lesson viewer). */
+export function lessonLink(id: string): string {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  return `${origin}${basePath()}/lesson/?id=${encodeURIComponent(id)}`;
+}

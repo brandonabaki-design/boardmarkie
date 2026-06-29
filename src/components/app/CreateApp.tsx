@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { FolderOpen, Settings, Plus, ArrowLeft, AlertCircle, X, Play, FlaskConical, Share2 } from "lucide-react";
+import { FolderOpen, Settings, Plus, ArrowLeft, AlertCircle, X, Play, FlaskConical, Share2, BookOpen } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import type {
   Artifact,
@@ -664,7 +664,23 @@ export function CreateApp() {
     <div className="flex min-h-screen flex-col">
       <header className="no-print sticky top-0 z-40 border-b border-line bg-white/85 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-          <Logo />
+          <div className="flex items-center gap-3">
+            <Logo />
+            <nav className="hidden items-center gap-0.5 sm:flex">
+              <Link
+                href="/lessons/"
+                className="rounded-full px-3 py-1.5 text-sm font-semibold text-muted transition-colors hover:bg-paper hover:text-ink"
+              >
+                Shared lessons
+              </Link>
+              <Link
+                href="/sims/"
+                className="rounded-full px-3 py-1.5 text-sm font-semibold text-muted transition-colors hover:bg-paper hover:text-ink"
+              >
+                EduSim library
+              </Link>
+            </nav>
+          </div>
           <div className="flex items-center gap-2">
             {current && (
               <>
@@ -681,7 +697,7 @@ export function CreateApp() {
                       title="Publish this lesson to the shared library"
                       className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
                     >
-                      <Share2 size={16} className="text-brand-600" /> <span className="hidden sm:inline">Share</span>
+                      <Share2 size={16} className="text-brand-600" /> <span className="hidden sm:inline">Publish</span>
                     </button>
                   </>
                 )}
@@ -786,6 +802,39 @@ export function CreateApp() {
                 <p className="mt-1.5 text-[11px] text-muted">
                   Loads a ready-made lesson without using Claude credits — still searches the web for GIFs/images.
                 </p>
+              </div>
+
+              {/* Discover shared resources made by all teachers */}
+              <div className="mx-auto mt-10 max-w-2xl">
+                <p className="text-center text-[11px] font-semibold uppercase tracking-wide text-muted">
+                  Or explore shared resources
+                </p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <Link
+                    href="/lessons/"
+                    className="flex items-center gap-3 rounded-2xl border border-line bg-white p-4 text-left transition-colors hover:border-brand-300 card-shadow"
+                  >
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
+                      <BookOpen size={20} />
+                    </span>
+                    <span>
+                      <span className="block text-sm font-bold text-ink">Shared lessons</span>
+                      <span className="block text-xs text-muted">Ready-made lessons from teachers — open &amp; adapt.</span>
+                    </span>
+                  </Link>
+                  <Link
+                    href="/sims/"
+                    className="flex items-center gap-3 rounded-2xl border border-line bg-white p-4 text-left transition-colors hover:border-brand-300 card-shadow"
+                  >
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
+                      <FlaskConical size={20} />
+                    </span>
+                    <span>
+                      <span className="block text-sm font-bold text-ink">EduSim library</span>
+                      <span className="block text-xs text-muted">Interactive simulations to embed via QR.</span>
+                    </span>
+                  </Link>
+                </div>
               </div>
             </div>
             {refine && (

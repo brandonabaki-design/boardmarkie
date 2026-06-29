@@ -32,6 +32,17 @@ export function SimCard({ sim, authorName }: { sim: Simulation; authorName?: str
           </span>
         ))}
       </div>
+      {(sim.standards || []).length > 0 && (
+        <div className="flex flex-wrap items-center gap-1 text-[10px] text-muted">
+          <span className="font-semibold uppercase tracking-wide">Standards:</span>
+          {(sim.standards || []).slice(0, 2).map((s) => (
+            <span key={s} className="rounded bg-paper px-1.5 py-0.5 font-medium">
+              {s}
+            </span>
+          ))}
+          {(sim.standards || []).length > 2 && <span>+{(sim.standards || []).length - 2}</span>}
+        </div>
+      )}
       <div className="mt-auto flex items-center justify-between pt-1 text-xs text-muted">
         <span>{authorName || "A teacher"}</span>
         <span>{sim.view_count || 0} views</span>

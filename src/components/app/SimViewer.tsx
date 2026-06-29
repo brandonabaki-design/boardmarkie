@@ -124,9 +124,21 @@ export function SimViewer() {
             ))}
           </div>
           {(sim.standards || []).length > 0 && (
-            <p className="mt-2 text-xs text-muted">
-              <strong className="text-ink">Standards:</strong> {sim.standards.join(", ")}
-            </p>
+            <div className="mt-2">
+              <p className="text-xs font-semibold text-ink">Standards</p>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {sim.standards.map((s) => (
+                  <Link
+                    key={s}
+                    href={`/sims/?standard=${encodeURIComponent(s)}`}
+                    className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700 transition-colors hover:bg-brand-100"
+                  >
+                    {s}
+                  </Link>
+                ))}
+              </div>
+              <p className="mt-1 text-[11px] text-muted">Tap a standard to find more activities aligned to it.</p>
+            </div>
           )}
           <p className="mt-2 text-xs text-muted">
             By {author} · {sim.view_count} views
