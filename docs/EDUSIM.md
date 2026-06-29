@@ -60,29 +60,34 @@ Supabase project, so simulations work out of the box. To finish enabling
    `SUPABASE_URL` / `SUPABASE_ANON_KEY` (Settings → Secrets and variables →
    Actions → Variables). The anon key is not a secret (RLS enforces access).
 
-## Auth today (and the planned consolidation)
+## Single sign-on (Supabase) — Firebase retired
 
-The user-chosen end state is **one sign-in on Supabase, Firebase retired**. This
-change set delivers the full EduSim feature + shared lesson library *additively*:
+The whole app now uses **one Supabase account** (Google OAuth or email magic
+link). Firebase has been removed.
 
-- **Lesson private library + cross-device sync** still run on **Firebase**
-  (`src/lib/auth.ts`, `sync.ts`, `firebase.ts`) — untouched and working.
-- **EduSim + shared-lesson publishing/browse** run on **Supabase**
-  (`src/lib/supabaseAuth.ts`).
+- `src/lib/auth.ts` — Supabase-backed, but keeps the lesson app's existing API
+  (`AppUser` / `onAuthChange` / `getCurrentUser` / `signInWithGoogle` /
+  `signOutUser`, plus `signInWithEmail`). Shares the single `supabase` client with
+  `src/lib/supabaseAuth.ts` (the EduSim hook), so one session covers everything.
+- `src/lib/sync.ts` — per-user library sync now writes to the Supabase `lessons`
+  table (RLS: `author_id = auth.uid()`), via the same `storage.ts` hook pattern.
+  Each artifact is one row; `is_published=false` = private (your library only),
+  `true` = shared to `/lessons`. Saves omit `is_published`, so they never
+  un-publish. Live cross-device updates use Supabase Realtime (`subscribeArtifacts`).
+- `src/components/app/SyncPanel.tsx` (Settings → Sync) is now a Supabase
+  sign-in/account panel — no per-user config needed.
+- `getFirebaseConfig`/`setFirebaseConfig` remain in `storage.ts` but are unused
+  (harmless); the `firebase` npm dependency has been removed.
 
-So a teacher may sign in twice (once per backend) until consolidation. Remaining
-work to reach the single-sign-in end state:
+**Hosted ("school") mode caveat:** `backend.ts` `getIdToken()` now returns the
+Supabase access token, so if you enable hosted mode the proxy
+(`vercel-proxy/api/_auth.js`) must verify a **Supabase JWT** instead of a Firebase
+ID token. Bring-your-own-key builds (the default GitHub Pages deploy) are
+unaffected.
 
-1. Repoint the lesson app's `useAuth`/`AppUser` at `supabaseAuth` (keep the
-   `AppUser` shape so callers barely change).
-2. Move per-user lesson sync from Firestore to Supabase (a `lessons`-style
-   per-user store, or reuse the shared table with an `is_published=false` draft
-   state), replacing `sync.ts`’s Firestore calls; keep `storage.ts`’s hook
-   pattern (it’s backend-agnostic).
-3. Host shared raster images in **Supabase Storage** (today base64 raster is
-   stripped before upload, as it was before Firestore) so AI images survive
-   cross-account. Suggested: a public-read `lesson-images` bucket; upload on
-   publish and rewrite `data:` URLs to Storage URLs.
-4. Update hosted-mode token verification in `vercel-proxy/api/_auth.js` to accept
-   Supabase JWTs instead of Firebase ID tokens.
-5. Remove Firebase deps once nothing imports them.
+### Not yet done
+- **Shared raster images.** Big AI-generated `data:` images are still stripped
+  before any cloud write (doc-size + cross-account portability), so they stay on
+  the device that made them. To share them, add a public-read Supabase **Storage**
+  bucket (e.g. `lesson-images`), upload on save/publish, and rewrite `data:` URLs
+  to Storage URLs. Text, layouts, SVG diagrams and URL media already sync/share.

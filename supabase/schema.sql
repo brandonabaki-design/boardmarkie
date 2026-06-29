@@ -65,6 +65,7 @@ create table if not exists public.lessons (
   id           text primary key,
   author_id    uuid not null references auth.users(id) on delete cascade,
   author_name  text,
+  kind         text not null default 'lesson',  -- 'lesson' | 'worksheet' | 'series'
   title        text not null,
   subject      text,
   grade_level  text,
@@ -72,10 +73,16 @@ create table if not exists public.lessons (
   description  text,
   standards    text[] not null default '{}',
   data         jsonb not null,
-  is_published boolean not null default true,
+  -- Private by default (your library only); the Share button flips this to true,
+  -- which lists it in the shared /lessons catalogue. Routine saves never touch it.
+  is_published boolean not null default false,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
 );
+
+-- If the table predates the `kind` column / default change, bring it up to date.
+alter table public.lessons add column if not exists kind text not null default 'lesson';
+alter table public.lessons alter column is_published set default false;
 
 -- ---------------------------------------------------------------------------
 -- Indexes
@@ -216,3 +223,16 @@ grant select on public.profiles, public.simulations, public.ratings, public.less
 grant insert, update, delete on public.simulations, public.ratings, public.lessons to authenticated;
 grant insert, update on public.profiles to authenticated;
 grant execute on function public.increment_view(uuid) to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Realtime: stream a teacher's own lesson changes to their other devices
+-- (subscribeArtifacts in src/lib/sync.ts). Optional — sync still reconciles on
+-- sign-in without it. Wrapped so re-running the file never errors.
+-- ---------------------------------------------------------------------------
+do $$
+begin
+  alter publication supabase_realtime add table public.lessons;
+exception
+  when duplicate_object then null;  -- already in the publication
+  when undefined_object then null;  -- publication doesn't exist on this project
+end $$;

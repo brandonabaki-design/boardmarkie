@@ -12,7 +12,7 @@
 // Per-feature endpoints hang off it: /anthropic, /openai-chat, /openai-image,
 // /image, /imagesearch.
 
-import { getAuthInstance } from "./firebase";
+import { supabase } from "./supabase";
 
 const BACKEND = (process.env.NEXT_PUBLIC_BACKEND_URL || "").replace(/\/+$/, "");
 
@@ -39,12 +39,15 @@ export function backendEndpoint(name: string): string {
   return `${BACKEND}/${name}`;
 }
 
-// A fresh Firebase ID token for the signed-in user (auto-refreshes if expired).
+// A fresh Supabase access token (JWT) for the signed-in user (auto-refreshed).
 // Throws a 401 if nobody is signed in, which surfaces the sign-in wall.
+// NOTE: in hosted mode the proxy (vercel-proxy/api/_auth.js) must verify the
+// Supabase JWT instead of a Firebase ID token — see docs/EDUSIM.md.
 export async function getIdToken(): Promise<string> {
-  const user = getAuthInstance()?.currentUser;
-  if (!user) throw err("Please sign in to use Boardmarkie.", 401);
-  return user.getIdToken();
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw err("Please sign in to use Boardmarkie.", 401);
+  return token;
 }
 
 export async function authHeader(): Promise<Record<string, string>> {
