@@ -16,8 +16,8 @@ keys and requires Google sign-in, so end users never enter a key.
 | `/api/imagesearch` | Photo search (Openverse + Pixabay + Unsplash) and `kind=gif` (Giphy). |
 | `/api/youtube`, `/api/fetch-image` | Video lookup + image fetch helpers. |
 
-`api/_auth.js` is a shared helper (Firebase ID-token verification + CORS); files
-starting with `_` aren't exposed as routes.
+`api/_auth.js` is a shared helper (Supabase token verification + CORS, with a
+legacy Firebase fallback); files starting with `_` aren't exposed as routes.
 
 ## Deploy (no terminal needed)
 
@@ -41,8 +41,10 @@ from the app, and search works keyless via Openverse.
 | Variable | Required | Notes |
 | --- | --- | --- |
 | `ANTHROPIC_API_KEY` | yes | Shared Claude key (lesson generation). |
-| `FIREBASE_PROJECT_ID` | yes | e.g. `aisa-present`. **Presence of this turns auth ON** for every endpoint. |
-| `ALLOWED_EMAIL_DOMAINS` | recommended | Comma-separated, e.g. `aisa.edu,students.aisa.edu`. Blank = any Google account. |
+| `SUPABASE_URL` | yes | e.g. `https://xxxx.supabase.co`. **Presence of this turns auth ON** — the proxy validates each caller's Supabase access token via `/auth/v1/user`. |
+| `SUPABASE_ANON_KEY` | yes | The project's public anon/publishable key (sent as the `apikey` header when validating tokens). |
+| `ALLOWED_EMAIL_DOMAINS` | recommended | Comma-separated, e.g. `aisa.edu,students.aisa.edu`. Blank = any signed-in account. |
+| `FIREBASE_PROJECT_ID` | legacy | Only used if `SUPABASE_URL` is unset (old Firebase-token deployments). |
 | `OPENAI_API_KEY` | optional | Ask Boardmarkie + GPT image. |
 | `GEMINI_API_KEY` | optional | Google Imagen image generation. |
 | `PIXABAY_API_KEY` / `UNSPLASH_ACCESS_KEY` | optional | Extra photo sources (Openverse always works without a key). |
@@ -51,10 +53,14 @@ from the app, and search works keyless via Openverse.
 After setting/changing env vars, **redeploy** so they take effect. Verify with a
 browser GET, e.g. `https://<project>.vercel.app/api/anthropic` → `{"ok":true,…}`.
 
-> Security: once `FIREBASE_PROJECT_ID` is set, every request must carry a valid
-> Google sign-in token whose email matches `ALLOWED_EMAIL_DOMAINS`. This is what
-> keeps the shared keys from being used by anyone who finds the URL — set the
-> domain allow-list before sharing the app.
+> Security: once `SUPABASE_URL` is set, every request must carry a valid Supabase
+> session token whose email matches `ALLOWED_EMAIL_DOMAINS`. This is what keeps the
+> shared keys from being used by anyone who finds the URL — set the domain
+> allow-list before sharing the app.
+>
+> Migrating from Firebase auth? Add `SUPABASE_URL` + `SUPABASE_ANON_KEY` and
+> redeploy. The app now signs in with Supabase, so a proxy still set to verify
+> Firebase tokens rejects every call with `401 "Unexpected token algorithm."`
 
 ## Region
 
