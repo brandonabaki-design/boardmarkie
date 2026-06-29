@@ -242,6 +242,12 @@ export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
 
       if (el.type === "text") {
         if (!el.text.trim()) continue;
+        // Readability plate: explicit colour wins; "transparent" = none; otherwise
+        // a soft white plate on themed-background decks (mirrors the editor).
+        const plate = el.bg === "transparent" ? null : el.bg || (bg ? "#ffffff" : null);
+        const fill = plate
+          ? { color: hex(plate, "ffffff"), transparency: el.bg && el.bg !== "transparent" ? 0 : 28 }
+          : undefined;
         s.addText(mdParas(el.text, !!el.bold, !!el.italic), {
           ...box,
           fontSize: Math.max(6, Math.round((el.fontSize / 100) * 540)), // cqh → pt (7.5in = 540pt)
@@ -249,6 +255,7 @@ export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
           valign: "top",
           color: hex(el.color ?? inkColor),
           fontFace: "Arial",
+          ...(fill ? { fill } : {}),
         });
       } else if (el.type === "shape") {
         const shapeType = el.shape === "ellipse" ? "ellipse" : el.radius != null ? "roundRect" : "rect";

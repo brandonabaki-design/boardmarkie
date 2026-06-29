@@ -14,6 +14,7 @@ import {
   AlignCenter,
   AlignRight,
   ExternalLink,
+  PaintBucket,
 } from "lucide-react";
 import type { CanvasElement, TextElement } from "@/lib/types";
 import { clamp, INK, MUTED } from "@/lib/canvas";
@@ -45,6 +46,7 @@ export function SlideCanvas({
   ink = INK,
   muted = MUTED,
   displayFont = "var(--font-bricolage)",
+  textPlate,
   editable = false,
   interactive = false,
   selectedId = null,
@@ -60,6 +62,7 @@ export function SlideCanvas({
   ink?: string; // default text colour (from the deck theme)
   muted?: string; // secondary text colour (from the deck theme)
   displayFont?: string; // heading/title font family (from the deck theme)
+  textPlate?: string; // auto readability plate behind text (set on themed-background decks)
   editable?: boolean;
   interactive?: boolean; // allow iframe playback (Present mode)
   selectedId?: string | null;
@@ -244,6 +247,7 @@ export function SlideCanvas({
               ink={ink}
               muted={muted}
               displayFont={displayFont}
+              textPlate={textPlate}
               onCommitText={(t) => {
                 update(el.id, { text: t });
                 setEditingId(null);
@@ -320,6 +324,7 @@ function ElementContent({
   ink,
   muted,
   displayFont,
+  textPlate,
   onCommitText,
 }: {
   el: CanvasElement;
@@ -329,10 +334,13 @@ function ElementContent({
   ink: string;
   muted: string;
   displayFont: string;
+  textPlate?: string;
   onCommitText: (text: string) => void;
 }) {
   if (el.type === "text") {
-    return <TextBox el={el} editing={editing} onCommit={onCommitText} ink={ink} muted={muted} displayFont={displayFont} />;
+    return (
+      <TextBox el={el} editing={editing} onCommit={onCommitText} ink={ink} muted={muted} displayFont={displayFont} autoPlate={textPlate} />
+    );
   }
   if (el.type === "shape") {
     return (
@@ -452,6 +460,7 @@ function TextBox({
   ink = INK,
   muted = MUTED,
   displayFont = "var(--font-bricolage)",
+  autoPlate,
 }: {
   el: TextElement;
   editing: boolean;
@@ -459,9 +468,13 @@ function TextBox({
   ink?: string;
   muted?: string;
   displayFont?: string;
+  autoPlate?: string;
 }) {
   // Map the canvas default ink/muted to the deck theme; explicit user colours stay.
   const color = !el.color || el.color === INK ? ink : el.color === MUTED ? muted : el.color;
+  // Readability plate: explicit "transparent" = none; an explicit colour wins;
+  // otherwise fall back to the deck's auto plate (only set on themed backgrounds).
+  const plate = el.bg === "transparent" ? null : el.bg || autoPlate || null;
   const ref = useRef<HTMLDivElement>(null);
 
   // Editing → show raw text (with markdown markers); not editing → rendered bold/italic.
@@ -505,7 +518,9 @@ function TextBox({
         whiteSpace: "pre-wrap",
         wordBreak: "break-word",
         outline: "none",
-        padding: "1.2cqh 1.4cqh",
+        padding: plate ? "1.4cqh 1.8cqh" : "1.2cqh 1.4cqh",
+        background: plate ?? undefined,
+        borderRadius: plate ? "1.6cqh" : undefined,
         fontSize: `${el.fontSize}cqh`,
         lineHeight: 1.2,
         fontWeight: el.bold ? 800 : 500,
@@ -579,6 +594,7 @@ function FloatingToolbar({
             {el.align === "center" ? <AlignCenter size={15} /> : el.align === "right" ? <AlignRight size={15} /> : <AlignLeft size={15} />}
           </TBtn>
           <Swatches colors={TEXT_COLORS} value={el.color} onPick={(c) => onUpdate({ color: c })} />
+          <TextBgControl value={el.bg} onPick={(c) => onUpdate({ bg: c })} />
           <Divider />
         </>
       )}
@@ -630,6 +646,66 @@ function TBtn({
 
 function Divider() {
   return <span className="mx-0.5 h-5 w-px bg-line" />;
+}
+
+// Background plate picker for a text box: Auto (theme), None, or a colour.
+const TEXT_BG_SWATCHES = ["#ffffff", "#f3f5fa", "#16181d", "#0c8a78", "#fff7ed", "#e8f0ff"];
+function TextBgControl({ value, onPick }: { value?: string; onPick: (c: string | undefined) => void }) {
+  const [open, setOpen] = useState(false);
+  const dot =
+    value === "transparent" ? "transparent" : value || "linear-gradient(135deg,#fff 50%,#cbd5e1 50%)";
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        title="Text background"
+        aria-label="Text background"
+        onClick={() => setOpen((v) => !v)}
+        className="grid h-8 w-8 place-items-center rounded-lg hover:bg-paper"
+      >
+        <PaintBucket size={15} />
+        <span className="absolute bottom-1 right-1 h-2 w-2 rounded-full border border-line" style={{ background: dot }} />
+      </button>
+      {open && (
+        <div className="absolute left-1/2 top-full z-[1002] mt-1 w-44 -translate-x-1/2 rounded-xl border border-line bg-white p-2 card-shadow">
+          <button
+            type="button"
+            onClick={() => {
+              onPick(undefined);
+              setOpen(false);
+            }}
+            className="mb-1 w-full rounded-lg px-2 py-1 text-left text-xs font-semibold text-ink hover:bg-paper"
+          >
+            Auto (match theme)
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onPick("transparent");
+              setOpen(false);
+            }}
+            className="mb-1.5 w-full rounded-lg px-2 py-1 text-left text-xs font-semibold text-ink hover:bg-paper"
+          >
+            None
+          </button>
+          <div className="flex flex-wrap gap-1">
+            {TEXT_BG_SWATCHES.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => {
+                  onPick(c);
+                  setOpen(false);
+                }}
+                className="h-6 w-6 rounded-md border border-line"
+                style={{ background: c }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Swatches({ colors, value, onPick }: { colors: string[]; value?: string; onPick: (c: string) => void }) {

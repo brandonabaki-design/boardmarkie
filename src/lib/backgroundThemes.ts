@@ -78,6 +78,10 @@ export interface DeckRender {
   muted: string;
   displayFont: string;
   logoUrl?: string; // AISA watermark overlay (only when no subject background)
+  // Subtle readability plate auto-applied behind text when a subject background
+  // image is shown (so the busy artwork never hurts legibility). Undefined when
+  // there's no background image — plain decks stay clean unless a box opts in.
+  textPlate?: string;
 }
 
 /** Combined render props for a slide: the colour deck theme, with the subject
@@ -93,5 +97,8 @@ export function deckRender(lesson: BgLesson, slide: Slide, theme: Theme): DeckRe
     muted: bg?.muted ?? theme.muted,
     displayFont: theme.displayFont,
     logoUrl: bg ? undefined : theme.dark ? AISA_LOGO_WHITE : AISA_LOGO_BLUE,
+    // Subject backgrounds use dark ink on light artwork, so a soft white plate
+    // keeps text crisp. (No plate when there's no background image.)
+    textPlate: bg ? "rgba(255,255,255,0.68)" : undefined,
   };
 }

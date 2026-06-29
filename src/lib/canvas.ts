@@ -43,6 +43,7 @@ export function textElement(p: Partial<TextElement> & Pick<TextElement, "x" | "y
     align: p.align ?? "left",
     color: p.color ?? INK,
     font: p.font ?? "body",
+    bg: p.bg,
     x: p.x,
     y: p.y,
     w: p.w,

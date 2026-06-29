@@ -92,6 +92,10 @@ export interface TextElement extends CanvasElementBase {
   align?: "left" | "center" | "right";
   color?: string; // hex
   font?: "display" | "body";
+  // Background plate behind the text for readability. A hex colour, or
+  // "transparent" for an explicit none. Undefined = auto: a subtle plate is shown
+  // only when a subject background theme is active (so themes never hurt reading).
+  bg?: string;
 }
 
 export interface ImageElement extends CanvasElementBase {
