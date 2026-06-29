@@ -117,6 +117,7 @@ export function CreateApp() {
   const [authReady, setAuthReady] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
   const [imageProgress, setImageProgress] = useState<{ done: number; total: number } | null>(null);
   const [past, setPast] = useState<Lesson[]>([]);
   const [future, setFuture] = useState<Lesson[]>([]);
@@ -761,6 +762,7 @@ export function CreateApp() {
                 canRedo={future.length > 0}
                 onPresent={() => setPresenting(true)}
                 onPublish={() => setShareOpen(true)}
+                onAsk={() => setAskOpen(true)}
               />
             )}
             {current.kind === "worksheet" && <WorksheetView worksheet={current} />}
@@ -879,6 +881,10 @@ export function CreateApp() {
         onEdit={askEdit}
         onArrange={askArrange}
         onOpenSettings={() => openSettings("openai")}
+        open={askOpen}
+        onOpenChange={setAskOpen}
+        // Lessons trigger Ask from the deck bar button; other views keep the float.
+        showLauncher={current?.kind !== "lesson"}
       />
 
       {presenting && current && current.kind === "lesson" && (

@@ -28,6 +28,7 @@ import {
   QrCode,
   Play,
   Share2,
+  MessageCircle,
 } from "lucide-react";
 import type { CanvasElement, EditAction, Lesson, Slide } from "@/lib/types";
 import {
@@ -66,6 +67,7 @@ export function CanvasEditor({
   canRedo,
   onPresent,
   onPublish,
+  onAsk,
 }: {
   lesson: Lesson;
   busy: boolean;
@@ -77,6 +79,7 @@ export function CanvasEditor({
   canRedo: boolean;
   onPresent: () => void;
   onPublish: () => void;
+  onAsk: () => void;
 }) {
   const [idx, setIdx] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -191,8 +194,9 @@ export function CanvasEditor({
     goTo(Math.max(0, safeIdx - 1));
   };
 
-  // Rebuild the layout from the slide's content (auto-fit + columns); no AI call.
-  const autoArrange = () => writeSlide({ elements: slideToElements(slide) });
+  // Reset this slide's layout: rebuild positions from its content (auto-fit +
+  // columns), discarding manual drags. Instant, no AI call.
+  const resetLayout = () => writeSlide({ elements: slideToElements(slide) });
 
   const moveSlide = (dir: -1 | 1) => {
     const j = safeIdx + dir;
@@ -411,7 +415,7 @@ export function CanvasEditor({
             />
           </div>
 
-          <div className="no-print mt-2 flex flex-wrap items-center gap-1.5">
+          <div className="no-print sticky bottom-3 z-30 mt-3 flex flex-wrap items-center gap-1.5 rounded-2xl border border-line bg-white/90 px-3 py-2 backdrop-blur card-shadow">
             <IconBtn title="Undo (⌘Z)" disabled={!canUndo} onClick={onUndo}>
               <Undo2 size={16} />
             </IconBtn>
@@ -439,7 +443,7 @@ export function CanvasEditor({
               <Trash2 size={15} />
             </IconBtn>
             <span className="mx-1 h-5 w-px bg-line" />
-            <IconBtn title="Auto-arrange (reset layout from content)" onClick={autoArrange}>
+            <IconBtn title="Reset layout — re-tidy this slide from its content (clears manual moves)" onClick={resetLayout}>
               <LayoutGrid size={15} />
             </IconBtn>
             <span className="mx-1 h-5 w-px bg-line" />
@@ -478,6 +482,13 @@ export function CanvasEditor({
             </label>
 
             <div className="ml-auto flex flex-wrap items-center gap-1.5">
+              <button
+                onClick={onAsk}
+                title="Ask Boardmarkie — your teaching assistant"
+                className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-brand-300"
+              >
+                <MessageCircle size={14} className="text-brand-600" /> Ask
+              </button>
               <div className="relative">
                 <button
                   onClick={() => setImproveOpen((v) => !v)}

@@ -117,6 +117,9 @@ export function AskBoardmarkie({
   onEdit,
   onArrange,
   onOpenSettings,
+  open: openProp,
+  onOpenChange,
+  showLauncher = true,
 }: {
   context?: AskContext;
   editKind?: EditKind;
@@ -124,8 +127,17 @@ export function AskBoardmarkie({
   onEdit?: (instruction: string, slideNumber?: number) => Promise<string>;
   onArrange?: (op: string, slideNumber: number, toPosition?: number) => Promise<string>;
   onOpenSettings: () => void;
+  // Optionally control open state externally (e.g. from a button in the deck bar).
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  showLauncher?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = openProp !== undefined ? openProp : internalOpen;
+  const setOpen = (v: boolean) => {
+    onOpenChange?.(v);
+    if (openProp === undefined) setInternalOpen(v);
+  };
   const [msgs, setMsgs] = useState<UiMsg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -221,15 +233,17 @@ export function AskBoardmarkie({
 
   return (
     <>
-      {/* launcher */}
-      <button
-        onClick={() => setOpen((o) => !o)}
-        aria-label="Ask Boardmarkie"
-        title="Ask Boardmarkie"
-        className="no-print fixed bottom-5 right-5 z-40 grid h-14 w-14 place-items-center rounded-full bg-brand-600 text-white shadow-lg transition-transform hover:scale-105 hover:bg-brand-700 active:scale-95"
-      >
-        {open ? <X size={22} /> : <MessageCircle size={22} />}
-      </button>
+      {/* launcher (hidden when an external trigger drives it, e.g. the deck bar) */}
+      {showLauncher && (
+        <button
+          onClick={() => setOpen(!open)}
+          aria-label="Ask Boardmarkie"
+          title="Ask Boardmarkie"
+          className="no-print fixed bottom-5 right-5 z-40 grid h-14 w-14 place-items-center rounded-full bg-brand-600 text-white shadow-lg transition-transform hover:scale-105 hover:bg-brand-700 active:scale-95"
+        >
+          {open ? <X size={22} /> : <MessageCircle size={22} />}
+        </button>
+      )}
 
       {open && (
         <div
