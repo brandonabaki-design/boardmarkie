@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Pencil, Trash2, ExternalLink } from "lucide-react";
+import { Plus, Pencil, Trash2, ExternalLink } from "lucide-react";
 import { getMySimulations, deleteSimulation, type Simulation } from "@/lib/sims";
 import { useSupabaseUser } from "@/lib/supabaseAuth";
+import { AppHeader } from "./AppHeader";
 import { Stars } from "./Stars";
 import { SimSignIn } from "./SimSignIn";
 
@@ -39,20 +40,17 @@ export function MySims() {
 
   return (
     <div className="min-h-[100dvh] bg-paper">
-      <header className="flex items-center gap-3 border-b border-line bg-white px-4 py-3">
-        <Link href="/sims/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted hover:text-ink">
-          <ArrowLeft size={16} /> Library
-        </Link>
-        <span className="font-display text-lg font-extrabold tracking-tight text-ink">My simulations</span>
+      <AppHeader>
         <Link
           href="/sims/new/"
-          className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+          className="inline-flex items-center gap-1.5 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
         >
-          <Plus size={16} /> New
+          <Plus size={16} /> <span className="hidden sm:inline">New simulation</span>
         </Link>
-      </header>
+      </AppHeader>
 
       <div className="mx-auto max-w-4xl px-4 py-6">
+        <h1 className="mb-4 font-display text-2xl font-extrabold tracking-tight text-ink">My simulations</h1>
         {!authLoading && !user ? (
           <SimSignIn heading="Sign in to see your simulations" />
         ) : loading ? (

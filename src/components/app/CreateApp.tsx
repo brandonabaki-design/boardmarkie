@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { FolderOpen, Settings, Plus, ArrowLeft, AlertCircle, X, FlaskConical, BookOpen } from "lucide-react";
-import { Logo } from "@/components/Logo";
 import type {
   Artifact,
   EditAction,
@@ -32,10 +31,10 @@ import {
   saveArtifact,
   LIBRARY_EVENT,
 } from "@/lib/storage";
-import { onAuthChange, signInWithGoogle, signOutUser, type AppUser } from "@/lib/auth";
+import { onAuthChange, signOutUser, type AppUser } from "@/lib/auth";
 import { isHostedMode, emailAllowed } from "@/lib/backend";
 import { installSyncHooks, removeSyncHooks, subscribeArtifacts, syncOnce } from "@/lib/sync";
-import { AccountButton } from "./AccountButton";
+import { AppHeader } from "./AppHeader";
 import { SignInWall } from "./SignInWall";
 import { GeneratorForm } from "./GeneratorForm";
 import { GeneratingState } from "./GeneratingState";
@@ -193,14 +192,6 @@ export function CreateApp() {
   const openSettings = (t: SettingsTab = "claude") => {
     setSettingsTab(t);
     setSettingsOpen(true);
-  };
-
-  const handleSignIn = async () => {
-    try {
-      await signInWithGoogle();
-    } catch (err) {
-      handleError(err);
-    }
   };
 
   const handleError = (err: unknown) => {
@@ -663,66 +654,38 @@ export function CreateApp() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="no-print sticky top-0 z-40 border-b border-line bg-white/85 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-          <div className="flex items-center gap-3">
-            <Logo />
-            <nav className="hidden items-center gap-0.5 sm:flex">
-              <Link
-                href="/lessons/"
-                className="rounded-full px-3 py-1.5 text-sm font-semibold text-muted transition-colors hover:bg-paper hover:text-ink"
-              >
-                Shared lessons
-              </Link>
-              <Link
-                href="/sims/"
-                className="rounded-full px-3 py-1.5 text-sm font-semibold text-muted transition-colors hover:bg-paper hover:text-ink"
-              >
-                EduSim library
-              </Link>
-            </nav>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Worksheets/series have no bottom workspace bar, so their document
-                actions stay here. Lessons get Present/Publish/Export in the bottom
-                deck bar (CanvasEditor) — keeping the site header free of per-deck
-                actions so it clearly reads as app navigation. */}
-            {current && current.kind !== "lesson" && (
-              <>
-                <ExportMenu artifact={current} />
-                <button
-                  onClick={startNew}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
-                >
-                  <Plus size={16} /> <span className="hidden sm:inline">New</span>
-                </button>
-              </>
-            )}
-            <AccountButton
-              user={user}
-              configured
-              onSignIn={handleSignIn}
-              onOpenSync={() => openSettings("sync")}
-            />
+      <AppHeader>
+        {/* Worksheets/series have no bottom workspace bar, so their document
+            actions stay here. Lessons get Present/Publish/Export in the bottom
+            deck bar (CanvasEditor). Library + Settings are this page's tools. */}
+        {current && current.kind !== "lesson" && (
+          <>
+            <ExportMenu artifact={current} />
             <button
-              onClick={() => setLibOpen(true)}
-              className="grid h-10 w-10 place-items-center rounded-full border border-line bg-white text-ink transition-colors hover:border-brand-300"
-              aria-label="Library"
-              title="My library"
+              onClick={startNew}
+              className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
             >
-              <FolderOpen size={18} />
+              <Plus size={16} /> <span className="hidden sm:inline">New</span>
             </button>
-            <button
-              onClick={() => openSettings("claude")}
-              className="grid h-10 w-10 place-items-center rounded-full border border-line bg-white text-ink transition-colors hover:border-brand-300"
-              aria-label="Settings"
-              title="Settings"
-            >
-              <Settings size={18} />
-            </button>
-          </div>
-        </div>
-      </header>
+          </>
+        )}
+        <button
+          onClick={() => setLibOpen(true)}
+          className="grid h-10 w-10 place-items-center rounded-full border border-line bg-white text-ink transition-colors hover:border-brand-300"
+          aria-label="Library"
+          title="My library"
+        >
+          <FolderOpen size={18} />
+        </button>
+        <button
+          onClick={() => openSettings("claude")}
+          className="grid h-10 w-10 place-items-center rounded-full border border-line bg-white text-ink transition-colors hover:border-brand-300"
+          aria-label="Settings"
+          title="Settings"
+        >
+          <Settings size={18} />
+        </button>
+      </AppHeader>
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
         {error && (

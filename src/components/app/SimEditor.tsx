@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Sparkles, Wand2 } from "lucide-react";
+import { Sparkles, Wand2 } from "lucide-react";
 import { GRADE_LEVELS, SUBJECTS } from "@/lib/taxonomy";
 import { createSimulation, getSimulation, updateSimulation } from "@/lib/sims";
 import { extractSimMetadata } from "@/lib/client";
 import { useSupabaseUser } from "@/lib/supabaseAuth";
+import { AppHeader } from "./AppHeader";
 import { SandboxedHtml } from "./SandboxedHtml";
 import { TagInput } from "./TagInput";
 import { SimSignIn } from "./SimSignIn";
@@ -152,7 +152,7 @@ export function SimEditor() {
   if (!authLoading && !user) {
     return (
       <div className="min-h-[100dvh] bg-paper">
-        <Header />
+        <AppHeader />
         <div className="mx-auto max-w-6xl px-4 py-12">
           <SimSignIn />
         </div>
@@ -166,7 +166,7 @@ export function SimEditor() {
 
   return (
     <div className="min-h-[100dvh] bg-paper">
-      <Header />
+      <AppHeader />
       <div className="mx-auto max-w-6xl px-4 py-6">
         <h1 className="mb-1 font-display text-2xl font-extrabold tracking-tight text-ink">
           {editing ? "Edit simulation" : "New simulation"}
@@ -302,13 +302,3 @@ export function SimEditor() {
   );
 }
 
-function Header() {
-  return (
-    <header className="flex items-center gap-3 border-b border-line bg-white px-4 py-3">
-      <Link href="/sims/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted hover:text-ink">
-        <ArrowLeft size={16} /> Library
-      </Link>
-      <span className="font-display text-lg font-extrabold tracking-tight text-ink">EduSim</span>
-    </header>
-  );
-}

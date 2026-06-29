@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, ArrowLeft, Search, ClipboardCheck, X } from "lucide-react";
+import { Plus, Search, ClipboardCheck, X } from "lucide-react";
 import { listSimulations, getAuthorNames, type Simulation, type SimFilters } from "@/lib/sims";
 import { GRADE_LEVELS, SUBJECTS } from "@/lib/taxonomy";
 import { SimCard } from "@/components/app/SimCard";
+import { AppHeader } from "@/components/app/AppHeader";
 import { Select } from "@/components/app/ui";
 
 export default function SimsLibraryPage() {
@@ -53,18 +54,14 @@ export default function SimsLibraryPage() {
 
   return (
     <div className="min-h-[100dvh] bg-paper">
-      <header className="flex items-center gap-3 border-b border-line bg-white px-4 py-3">
-        <Link href="/create/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted hover:text-ink">
-          <ArrowLeft size={16} /> Lessons
-        </Link>
-        <span className="font-display text-lg font-extrabold tracking-tight text-ink">EduSim Library</span>
+      <AppHeader>
         <Link
           href="/sims/new/"
-          className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
+          className="inline-flex items-center gap-1.5 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
         >
-          <Plus size={16} /> Add a simulation
+          <Plus size={16} /> <span className="hidden sm:inline">Add a simulation</span>
         </Link>
-      </header>
+      </AppHeader>
 
       <div className="mx-auto max-w-6xl px-4 py-6">
         <div className="mb-5 rounded-2xl border border-line bg-white p-5 card-shadow">

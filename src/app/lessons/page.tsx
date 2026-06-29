@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Search, FlaskConical, ClipboardCheck, X } from "lucide-react";
+import { Plus, Search, ClipboardCheck, X } from "lucide-react";
 import { listSharedLessons, type SharedLessonMeta, type SharedLessonFilters } from "@/lib/lessonsLib";
 import { GRADE_LEVELS, SUBJECTS } from "@/lib/taxonomy";
 import { SharedLessonCard } from "@/components/app/SharedLessonCard";
+import { AppHeader } from "@/components/app/AppHeader";
 import { Select } from "@/components/app/ui";
 
 export default function SharedLessonsPage() {
@@ -45,18 +46,14 @@ export default function SharedLessonsPage() {
 
   return (
     <div className="min-h-[100dvh] bg-paper">
-      <header className="flex items-center gap-3 border-b border-line bg-white px-4 py-3">
-        <Link href="/create/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted hover:text-ink">
-          <ArrowLeft size={16} /> Create
-        </Link>
-        <span className="font-display text-lg font-extrabold tracking-tight text-ink">Shared lessons</span>
+      <AppHeader>
         <Link
-          href="/sims/"
-          className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
+          href="/create/"
+          className="inline-flex items-center gap-1.5 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
         >
-          <FlaskConical size={16} className="text-brand-600" /> EduSim library
+          <Plus size={16} /> <span className="hidden sm:inline">New lesson</span>
         </Link>
-      </header>
+      </AppHeader>
 
       <div className="mx-auto max-w-6xl px-4 py-6">
         <div className="mb-5 rounded-2xl border border-line bg-white p-5 card-shadow">
