@@ -41,10 +41,15 @@ from the app, and search works keyless via Openverse.
 | Variable | Required | Notes |
 | --- | --- | --- |
 | `ANTHROPIC_API_KEY` | yes | Shared Claude key (lesson generation). |
-| `SUPABASE_URL` | yes | e.g. `https://xxxx.supabase.co`. **Presence of this turns auth ON** — the proxy validates each caller's Supabase access token via `/auth/v1/user`. |
-| `SUPABASE_ANON_KEY` | yes | The project's public anon/publishable key (sent as the `apikey` header when validating tokens). |
+| `FIREBASE_PROJECT_ID` **or** `SUPABASE_URL` | yes | **Either one turns auth ON** for every endpoint. Existing deployments already have `FIREBASE_PROJECT_ID` — that's enough; you don't have to change it. |
+| `SUPABASE_URL` | optional | Defaults to the committed project URL. Set only to point at a different Supabase project. |
+| `SUPABASE_ANON_KEY` | optional | Defaults to the committed public anon key. Set only with a custom `SUPABASE_URL`. |
 | `ALLOWED_EMAIL_DOMAINS` | recommended | Comma-separated, e.g. `aisa.edu,students.aisa.edu`. Blank = any signed-in account. |
-| `FIREBASE_PROJECT_ID` | legacy | Only used if `SUPABASE_URL` is unset (old Firebase-token deployments). |
+
+> Token verification always uses Supabase now (the app's single sign-on). The
+> Supabase URL + anon key are public and baked in, so **upgrading is just a code
+> redeploy — no env changes**. `FIREBASE_PROJECT_ID` is kept only as an "auth ON"
+> switch; keep at least one of it / `SUPABASE_URL` set so the keys aren't left open.
 | `OPENAI_API_KEY` | optional | Ask Boardmarkie + GPT image. |
 | `GEMINI_API_KEY` | optional | Google Imagen image generation. |
 | `PIXABAY_API_KEY` / `UNSPLASH_ACCESS_KEY` | optional | Extra photo sources (Openverse always works without a key). |
@@ -53,14 +58,15 @@ from the app, and search works keyless via Openverse.
 After setting/changing env vars, **redeploy** so they take effect. Verify with a
 browser GET, e.g. `https://<project>.vercel.app/api/anthropic` → `{"ok":true,…}`.
 
-> Security: once `SUPABASE_URL` is set, every request must carry a valid Supabase
-> session token whose email matches `ALLOWED_EMAIL_DOMAINS`. This is what keeps the
-> shared keys from being used by anyone who finds the URL — set the domain
-> allow-list before sharing the app.
+> Security: while auth is ON, every request must carry a valid Supabase session
+> token whose email matches `ALLOWED_EMAIL_DOMAINS`. This is what keeps the shared
+> keys from being used by anyone who finds the URL — set the domain allow-list
+> before sharing the app.
 >
-> Migrating from Firebase auth? Add `SUPABASE_URL` + `SUPABASE_ANON_KEY` and
-> redeploy. The app now signs in with Supabase, so a proxy still set to verify
-> Firebase tokens rejects every call with `401 "Unexpected token algorithm."`
+> Migrating from Firebase auth? Just **redeploy** this proxy — token verification
+> now uses Supabase (public URL/key baked in), no env changes needed. An OLD proxy
+> build still verifying Firebase rejects every call with `401 "Unexpected token
+> algorithm."`, so confirm the latest commit is the live deployment.
 
 ## Region
 
