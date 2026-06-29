@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { LogIn, Cloud } from "lucide-react";
 import { Logo } from "@/components/Logo";
-import { signInWithGoogle, signOutUser } from "@/lib/auth";
-import { allowedDomains, emailAllowed } from "@/lib/backend";
+import { signInWithGoogle } from "@/lib/auth";
+import { allowedDomains } from "@/lib/backend";
 import { Spinner } from "./ui";
 
 // Full-screen gate shown in hosted ("school") mode until a permitted account is
@@ -19,19 +19,11 @@ export function SignInWall() {
     setError(null);
     setBusy(true);
     try {
-      const user = await signInWithGoogle();
-      if (!emailAllowed(user.email)) {
-        await signOutUser();
-        setError(
-          domainHint
-            ? `Please use your ${domainHint} account — ${user.email} isn't permitted.`
-            : "That account isn't permitted to use this app.",
-        );
-      }
-      // On success the onAuthChange listener in CreateApp swaps in the app.
+      // Full-page OAuth redirect. On return, CreateApp's onAuthChange swaps in the
+      // app (and signs out + warns if the email domain isn't permitted).
+      await signInWithGoogle();
     } catch (e) {
       setError((e as Error).message);
-    } finally {
       setBusy(false);
     }
   };

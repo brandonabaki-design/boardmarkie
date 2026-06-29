@@ -33,7 +33,6 @@ import {
   LIBRARY_EVENT,
 } from "@/lib/storage";
 import { onAuthChange, signInWithGoogle, signOutUser, type AppUser } from "@/lib/auth";
-import { firebaseConfigured } from "@/lib/firebase";
 import { isHostedMode, emailAllowed } from "@/lib/backend";
 import { installSyncHooks, removeSyncHooks, subscribeArtifacts, syncOnce } from "@/lib/sync";
 import { AccountButton } from "./AccountButton";
@@ -720,7 +719,7 @@ export function CreateApp() {
             </Link>
             <AccountButton
               user={user}
-              configured={firebaseConfigured()}
+              configured
               onSignIn={handleSignIn}
               onOpenSync={() => openSettings("sync")}
             />

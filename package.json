@@ -13,7 +13,6 @@
     "@supabase/supabase-js": "^2.108.2",
     "docx": "^9.7.1",
     "fflate": "^0.8.3",
-    "firebase": "^12.15.0",
     "lucide-react": "^1.21.0",
     "next": "16.2.9",
     "pptxgenjs": "^4.0.1",

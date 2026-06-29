@@ -1,23 +1,17 @@
 "use client";
 
-// Cross-device sync of the library to Firestore, scoped per signed-in user at
-// `users/{uid}/artifacts/{id}`. Firestore security rules enforce that a user can
-// only touch their own subtree (see Settings → Sync for the rules text).
+// Cross-device sync of the per-user library to Supabase (`lessons` table), scoped
+// to the signed-in user via RLS (author_id = auth.uid()). Each artifact is one
+// row: `data` holds the full artifact JSON, plus denormalised metadata columns.
+// is_published distinguishes a private row (your library only) from one shared to
+// the /lessons catalogue — so sync writes deliberately OMIT is_published, never
+// un-publishing a lesson on a routine save.
 //
 // Flow: on sign-in, CreateApp installs the storage hooks (so every save/delete
 // mirrors to the cloud), runs syncOnce() to reconcile both sides, then subscribes
 // for live updates from other devices.
 
-import {
-  collection,
-  doc,
-  getDocs,
-  setDoc,
-  deleteDoc,
-  onSnapshot,
-  type Firestore,
-} from "firebase/firestore";
-import { getDb } from "./firebase";
+import { supabase } from "./supabase";
 import { getCurrentUser } from "./auth";
 import {
   getLibrary,
@@ -28,23 +22,32 @@ import {
 } from "./storage";
 import type { Artifact } from "./types";
 
-function artifactsCol(db: Firestore, uid: string) {
-  return collection(db, "users", uid, "artifacts");
-}
-function artifactDoc(db: Firestore, uid: string, id: string) {
-  return doc(db, "users", uid, "artifacts", id);
-}
-
 // Effective edit time for last-write-wins conflict resolution.
 function stamp(a: Artifact): number {
   return a.updatedAt ?? a.createdAt ?? 0;
 }
 
-// A single Firestore doc caps at ~1MB, so heavy base64 images can't be stored.
-// Text, layout, SVG diagrams, and URL-based media (web search / GIF / YouTube)
-// all sync fine; AI-generated raster images are dropped from the cloud copy.
-function forCloud(a: Artifact): Record<string, unknown> {
-  return stripHeavyImages([a])[0] as unknown as Record<string, unknown>;
+// Build the row for an artifact. Heavy base64 images are stripped (kept small +
+// portable across accounts); text/layout/SVG/URL media all sync. is_published is
+// intentionally omitted so a save preserves a row's published state.
+function rowFor(a: Artifact, uid: string, name: string): Record<string, unknown> {
+  const stripped = stripHeavyImages([a])[0] as Artifact;
+  const m = a.meta as unknown as Record<string, unknown>;
+  const str = (v: unknown) => (typeof v === "string" && v ? v : null);
+  return {
+    id: a.id,
+    author_id: uid,
+    author_name: name,
+    kind: a.kind,
+    title: str(m.title) ?? "Untitled",
+    subject: str(m.subject),
+    grade_level: str(m.yearGroup),
+    topic: str(m.topic),
+    description: str(m.summary),
+    standards: Array.isArray(m.standards) ? (m.standards as string[]) : [],
+    data: stripped,
+    updated_at: new Date().toISOString(),
+  };
 }
 
 function isArtifact(a: unknown): a is Artifact {
@@ -78,9 +81,7 @@ function restoreImages(incoming: Artifact, local: Artifact | undefined): Artifac
   };
 }
 
-// Apply a remote doc to local storage if it's strictly newer (guards against
-// overwriting local images with a stripped copy and against echoing our own
-// pushes). Returns whether anything changed.
+// Apply a remote artifact to local storage if it's strictly newer.
 function applyRemote(remote: Artifact): boolean {
   const local = getLibrary().find((a) => a.id === remote.id);
   if (local && stamp(local) >= stamp(remote)) return false;
@@ -95,43 +96,49 @@ const pushTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 // Debounced so rapid edits / drag-saves coalesce into one write per artifact.
 export function pushArtifact(a: Artifact): void {
   const user = getCurrentUser();
-  const db = getDb();
-  if (!user || !db) return;
+  if (!user) return;
   const id = a.id;
   if (pushTimers[id]) clearTimeout(pushTimers[id]);
   pushTimers[id] = setTimeout(() => {
     delete pushTimers[id];
-    void setDoc(artifactDoc(db, user.uid, id), forCloud(a)).catch((e) =>
-      console.warn("[sync] push failed", e),
-    );
+    void supabase
+      .from("lessons")
+      .upsert(rowFor(a, user.uid, user.name), { onConflict: "id" })
+      .then(({ error }) => {
+        if (error) console.warn("[sync] push failed", error.message);
+      });
   }, 700);
 }
 
 export function deleteRemoteArtifact(id: string): void {
   const user = getCurrentUser();
-  const db = getDb();
-  if (!user || !db) return;
+  if (!user) return;
   if (pushTimers[id]) {
     clearTimeout(pushTimers[id]);
     delete pushTimers[id];
   }
-  void deleteDoc(artifactDoc(db, user.uid, id)).catch((e) => console.warn("[sync] delete failed", e));
+  void supabase
+    .from("lessons")
+    .delete()
+    .eq("id", id)
+    .then(({ error }) => {
+      if (error) console.warn("[sync] delete failed", error.message);
+    });
 }
 
 export async function pullAllArtifacts(): Promise<Artifact[]> {
   const user = getCurrentUser();
-  const db = getDb();
-  if (!user || !db) return [];
-  const snap = await getDocs(artifactsCol(db, user.uid));
-  return snap.docs.map((d) => d.data()).filter(isArtifact);
+  if (!user) return [];
+  const { data, error } = await supabase.from("lessons").select("data").eq("author_id", user.uid);
+  if (error) return [];
+  return ((data ?? []) as unknown as { data: Artifact }[]).map((r) => r.data).filter(isArtifact);
 }
 
 // Two-way reconcile on sign-in: pull the cloud, push anything newer/local-only,
 // pull down anything newer/remote-only. Newest (updatedAt||createdAt) wins.
 export async function syncOnce(): Promise<void> {
   const user = getCurrentUser();
-  const db = getDb();
-  if (!user || !db) return;
+  if (!user) return;
   const remote = await pullAllArtifacts();
   const remoteById = new Map(remote.map((a) => [a.id, a]));
   const local = getLibrary();
@@ -141,42 +148,49 @@ export async function syncOnce(): Promise<void> {
     const l = localById.get(r.id);
     if (!l || stamp(r) > stamp(l)) putArtifactLocal(restoreImages(r, l));
   }
-  for (const l of local) {
-    const r = remoteById.get(l.id);
-    if (!r || stamp(l) > stamp(r)) {
-      void setDoc(artifactDoc(db, user.uid, l.id), forCloud(l)).catch((e) =>
-        console.warn("[sync] initial push failed", e),
-      );
-    }
+  const upserts = local
+    .filter((l) => {
+      const r = remoteById.get(l.id);
+      return !r || stamp(l) > stamp(r);
+    })
+    .map((l) => rowFor(l, user.uid, user.name));
+  if (upserts.length) {
+    const { error } = await supabase.from("lessons").upsert(upserts, { onConflict: "id" });
+    if (error) console.warn("[sync] initial push failed", error.message);
   }
 }
 
-// Live updates from other devices. Mirrors remote changes into local storage and
-// calls onChange() so the UI refreshes.
+// Live updates from other devices via Supabase Realtime (requires the table to be
+// in the supabase_realtime publication — see supabase/schema.sql). Mirrors remote
+// changes into local storage and calls onChange() so the UI refreshes. No-ops
+// gracefully if realtime isn't enabled.
 export function subscribeArtifacts(onChange: () => void): () => void {
   const user = getCurrentUser();
-  const db = getDb();
-  if (!user || !db) return () => {};
-  return onSnapshot(
-    artifactsCol(db, user.uid),
-    (snap) => {
-      let changed = false;
-      snap.docChanges().forEach((ch) => {
-        if (ch.type === "removed") {
-          const id = ch.doc.id;
-          if (getLibrary().some((a) => a.id === id)) {
+  if (!user) return () => {};
+  const channel = supabase
+    .channel(`lessons:${user.uid}`)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "lessons", filter: `author_id=eq.${user.uid}` },
+      (payload: { eventType: string; new?: Record<string, unknown>; old?: Record<string, unknown> }) => {
+        let changed = false;
+        if (payload.eventType === "DELETE") {
+          const id = (payload.old?.id as string) || "";
+          if (id && getLibrary().some((a) => a.id === id)) {
             removeArtifactLocal(id);
             changed = true;
           }
         } else {
-          const remote = ch.doc.data();
+          const remote = payload.new?.data;
           if (isArtifact(remote) && applyRemote(remote)) changed = true;
         }
-      });
-      if (changed) onChange();
-    },
-    (e) => console.warn("[sync] snapshot error", e),
-  );
+        if (changed) onChange();
+      },
+    )
+    .subscribe();
+  return () => {
+    void supabase.removeChannel(channel);
+  };
 }
 
 export function installSyncHooks(): void {

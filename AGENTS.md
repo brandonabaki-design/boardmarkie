@@ -23,7 +23,12 @@ React 19, TypeScript, Tailwind v4, Anthropic Claude.
   the landing page is `/`.
 - Saved work + the API key live in browser localStorage (`src/lib/storage.ts`).
 
-## Cross-device sync (Firebase) — optional, keeps the app static
+## Cross-device sync — now on Supabase (this section describes the old Firebase setup, retired)
+> SUPERSEDED: auth + per-user sync moved to Supabase (single sign-on). See the
+> "EduSim + shared libraries" and "Single sign-on" notes below and docs/EDUSIM.md.
+> The Firebase description below is kept for historical context only.
+
+## Cross-device sync (Firebase, retired) — optional, keeps the app static
 - Google sign-in + cross-device library sync run entirely client-side against the
   user's **own Firebase project** (a managed backend), so `output: "export"` stays.
   Nothing here runs at import time; all init is lazy + browser-guarded so the SSG
@@ -84,9 +89,12 @@ React 19, TypeScript, Tailwind v4, Anthropic Claude.
   no extra code. The lesson **EduSim** button (copy JSON → Gemini → paste →
   auto-create sim → QR slide) and **Share** button (publish lesson) live in
   `CreateApp`.
-- **Additive**: Firebase auth + per-user lesson sync are unchanged; Supabase
-  powers EduSim + shared-lesson publishing. The planned single-sign-in (retire
-  Firebase) is scoped in `docs/EDUSIM.md`.
+- **Single sign-on**: the whole app now signs in with ONE Supabase account
+  (Google + magic link). `src/lib/auth.ts` is Supabase-backed (keeps the old
+  `AppUser`/`onAuthChange`/`getCurrentUser` API), `src/lib/sync.ts` syncs the
+  per-user library to the Supabase `lessons` table, and Firebase has been removed.
+  Hosted mode now sends a Supabase JWT (proxy must verify it). Sharing big raster
+  images via Supabase Storage is the one remaining follow-up — see `docs/EDUSIM.md`.
 
 ## Build & deploy
 - Static export (`output: "export"` in `next.config.ts`); `basePath`/`assetPrefix`

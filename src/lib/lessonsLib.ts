@@ -43,6 +43,7 @@ export async function publishLesson(
     id: lesson.id,
     author_id: author.id,
     author_name: author.name,
+    kind: "lesson",
     title: lesson.meta.title,
     subject: lesson.meta.subject || null,
     grade_level: lesson.meta.yearGroup || null,
@@ -66,7 +67,7 @@ export async function unpublishLesson(id: string): Promise<void> {
 /** Browse the shared library (lightweight metadata rows; no `data` blob). */
 export async function listSharedLessons(filters: SharedLessonFilters = {}): Promise<SharedLessonMeta[]> {
   const { search, grade, subject } = filters;
-  let q = supabase.from("lessons").select(META_COLUMNS).eq("is_published", true);
+  let q = supabase.from("lessons").select(META_COLUMNS).eq("is_published", true).eq("kind", "lesson");
   if (grade) q = q.eq("grade_level", grade);
   if (subject) q = q.eq("subject", subject);
   if (search && search.trim()) {
@@ -87,7 +88,11 @@ export async function getSharedLesson(id: string): Promise<Lesson> {
 
 /** Ids of the signed-in user's own published lessons (to badge "Shared" in the UI). */
 export async function getMyPublishedIds(userId: string): Promise<Set<string>> {
-  const { data, error } = await supabase.from("lessons").select("id").eq("author_id", userId);
+  const { data, error } = await supabase
+    .from("lessons")
+    .select("id")
+    .eq("author_id", userId)
+    .eq("is_published", true);
   if (error) return new Set();
   return new Set((data ?? []).map((r) => (r as unknown as { id: string }).id));
 }
