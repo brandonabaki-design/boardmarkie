@@ -29,6 +29,7 @@ import {
   Play,
   Share2,
   MessageCircle,
+  NotebookText,
 } from "lucide-react";
 import type { CanvasElement, EditAction, Lesson, Slide } from "@/lib/types";
 import {
@@ -44,6 +45,7 @@ import {
   youtubeId,
 } from "@/lib/canvas";
 import { EduSimModal } from "./EduSimModal";
+import { NotebookLMModal } from "./NotebookLMModal";
 import { ExportMenu } from "./ExportMenu";
 import { SlideCanvas } from "./SlideCanvas";
 import { ImageSwap, type SwapMedia } from "./ImageSwap";
@@ -91,6 +93,7 @@ export function CanvasEditor({
   const [ytInput, setYtInput] = useState("");
   const [ytErr, setYtErr] = useState<string | null>(null);
   const [esOpen, setEsOpen] = useState(false);
+  const [nbOpen, setNbOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [improveOpen, setImproveOpen] = useState(false);
   const [instruction, setInstruction] = useState("");
@@ -293,6 +296,7 @@ export function CanvasEditor({
     { label: "Shape", icon: Square, onClick: addShape },
     { label: "Video", icon: Video, onClick: () => setYtOpen(true) },
     { label: "EduSim", icon: QrCode, onClick: () => setEsOpen(true) },
+    { label: "NotebookLM", icon: NotebookText, onClick: () => setNbOpen(true) },
   ];
 
   const refineActions: { action: EditAction; label: string; icon: typeof Smile }[] = [
@@ -699,6 +703,8 @@ export function CanvasEditor({
           onAddSlide={addEduSimSlide}
         />
       )}
+
+      {nbOpen && <NotebookLMModal lesson={lesson} onClose={() => setNbOpen(false)} />}
     </div>
     <PrintDeck lesson={lesson} />
     </>
