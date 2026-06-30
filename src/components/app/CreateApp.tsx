@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { FolderOpen, Settings, Plus, ArrowLeft, AlertCircle, X, FlaskConical, BookOpen } from "lucide-react";
+import { FolderOpen, Settings, Plus, ArrowLeft, AlertCircle, X, FlaskConical, BookOpen, ClipboardPaste } from "lucide-react";
 import type {
   Artifact,
   EditAction,
@@ -46,6 +46,7 @@ import { WorksheetView } from "./WorksheetView";
 import { SeriesView } from "./SeriesView";
 import { SettingsModal } from "./SettingsModal";
 import { LibraryDrawer } from "./LibraryDrawer";
+import { ImportLessonModal } from "./ImportLessonModal";
 import { ExportMenu } from "./ExportMenu";
 import { PresentMode } from "./PresentMode";
 import { ShareLessonDialog } from "./ShareLessonDialog";
@@ -117,6 +118,7 @@ export function CreateApp() {
   const [presenting, setPresenting] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [imageProgress, setImageProgress] = useState<{ done: number; total: number } | null>(null);
   const [past, setPast] = useState<Lesson[]>([]);
   const [future, setFuture] = useState<Lesson[]>([]);
@@ -288,6 +290,26 @@ export function CreateApp() {
     }
     const hasProxy = isHostedMode() || !!getImageConfig().proxyUrl;
     if (hasProxy) await autoEmbedYoutube(working);
+  };
+
+  // Import a pasted outline (e.g. MagicSchool) into a full lesson with NO AI call.
+  // Optionally attaches a relevant photo/GIF per slide via the free web search.
+  const handleImport = async (lesson: Lesson, addMedia: boolean) => {
+    setImportOpen(false);
+    setError(null);
+    setTestMode(false);
+    testMakerRef.current = null;
+    setGenMode("lesson");
+    const seeded = seedLesson(lesson);
+    saveArtifact(seeded);
+    setCurrent(seeded);
+    setPast([]);
+    setFuture([]);
+    refresh();
+    if (addMedia) {
+      if (isHostedMode() || getGiphyKey()) await autoSearchMedia(seeded, "gif");
+      else await autoSearchMedia(seeded, "search");
+    }
   };
 
   const runGenerate = async (req: GenerateRequest, themeId?: string) => {
@@ -743,7 +765,25 @@ export function CreateApp() {
             {/* Form stays mounted (just hidden) during Refine so inputs are preserved on Back. */}
             <div className={refine ? "hidden" : ""}>
               <GeneratorForm initialMode={initialMode} loading={false} onSubmit={handleGenerate} />
-              <div className="mx-auto mt-5 max-w-2xl text-center">
+
+              <div className="mx-auto mt-4 flex max-w-2xl items-center justify-center gap-3 text-xs text-muted">
+                <span className="h-px flex-1 bg-line" />
+                <span className="font-semibold uppercase tracking-wide">or</span>
+                <span className="h-px flex-1 bg-line" />
+              </div>
+              <div className="mx-auto mt-4 max-w-2xl text-center">
+                <button
+                  onClick={() => setImportOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-5 py-2.5 text-sm font-semibold text-ink transition-colors hover:border-brand-300 hover:text-brand-700 card-shadow"
+                >
+                  <ClipboardPaste size={16} className="text-brand-600" /> Paste an outline (no AI)
+                </button>
+                <p className="mt-1.5 text-[11px] text-muted">
+                  Already have an outline (e.g. from MagicSchool)? Build the slides instantly — no Claude credits used.
+                </p>
+              </div>
+
+              <div className="mx-auto mt-7 max-w-2xl text-center">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
                   Test lessons · no AI
                 </p>
@@ -821,6 +861,9 @@ export function CreateApp() {
         onOpen={openArtifact}
         onDelete={removeArtifact}
       />
+      {importOpen && (
+        <ImportLessonModal onClose={() => setImportOpen(false)} onImport={handleImport} canAutoMedia />
+      )}
       <SettingsModal
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
