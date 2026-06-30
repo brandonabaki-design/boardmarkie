@@ -412,11 +412,13 @@ function ElementContent({
         >
           🎧 {el.title || "Audio"}
         </span>
-        {interactive ? (
-          // Stop pointer-down so clicking the controls doesn't start a drag.
+        {interactive || editable ? (
+          // Playable in the editor AND when presenting. Stop pointer-down so
+          // clicking the controls doesn't start a drag/move gesture.
           <audio src={el.src} controls onPointerDown={(e) => e.stopPropagation()} style={{ position: "relative", zIndex: 10, width: "92%" }} />
         ) : (
-          <span style={{ position: "relative", zIndex: 10, fontSize: "2.8cqh", opacity: 0.85 }}>▶ Plays in Present mode</span>
+          // Thumbnails / print: playback isn't possible, so just label it.
+          <span style={{ position: "relative", zIndex: 10, fontSize: "2.8cqh", opacity: 0.85 }}>▶ Audio</span>
         )}
       </div>
     );
