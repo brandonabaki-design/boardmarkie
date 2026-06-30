@@ -3,6 +3,7 @@
 // flashcards. Pure data/strings (no JSX) so it can be imported anywhere.
 
 import type { Lesson } from "./types";
+import { textPdf, type PdfLine } from "./pdf";
 
 export const NOTEBOOKLM_URL = "https://notebooklm.google.com/";
 
@@ -34,7 +35,7 @@ export function notebookLmPrompt(activity: NotebookActivity, lesson: Lesson): st
     `You are creating ${noun} for a ${grade} ${subject} lesson titled "${m.title}"` +
     `${m.topic ? ` (topic: ${m.topic})` : ""} at the American International School in Abu Dhabi (AISA), in the ` +
     `United Arab Emirates. Base it strictly on the lesson materials I've uploaded as sources — the slide deck ` +
-    `(.pptx) and the lesson-details JSON. ` +
+    `(.pptx) and the lesson-details PDF. ` +
     (objectives ? `Align it to these learning objectives: ${objectives}. ` : "") +
     (vocab ? `Reinforce the key vocabulary: ${vocab}. ` : "") +
     (standards ? `Where relevant, connect to these standards: ${standards}. ` : "") +
@@ -60,7 +61,51 @@ export function notebookLmPrompt(activity: NotebookActivity, lesson: Lesson): st
   return `${context}\n\n${specific[activity]}`;
 }
 
-/** Clean, NotebookLM-friendly lesson details for download as a JSON source. */
+/** A NotebookLM-friendly lesson-details PDF (NotebookLM can't ingest JSON, but
+ *  reads PDFs cleanly). Lays out the metadata then a slide-by-slide breakdown. */
+export function lessonDetailsPdf(lesson: Lesson): Blob {
+  const m = lesson.meta;
+  const L: PdfLine[] = [];
+
+  L.push({ text: m.title || "Lesson", size: 20, bold: true });
+  const head = [m.subject, m.yearGroup, m.region].filter(Boolean).join("   •   ");
+  if (head) L.push({ text: head, size: 11, gap: 4 });
+  if (m.durationMinutes) L.push({ text: `Duration: ${m.durationMinutes} minutes`, size: 11, gap: 2 });
+  if (m.summary) L.push({ text: m.summary, size: 11, gap: 8 });
+
+  const section = (title: string, items: string[]) => {
+    if (!items.length) return;
+    L.push({ text: title, size: 14, bold: true, gap: 14 });
+    for (const it of items) L.push({ text: `-  ${it}`, size: 11, gap: 2 });
+  };
+  section("Learning objectives", m.objectives ?? []);
+  section("Standards", m.standards ?? []);
+  section("Key vocabulary", (m.vocabulary ?? []).map((v) => `${v.term}: ${v.definition}`));
+
+  L.push({ text: "Slides", size: 14, bold: true, gap: 16 });
+  lesson.slides.forEach((s, i) => {
+    L.push({ text: `${i + 1}.  ${s.title || "Untitled"}`, size: 12.5, bold: true, gap: 12 });
+    if (s.subtitle) L.push({ text: s.subtitle, size: 11, gap: 1 });
+    if (s.body) L.push({ text: s.body, size: 11, gap: 2 });
+    for (const b of s.bullets ?? []) L.push({ text: `-  ${b}`, size: 11, gap: 1 });
+    for (const v of s.vocabulary ?? []) L.push({ text: `-  ${v.term}: ${v.definition}`, size: 11, gap: 1 });
+    if (s.activity) {
+      L.push({ text: `Activity: ${s.activity.title || "Activity"}`, size: 11, bold: true, gap: 3 });
+      if (s.activity.instructions) L.push({ text: s.activity.instructions, size: 11, gap: 1 });
+    }
+    for (const q of s.discussionQuestions ?? []) L.push({ text: `Discuss: ${q}`, size: 11, gap: 1 });
+    for (const q of s.quiz ?? []) {
+      L.push({ text: `Q: ${q.question}`, size: 11, gap: 2 });
+      (q.options ?? []).forEach((o, oi) => L.push({ text: `   ${String.fromCharCode(65 + oi)}. ${o}`, size: 11 }));
+      if (q.answer) L.push({ text: `Answer: ${q.answer}`, size: 11 });
+    }
+    if (s.teacherNotes) L.push({ text: `Teacher notes: ${s.teacherNotes}`, size: 10.5, gap: 2 });
+  });
+
+  return textPdf(L);
+}
+
+/** Clean, structured lesson details (also used for other exports). */
 export function lessonDetails(lesson: Lesson) {
   const m = lesson.meta;
   return {

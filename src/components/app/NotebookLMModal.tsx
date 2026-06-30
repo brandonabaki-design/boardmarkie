@@ -8,7 +8,7 @@ import {
   NOTEBOOK_ACTIVITIES,
   NOTEBOOKLM_URL,
   notebookLmPrompt,
-  lessonDetails,
+  lessonDetailsPdf,
   type NotebookActivity,
 } from "@/lib/notebooklm";
 import { Spinner } from "./ui";
@@ -29,17 +29,17 @@ export function NotebookLMModal({ lesson, onClose }: { lesson: Lesson; onClose: 
   const [copied, setCopied] = useState<NotebookActivity | null>(null);
 
   // Download the two NotebookLM sources: the slide deck (.pptx) + a clean
-  // lesson-details JSON (objectives, standards, vocabulary, slide content).
+  // lesson-details PDF (objectives, standards, vocabulary, slide content).
+  // NotebookLM can't ingest JSON, so the details ship as a PDF it reads natively.
   const downloadPack = async () => {
     setDownloading(true);
     try {
       const slug = slugify(lesson.meta.title);
-      const json = JSON.stringify(lessonDetails(lesson), null, 2);
-      const blob = new Blob([json], { type: "application/json" });
+      const blob = lessonDetailsPdf(lesson);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${slug}-details.json`;
+      a.download = `${slug}-details.pdf`;
       a.click();
       URL.revokeObjectURL(url);
       await exportLessonToPptx(lesson); // triggers the .pptx download
@@ -80,7 +80,7 @@ export function NotebookLMModal({ lesson, onClose }: { lesson: Lesson; onClose: 
           <li>
             <p className="font-semibold text-ink">1. Download your lesson sources</p>
             <p className="mt-0.5 text-muted">
-              The slide deck (.pptx) and a lesson-details file (objectives, standards, vocabulary, slide content) to
+              The slide deck (.pptx) and a lesson-details PDF (objectives, standards, vocabulary, slide content) to
               upload into NotebookLM as sources.
             </p>
             <button
@@ -89,7 +89,7 @@ export function NotebookLMModal({ lesson, onClose }: { lesson: Lesson; onClose: 
               className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300 disabled:opacity-50"
             >
               {downloading ? <Spinner /> : downloaded ? <Check size={15} className="text-brand-600" /> : <Download size={15} />}
-              {downloading ? "Preparing…" : downloaded ? "Downloaded — get more?" : "Download lesson pack (.pptx + .json)"}
+              {downloading ? "Preparing…" : downloaded ? "Downloaded — get more?" : "Download lesson pack (.pptx + .pdf)"}
             </button>
           </li>
 
