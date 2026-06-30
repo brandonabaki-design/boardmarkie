@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { X, Download, Copy, Check, ExternalLink, NotebookText, Headphones, Video, Layers } from "lucide-react";
-import type { Lesson } from "@/lib/types";
+import { X, Download, Copy, Check, ExternalLink, NotebookText, Headphones, Video, Layers, QrCode } from "lucide-react";
+import type { Lesson, Slide } from "@/lib/types";
 import { exportLessonToPptx } from "@/lib/export";
+import { cid, textElement, imageElement, MUTED } from "@/lib/canvas";
+import { qrToSvg } from "@/lib/qr";
 import {
   NOTEBOOK_ACTIVITIES,
   NOTEBOOKLM_URL,
@@ -19,14 +21,53 @@ const ACTIVITY_ICON: Record<NotebookActivity, typeof Headphones> = {
   flashcards: Layers,
 };
 
+// Per-resource labels for the slide that carries the QR/link to the finished
+// NotebookLM artifact.
+const RESOURCE_SLIDE: Record<NotebookActivity, { verb: string; emoji: string; scan: string }> = {
+  podcast: { verb: "Listen to the Podcast", emoji: "🎧", scan: "Scan to listen" },
+  video: { verb: "Watch the Video", emoji: "🎬", scan: "Scan to watch" },
+  flashcards: { verb: "Study the Flashcards", emoji: "🃏", scan: "Scan to study" },
+};
+
 function slugify(s: string): string {
   return (s || "lesson").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "lesson";
 }
 
-export function NotebookLMModal({ lesson, onClose }: { lesson: Lesson; onClose: () => void }) {
+// A dedicated slide carrying a QR + link to a NotebookLM resource (mirrors the
+// EduSim QR slide). Students scan to open the podcast/video/flashcards.
+function buildResourceSlide(kind: NotebookActivity, url: string, qrSvg: string): Slide {
+  const r = RESOURCE_SLIDE[kind];
+  return {
+    id: cid("sl"),
+    layout: "content",
+    title: r.verb,
+    elements: [
+      textElement({ text: `${r.verb} ${r.emoji}`, x: 6, y: 8, w: 88, h: 12, fontSize: 7, bold: true, font: "display", align: "center", z: 1 }),
+      textElement({ text: `${r.scan}, or open the link below`, x: 12, y: 22, w: 76, h: 8, fontSize: 3.2, color: MUTED, align: "center", z: 2 }),
+      imageElement({ svg: qrSvg, alt: `${r.verb} QR code`, x: 38, y: 32, w: 24, h: 43, z: 3 }),
+      textElement({ text: url, x: 6, y: 80, w: 88, h: 6, fontSize: 2, color: MUTED, align: "center", z: 4 }),
+    ],
+  };
+}
+
+export function NotebookLMModal({
+  lesson,
+  onClose,
+  onAddSlide,
+}: {
+  lesson: Lesson;
+  onClose: () => void;
+  onAddSlide?: (slide: Slide) => void;
+}) {
   const [downloading, setDownloading] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
   const [copied, setCopied] = useState<NotebookActivity | null>(null);
+
+  // final step: paste a link to the finished resource → QR slide
+  const [resourceKind, setResourceKind] = useState<NotebookActivity>("podcast");
+  const [resourceUrl, setResourceUrl] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [addErr, setAddErr] = useState("");
 
   // Download the two NotebookLM sources: the slide deck (.pptx) + a clean
   // lesson-details PDF (objectives, standards, vocabulary, slide content).
@@ -56,6 +97,29 @@ export function NotebookLMModal({ lesson, onClose }: { lesson: Lesson; onClose: 
       setTimeout(() => setCopied((c) => (c === activity ? null : c)), 1800);
     } catch {
       /* clipboard blocked */
+    }
+  };
+
+  // Paste a NotebookLM "Share" link to the finished resource → add a QR slide.
+  const addResource = async () => {
+    let url: string;
+    try {
+      const u = new URL(resourceUrl.trim());
+      if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error();
+      url = u.toString();
+    } catch {
+      setAddErr("Paste a valid link (starting with https://).");
+      return;
+    }
+    setAddErr("");
+    setAdding(true);
+    try {
+      const qrSvg = await qrToSvg(url);
+      onAddSlide?.(buildResourceSlide(resourceKind, url, qrSvg));
+      onClose();
+    } catch {
+      setAddErr("Couldn't generate the QR code. Check the link and try again.");
+      setAdding(false);
     }
   };
 
@@ -136,6 +200,54 @@ export function NotebookLMModal({ lesson, onClose }: { lesson: Lesson; onClose: 
               <ExternalLink size={15} /> Open NotebookLM
             </a>
           </li>
+
+          {onAddSlide && (
+            <li>
+              <p className="font-semibold text-ink">4. Add the finished resource to this lesson</p>
+              <p className="mt-0.5 text-muted">
+                Once your audio overview, video or flashcards are ready, hit{" "}
+                <span className="font-semibold text-ink">Share</span> in NotebookLM, copy the link, and paste it here.
+                We&apos;ll add a slide with a QR code students can scan to open it. (NotebookLM can&apos;t be played inside
+                another site, so the QR/link is the way to share it.)
+              </p>
+              <div className="mt-2 flex gap-1 rounded-lg border border-line bg-paper p-1">
+                {NOTEBOOK_ACTIVITIES.map((a) => {
+                  const Icon = ACTIVITY_ICON[a.id];
+                  const on = resourceKind === a.id;
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => setResourceKind(a.id)}
+                      className={`inline-flex flex-1 items-center justify-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                        on ? "bg-white text-brand-700 card-shadow" : "text-muted hover:text-ink"
+                      }`}
+                    >
+                      <Icon size={13} /> {a.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <input
+                value={resourceUrl}
+                onChange={(e) => {
+                  setResourceUrl(e.target.value);
+                  setAddErr("");
+                }}
+                onKeyDown={(e) => e.key === "Enter" && !adding && addResource()}
+                placeholder="Paste your NotebookLM share link…"
+                className="mt-2 w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+              />
+              {addErr && <p className="mt-2 text-xs text-coral">{addErr}</p>}
+              <button
+                onClick={addResource}
+                disabled={!resourceUrl.trim() || adding}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
+              >
+                {adding ? <Spinner /> : <QrCode size={15} />} Add resource slide
+              </button>
+            </li>
+          )}
         </ol>
       </div>
     </div>

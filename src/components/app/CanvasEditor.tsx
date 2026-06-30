@@ -709,7 +709,7 @@ export function CanvasEditor({
         />
       )}
 
-      {nbOpen && <NotebookLMModal lesson={lesson} onClose={() => setNbOpen(false)} />}
+      {nbOpen && <NotebookLMModal lesson={lesson} onClose={() => setNbOpen(false)} onAddSlide={addEduSimSlide} />}
     </div>
     <PrintDeck lesson={lesson} />
     </>
