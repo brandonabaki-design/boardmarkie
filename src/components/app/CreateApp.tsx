@@ -410,6 +410,10 @@ export function CreateApp() {
     if (!targets.length) return lesson;
     setImageProgress({ done: 0, total: targets.length });
 
+    // Lesson subject + topic disambiguate generic queries during ranking
+    // (e.g. biology "cells" over prison cells) without narrowing the search.
+    const context = [lesson.meta?.subject, lesson.meta?.topic].filter(Boolean).join(" ");
+
     let working = lesson;
     let done = 0;
     let next = 0;
@@ -425,15 +429,15 @@ export function CreateApp() {
           const gq = (t.gifQuery || "").trim();
           // In GIF mode, embed a GIF only where the model chose a concrete
           // gifQuery; otherwise fall back to a relevant photo (never a random GIF).
-          // Pick the first result that actually loads so no broken images land.
+          // Results are relevance-ranked, so the first that loads is the best match.
           if (kind === "gif" && gq) {
-            const gifs = await searchGifs(gq);
+            const gifs = await searchGifs(gq, context);
             url = await firstLoadableImage(gifs.slice(0, 6).map((g) => g.url));
           }
           if (!url) {
             const iq = slideQuery(t);
             if (iq) {
-              const imgs = await searchImages(iq);
+              const imgs = await searchImages(iq, context);
               url = await firstLoadableImage(imgs.slice(0, 8).map((r) => r.url));
             }
           }

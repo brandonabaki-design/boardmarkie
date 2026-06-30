@@ -20,6 +20,66 @@ const OPENVERSE = "https://api.openverse.org/v1/images/";
 export const NO_SEARCH_KEY =
   "No images found — try a different search, or add a free Unsplash / Pixabay key in Settings for more sources.";
 
+// ---- relevance ranking -----------------------------------------------------
+// Search APIs return loosely-sorted results; for AUTO-embed we want the single
+// most on-topic image, not just the first one that loads. We score each result's
+// title/tags against the query (and optional lesson context) and sort, so the
+// best match is tried first.
+
+const STOP_WORDS = new Set([
+  "a", "an", "the", "of", "and", "or", "for", "to", "in", "on", "at", "with", "this",
+  "that", "its", "your", "you", "slide", "image", "photo", "picture", "illustration",
+  "showing", "show", "about", "students", "student", "class", "classroom", "lesson",
+  "concept", "topic", "diagram", "background",
+]);
+
+function tokenize(text: string): string[] {
+  return (text.toLowerCase().match(/[a-z0-9]+/g) ?? []).filter(
+    (t) => t.length > 2 && !STOP_WORDS.has(t),
+  );
+}
+
+// Stock sources are far more reliable/relevant than Openverse, so they win ties.
+const SOURCE_WEIGHT: Record<string, number> = { unsplash: 0.4, pixabay: 0.3, openverse: 0 };
+
+function relevanceScore(title: string, queryTokens: string[], contextTokens: string[]): number {
+  const titleTokens = tokenize(title);
+  if (!titleTokens.length) return 0;
+  const titleSet = new Set(titleTokens);
+  let score = 0;
+  for (const q of queryTokens) {
+    if (titleSet.has(q)) score += 2; // exact keyword hit
+    else if (titleTokens.some((t) => t.includes(q) || q.includes(t))) score += 1; // partial/compound
+  }
+  // On-topic bonus: lesson subject/topic words that show up are a tie-breaker, not
+  // a primary signal (so "water cycle" still beats a generic "science" photo).
+  for (const c of contextTokens) if (titleSet.has(c)) score += 0.5;
+  return score;
+}
+
+/**
+ * Re-order search results by how well each title matches the query, then the
+ * optional lesson context, with a small stock-source tie-break. Stable for ties,
+ * so when nothing matches (abstract queries) the original ordering is preserved.
+ */
+export function rankByRelevance<T extends { title?: string; source?: string }>(
+  results: T[],
+  query: string,
+  context = "",
+): T[] {
+  const queryTokens = tokenize(query);
+  const contextTokens = tokenize(context);
+  if (!queryTokens.length && !contextTokens.length) return results;
+  return results
+    .map((r, i) => ({
+      r,
+      i,
+      score: relevanceScore(r.title ?? "", queryTokens, contextTokens) + (SOURCE_WEIGHT[r.source ?? ""] ?? 0),
+    }))
+    .sort((a, b) => b.score - a.score || a.i - b.i)
+    .map((x) => x.r);
+}
+
 interface OpenverseItem {
   title?: string;
   url?: string;
@@ -173,14 +233,16 @@ export async function proxySearch(q: string, kind: "image" | "gif"): Promise<Ima
   }
 }
 
-export async function searchImages(query: string): Promise<ImageResult[]> {
+// `context` is optional lesson context (e.g. subject + topic) used only to
+// break ties toward on-topic images during auto-embed; the manual picker omits it.
+export async function searchImages(query: string, context = ""): Promise<ImageResult[]> {
   const q = query.trim();
   if (!q) return [];
 
   if (isHostedMode()) {
     const results = await proxySearch(q, "image");
     if (!results.length) throw new Error(NO_SEARCH_KEY);
-    return results.slice(0, 36);
+    return rankByRelevance(results, q, context).slice(0, 36);
   }
 
   const [openverse, pixabay, unsplash] = await Promise.all([
@@ -199,7 +261,9 @@ export async function searchImages(query: string): Promise<ImageResult[]> {
   });
 
   if (!merged.length) throw new Error(NO_SEARCH_KEY);
-  return merged.slice(0, 36);
+  // Rank by relevance so auto-embed picks the most on-topic image, not just the
+  // first that loads. Source weight keeps the existing stock-first ordering on ties.
+  return rankByRelevance(merged, q, context).slice(0, 36);
 }
 
 /** Fallback link when a search fails: open Google Images in a new tab. */

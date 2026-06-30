@@ -6,7 +6,7 @@
 
 import { getGiphyKey } from "./storage";
 import { isHostedMode } from "./backend";
-import { proxySearch } from "./imageSearch";
+import { proxySearch, rankByRelevance } from "./imageSearch";
 
 export interface GifResult {
   title: string;
@@ -28,12 +28,14 @@ interface GiphyImages {
   preview_gif?: GiphyImage;
 }
 
-export async function searchGifs(query: string): Promise<GifResult[]> {
+// `context` is optional lesson context (subject + topic) used only to break ties
+// toward on-topic GIFs during auto-embed; the manual picker omits it.
+export async function searchGifs(query: string, context = ""): Promise<GifResult[]> {
   const q = query.trim();
   if (!q) return [];
 
   // Hosted mode: the proxy searches Giphy with the server-held key.
-  if (isHostedMode()) return proxySearch(q, "gif");
+  if (isHostedMode()) return rankByRelevance(await proxySearch(q, "gif"), q, context);
 
   const key = getGiphyKey();
   if (!key) {
@@ -64,7 +66,7 @@ export async function searchGifs(query: string): Promise<GifResult[]> {
   }
 
   const data = (await res.json()) as { data?: Array<{ title?: string; images?: GiphyImages }> };
-  return (data.data ?? [])
+  const gifs = (data.data ?? [])
     .map((g) => {
       const img = g.images ?? {};
       const url = img.downsized_medium?.url || img.original?.url || img.downsized?.url || "";
@@ -72,4 +74,6 @@ export async function searchGifs(query: string): Promise<GifResult[]> {
       return { title: g.title ?? "", url, thumb };
     })
     .filter((r) => r.url);
+  // Prefer GIFs whose title actually matches the topic (Giphy titles are noisy).
+  return rankByRelevance(gifs, q, context);
 }

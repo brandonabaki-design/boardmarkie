@@ -121,7 +121,7 @@ const slideSchema: JSONSchema = {
     imageQuery: {
       type: "string",
       description:
-        "2-4 plain keywords to find a stock PHOTO for this slide via image search (e.g. 'water cycle', 'volcano eruption', 'cheering students'). Empty string if the slide needs no image.",
+        "2-4 plain, SPECIFIC keywords to find a stock PHOTO that depicts this slide's concrete subject via image search (e.g. 'water cycle diagram', 'volcano eruption', 'cheering students'). Name the actual thing to picture, and disambiguate ambiguous words with the subject so search finds the right meaning (e.g. 'plant cell biology' not just 'cell', 'ancient roman colosseum' not just 'rome'). Avoid abstract or generic terms ('learning', 'success'). Empty string if the slide needs no image.",
     },
     gifQuery: {
       type: "string",
