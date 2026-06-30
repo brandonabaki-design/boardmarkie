@@ -252,25 +252,35 @@ export function AskBoardmarkie({
           className="no-print fixed bottom-24 right-5 z-40 flex h-[34rem] max-h-[75vh] w-[23rem] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-line bg-white card-shadow"
         >
           {/* header */}
-          <div className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
-            <div>
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-4 py-3">
+            <div className="min-w-0">
               <h2 className="flex items-center gap-1.5 font-display text-base font-bold text-ink">
                 <Sparkles size={16} className="text-brand-600" /> Ask Boardmarkie
               </h2>
-              <p className="text-[11px] text-muted">Teaching assistant · {CHAT_MODEL}</p>
+              <p className="truncate text-[11px] text-muted">Teaching assistant · {CHAT_MODEL}</p>
             </div>
-            {msgs.length > 0 && (
+            <div className="flex shrink-0 items-center gap-1">
+              {msgs.length > 0 && (
+                <button
+                  onClick={() => {
+                    setMsgs([]);
+                    setErr(null);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-muted hover:bg-paper hover:text-ink"
+                  title="Clear chat"
+                >
+                  <Eraser size={13} /> Clear
+                </button>
+              )}
               <button
-                onClick={() => {
-                  setMsgs([]);
-                  setErr(null);
-                }}
-                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-muted hover:bg-paper hover:text-ink"
-                title="Clear chat"
+                onClick={() => setOpen(false)}
+                className="grid h-7 w-7 place-items-center rounded-lg text-muted transition-colors hover:bg-paper hover:text-ink"
+                title="Minimize — keeps your chat"
+                aria-label="Minimize chat"
               >
-                <Eraser size={13} /> Clear
+                <X size={16} />
               </button>
-            )}
+            </div>
           </div>
 
           {/* body */}

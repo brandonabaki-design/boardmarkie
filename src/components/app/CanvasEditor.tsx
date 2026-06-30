@@ -70,6 +70,7 @@ export function CanvasEditor({
   onPresent,
   onPublish,
   onAsk,
+  askOpen,
 }: {
   lesson: Lesson;
   busy: boolean;
@@ -82,6 +83,7 @@ export function CanvasEditor({
   onPresent: () => void;
   onPublish: () => void;
   onAsk: () => void;
+  askOpen: boolean;
 }) {
   const [idx, setIdx] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -488,8 +490,11 @@ export function CanvasEditor({
             <div className="ml-auto flex flex-wrap items-center gap-1.5">
               <button
                 onClick={onAsk}
-                title="Ask Boardmarkie — your teaching assistant"
-                className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-brand-300"
+                title={askOpen ? "Minimize Ask Boardmarkie" : "Ask Boardmarkie — your teaching assistant"}
+                aria-pressed={askOpen}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  askOpen ? "border-brand-300 bg-brand-50 text-brand-700" : "border-line bg-white text-ink hover:border-brand-300"
+                }`}
               >
                 <MessageCircle size={14} className="text-brand-600" /> Ask
               </button>

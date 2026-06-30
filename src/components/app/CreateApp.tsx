@@ -725,7 +725,8 @@ export function CreateApp() {
                 canRedo={future.length > 0}
                 onPresent={() => setPresenting(true)}
                 onPublish={() => setShareOpen(true)}
-                onAsk={() => setAskOpen(true)}
+                onAsk={() => setAskOpen((o) => !o)}
+                askOpen={askOpen}
               />
             )}
             {current.kind === "worksheet" && <WorksheetView worksheet={current} />}
