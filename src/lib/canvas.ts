@@ -4,6 +4,7 @@
 // can be imported anywhere without pulling in the Anthropic SDK.
 
 import type {
+  AudioElement,
   CanvasElement,
   ImageElement,
   QuizQuestion,
@@ -96,6 +97,23 @@ export function youtubeElement(
     z: p.z ?? 1,
     videoId: p.videoId,
     title: p.title,
+    x: p.x,
+    y: p.y,
+    w: p.w,
+    h: p.h,
+  };
+}
+
+export function audioElement(
+  p: Partial<AudioElement> & Pick<AudioElement, "src" | "x" | "y" | "w" | "h">,
+): AudioElement {
+  return {
+    id: cid("au"),
+    type: "audio",
+    z: p.z ?? 1,
+    src: p.src,
+    title: p.title,
+    artworkSvg: p.artworkSvg,
     x: p.x,
     y: p.y,
     w: p.w,

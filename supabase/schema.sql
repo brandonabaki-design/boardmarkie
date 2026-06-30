@@ -231,6 +231,28 @@ grant insert, update on public.profiles to authenticated;
 grant execute on function public.increment_view(uuid) to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
+-- Storage: lesson media (e.g. NotebookLM audio overviews) so a podcast can play
+-- inside a deck. Public-read (students need no account); only signed-in teachers
+-- may upload, into a folder named after their own uid.
+-- ---------------------------------------------------------------------------
+insert into storage.buckets (id, name, public)
+values ('lesson-media', 'lesson-media', true)
+on conflict (id) do nothing;
+
+drop policy if exists media_read        on storage.objects;
+drop policy if exists media_insert_own  on storage.objects;
+drop policy if exists media_update_own  on storage.objects;
+drop policy if exists media_delete_own  on storage.objects;
+create policy media_read on storage.objects for select
+  using (bucket_id = 'lesson-media');
+create policy media_insert_own on storage.objects for insert to authenticated
+  with check (bucket_id = 'lesson-media' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy media_update_own on storage.objects for update to authenticated
+  using (bucket_id = 'lesson-media' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy media_delete_own on storage.objects for delete to authenticated
+  using (bucket_id = 'lesson-media' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ---------------------------------------------------------------------------
 -- Realtime: stream a teacher's own lesson changes to their other devices
 -- (subscribeArtifacts in src/lib/sync.ts). Optional — sync still reconciles on
 -- sign-in without it. Wrapped so re-running the file never errors.

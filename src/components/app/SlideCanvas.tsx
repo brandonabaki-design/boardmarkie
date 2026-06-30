@@ -379,6 +379,48 @@ function ElementContent({
       </div>
     );
   }
+  if (el.type === "audio") {
+    return (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          borderRadius: 8,
+          overflow: "hidden",
+          position: "relative",
+          background: "#0c6e62",
+          color: "#fff",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "2cqh",
+          padding: "3cqh",
+          boxSizing: "border-box",
+        }}
+      >
+        {el.artworkSvg && (
+          <div
+            aria-hidden
+            className="[&_svg]:h-full [&_svg]:w-full"
+            style={{ position: "absolute", inset: 0, opacity: 0.2 }}
+            dangerouslySetInnerHTML={{ __html: el.artworkSvg }}
+          />
+        )}
+        <span
+          style={{ position: "relative", zIndex: 10, fontSize: "4.4cqh", fontWeight: 800, textAlign: "center", display: "flex", alignItems: "center", gap: "1.5cqh" }}
+        >
+          🎧 {el.title || "Audio"}
+        </span>
+        {interactive ? (
+          // Stop pointer-down so clicking the controls doesn't start a drag.
+          <audio src={el.src} controls onPointerDown={(e) => e.stopPropagation()} style={{ position: "relative", zIndex: 10, width: "92%" }} />
+        ) : (
+          <span style={{ position: "relative", zIndex: 10, fontSize: "2.8cqh", opacity: 0.85 }}>▶ Plays in Present mode</span>
+        )}
+      </div>
+    );
+  }
   // image
   if (el.svg) {
     return (

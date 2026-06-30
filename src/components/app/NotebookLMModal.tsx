@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { X, Download, Copy, Check, ExternalLink, NotebookText, Headphones, Video, Layers, QrCode } from "lucide-react";
+import { X, Download, Copy, Check, ExternalLink, NotebookText, Headphones, Video, Layers, QrCode, Upload } from "lucide-react";
 import type { Lesson, Slide } from "@/lib/types";
 import { exportLessonToPptx } from "@/lib/export";
-import { cid, textElement, imageElement, MUTED } from "@/lib/canvas";
+import { cid, textElement, imageElement, audioElement, MUTED } from "@/lib/canvas";
 import { qrToSvg } from "@/lib/qr";
+import { uploadLessonAudio } from "@/lib/media";
+import { useSupabaseUser } from "@/lib/supabaseAuth";
 import {
   NOTEBOOK_ACTIVITIES,
   NOTEBOOKLM_URL,
@@ -31,6 +33,19 @@ const RESOURCE_SLIDE: Record<NotebookActivity, { verb: string; emoji: string; sc
 
 function slugify(s: string): string {
   return (s || "lesson").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "lesson";
+}
+
+// A slide with an inline audio player (the uploaded NotebookLM overview).
+function buildAudioSlide(title: string, src: string): Slide {
+  return {
+    id: cid("sl"),
+    layout: "content",
+    title,
+    elements: [
+      textElement({ text: `${title} 🎧`, x: 6, y: 8, w: 88, h: 12, fontSize: 7, bold: true, font: "display", align: "center", z: 1 }),
+      audioElement({ src, title, x: 14, y: 34, w: 72, h: 34, z: 2 }),
+    ],
+  };
 }
 
 // A dedicated slide carrying a QR + link to a NotebookLM resource (mirrors the
@@ -59,6 +74,7 @@ export function NotebookLMModal({
   onClose: () => void;
   onAddSlide?: (slide: Slide) => void;
 }) {
+  const { user } = useSupabaseUser();
   const [downloading, setDownloading] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
   const [copied, setCopied] = useState<NotebookActivity | null>(null);
@@ -68,6 +84,11 @@ export function NotebookLMModal({
   const [resourceUrl, setResourceUrl] = useState("");
   const [adding, setAdding] = useState(false);
   const [addErr, setAddErr] = useState("");
+
+  // podcast: upload the audio file → inline player slide
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadErr, setUploadErr] = useState("");
 
   // Download the two NotebookLM sources: the slide deck (.pptx) + a clean
   // lesson-details PDF (objectives, standards, vocabulary, slide content).
@@ -120,6 +141,21 @@ export function NotebookLMModal({
     } catch {
       setAddErr("Couldn't generate the QR code. Check the link and try again.");
       setAdding(false);
+    }
+  };
+
+  // Upload the downloaded audio overview → a slide with an inline player.
+  const uploadAudio = async () => {
+    if (!file) return;
+    setUploadErr("");
+    setUploading(true);
+    try {
+      const src = await uploadLessonAudio(file);
+      onAddSlide?.(buildAudioSlide(RESOURCE_SLIDE.podcast.verb, src));
+      onClose();
+    } catch (e) {
+      setUploadErr((e as Error)?.message || "Upload failed.");
+      setUploading(false);
     }
   };
 
@@ -228,6 +264,46 @@ export function NotebookLMModal({
                   );
                 })}
               </div>
+
+              {/* Podcasts can be uploaded and PLAYED inside the deck. */}
+              {resourceKind === "podcast" && (
+                <div className="mt-2 rounded-xl border border-line bg-paper/60 p-3">
+                  <p className="text-xs font-semibold text-ink">Plays inside the deck (recommended)</p>
+                  <p className="mt-0.5 text-[11px] text-muted">
+                    In NotebookLM, download the audio overview, then upload the file here — it becomes a player you can
+                    hit during the lesson.
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300">
+                      <Upload size={15} className="text-brand-600" />
+                      {file ? "Choose a different file" : "Choose audio file"}
+                      <input
+                        type="file"
+                        accept="audio/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          setFile(e.target.files?.[0] ?? null);
+                          setUploadErr("");
+                        }}
+                      />
+                    </label>
+                    {file && <span className="max-w-[12rem] truncate text-xs text-muted">{file.name}</span>}
+                  </div>
+                  {uploadErr && <p className="mt-2 text-xs text-coral">{uploadErr}</p>}
+                  {!user && <p className="mt-2 text-xs text-muted">Sign in to upload audio.</p>}
+                  <button
+                    onClick={uploadAudio}
+                    disabled={!file || uploading || !user}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
+                  >
+                    {uploading ? <Spinner /> : <Upload size={15} />} {uploading ? "Uploading…" : "Upload & add player slide"}
+                  </button>
+                  <div className="mt-3 flex items-center gap-2 text-[11px] text-muted">
+                    <span className="h-px flex-1 bg-line" /> or paste a link <span className="h-px flex-1 bg-line" />
+                  </div>
+                </div>
+              )}
+
               <input
                 value={resourceUrl}
                 onChange={(e) => {
@@ -244,7 +320,7 @@ export function NotebookLMModal({
                 disabled={!resourceUrl.trim() || adding}
                 className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
               >
-                {adding ? <Spinner /> : <QrCode size={15} />} Add resource slide
+                {adding ? <Spinner /> : <QrCode size={15} />} Add QR / link slide
               </button>
             </li>
           )}

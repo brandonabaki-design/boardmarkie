@@ -290,6 +290,17 @@ export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
             hyperlink: { url },
           });
         }
+      } else if (el.type === "audio") {
+        // PPTX can't reliably embed remote audio; a clickable card opens it.
+        s.addText(`🎧 ${el.title || "Listen to the audio"}`, {
+          ...box,
+          fontSize: 16,
+          color: "ffffff",
+          align: "center",
+          valign: "middle",
+          fill: { color: "0c6e62" },
+          hyperlink: { url: el.src },
+        });
       }
     }
 
