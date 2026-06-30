@@ -37,6 +37,7 @@ create table if not exists public.simulations (
   html         text not null check (char_length(html) <= 2000000),  -- ~2MB cap
   grade_level  text,
   subject      text,
+  sim_type     text not null default 'simulation',  -- 'simulation' | 'game' | 'adventure' | 'worksheet'
   concepts     text[] not null default '{}',
   standards    text[] not null default '{}',
   is_published boolean not null default true,
@@ -84,6 +85,10 @@ create table if not exists public.lessons (
 alter table public.lessons add column if not exists kind text not null default 'lesson';
 alter table public.lessons alter column is_published set default false;
 
+-- If the simulations table predates the `sim_type` column, add it (existing rows
+-- become 'simulation', the original behaviour).
+alter table public.simulations add column if not exists sim_type text not null default 'simulation';
+
 -- ---------------------------------------------------------------------------
 -- Indexes
 -- ---------------------------------------------------------------------------
@@ -91,6 +96,7 @@ create index if not exists idx_sim_created   on public.simulations (created_at d
 create index if not exists idx_sim_rating    on public.simulations (avg_rating desc);
 create index if not exists idx_sim_grade     on public.simulations (grade_level);
 create index if not exists idx_sim_subject   on public.simulations (subject);
+create index if not exists idx_sim_type      on public.simulations (sim_type);
 create index if not exists idx_sim_author    on public.simulations (author_id);
 create index if not exists idx_sim_concepts  on public.simulations using gin (concepts);
 create index if not exists idx_sim_standards on public.simulations using gin (standards);

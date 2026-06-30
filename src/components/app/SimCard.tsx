@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { Simulation } from "@/lib/sims";
 import { Stars } from "./Stars";
+import { SimTypeBadge } from "./SimTypeBadge";
 
 export function SimCard({ sim, authorName }: { sim: Simulation; authorName?: string }) {
   return (
@@ -16,6 +17,7 @@ export function SimCard({ sim, authorName }: { sim: Simulation; authorName?: str
       </div>
       {sim.description && <p className="line-clamp-2 text-sm text-muted">{sim.description}</p>}
       <div className="flex flex-wrap gap-1.5">
+        <SimTypeBadge type={sim.sim_type} />
         {sim.grade_level && (
           <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
             {sim.grade_level}

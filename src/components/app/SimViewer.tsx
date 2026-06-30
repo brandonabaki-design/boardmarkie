@@ -9,6 +9,7 @@ import { eduSimLink } from "@/lib/supabase";
 import { SandboxedHtml } from "./SandboxedHtml";
 import { QrOverlay } from "./QrOverlay";
 import { Stars } from "./Stars";
+import { SimTypeBadge } from "./SimTypeBadge";
 
 export function SimViewer() {
   const id = useSearchParams().get("id") ?? "";
@@ -107,6 +108,7 @@ export function SimViewer() {
           <h3 className="pr-6 font-display text-lg font-bold text-ink">{sim.title}</h3>
           {sim.description && <p className="mt-1 text-sm text-muted">{sim.description}</p>}
           <div className="mt-2 flex flex-wrap gap-1.5">
+            <SimTypeBadge type={sim.sim_type} />
             {sim.grade_level && (
               <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
                 {sim.grade_level}

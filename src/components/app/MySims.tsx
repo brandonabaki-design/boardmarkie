@@ -8,6 +8,7 @@ import { useSupabaseUser } from "@/lib/supabaseAuth";
 import { AppHeader } from "./AppHeader";
 import { Stars } from "./Stars";
 import { SimSignIn } from "./SimSignIn";
+import { SimTypeBadge } from "./SimTypeBadge";
 
 export function MySims() {
   const { user, loading: authLoading } = useSupabaseUser();
@@ -86,6 +87,9 @@ export function MySims() {
                       <Link href={`/sim/?id=${s.id}`} className="inline-flex items-center gap-1.5 hover:text-brand-700">
                         {s.title} <ExternalLink size={13} className="text-muted" />
                       </Link>
+                      <span className="mt-1 block">
+                        <SimTypeBadge type={s.sim_type} size="xs" />
+                      </span>
                     </td>
                     <td className="px-3 py-3">
                       {s.is_published ? (

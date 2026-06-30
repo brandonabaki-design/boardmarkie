@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Sparkles, Wand2 } from "lucide-react";
 import { GRADE_LEVELS, SUBJECTS } from "@/lib/taxonomy";
+import { SIM_TYPES } from "@/lib/simTypes";
 import { createSimulation, getSimulation, updateSimulation } from "@/lib/sims";
 import { extractSimMetadata } from "@/lib/client";
 import { useSupabaseUser } from "@/lib/supabaseAuth";
@@ -18,6 +19,7 @@ interface Form {
   description: string;
   grade_level: string;
   subject: string;
+  sim_type: string;
   concepts: string[];
   standards: string[];
   html: string;
@@ -29,6 +31,7 @@ const EMPTY: Form = {
   description: "",
   grade_level: "",
   subject: "",
+  sim_type: "simulation",
   concepts: [],
   standards: [],
   html: "",
@@ -64,6 +67,7 @@ export function SimEditor() {
           description: sim.description || "",
           grade_level: sim.grade_level || "",
           subject: sim.subject || "",
+          sim_type: sim.sim_type || "simulation",
           concepts: sim.concepts || [],
           standards: sim.standards || [],
           html: sim.html || "",
@@ -130,6 +134,7 @@ export function SimEditor() {
         description: form.description.trim() || null,
         grade_level: form.grade_level || null,
         subject: form.subject || null,
+        sim_type: form.sim_type || "simulation",
         concepts: form.concepts,
         standards: form.standards,
         html: form.html,
@@ -205,6 +210,16 @@ export function SimEditor() {
                 onChange={(e) => set("description", e.target.value)}
                 placeholder="What students will explore, simulate, and be assessed on."
               />
+            </Field>
+
+            <Field label="Type">
+              <Select value={form.sim_type} onChange={(e) => set("sim_type", e.target.value)}>
+                {SIM_TYPES.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </Select>
             </Field>
 
             <div className="grid grid-cols-2 gap-3">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Copy, Check, Sparkles, ExternalLink, QrCode, Link2 } from "lucide-react";
+import { X, Copy, Check, Sparkles, ExternalLink, QrCode, Link2, FlaskConical, Gamepad2, Map, ClipboardCheck } from "lucide-react";
 import type { Lesson, Slide } from "@/lib/types";
 import { cid, textElement, imageElement, MUTED, normalizeEduSimUrl } from "@/lib/canvas";
 import { qrToSvg } from "@/lib/qr";
@@ -9,17 +9,27 @@ import { extractSimMetadata } from "@/lib/client";
 import { createSimulation } from "@/lib/sims";
 import { eduSimLink } from "@/lib/supabase";
 import { useSupabaseUser } from "@/lib/supabaseAuth";
+import { SIM_TYPES, simBuildDirective, type SimType } from "@/lib/simTypes";
 import { SimSignIn } from "./SimSignIn";
 import { Spinner, TextArea } from "./ui";
 
 // The AISA "EduSim" gem on Gemini — turns a lesson into a student-facing,
-// simulation-based learning experience (it codes the simulation HTML for you).
+// interactive learning experience (it codes the HTML for you).
 const EDUSIM_GEM_URL = "https://gemini.google.com/gem/11QD4AkTJjpXVgEGw8SJ74nq99ntDfv8V?usp=sharing";
 
-// Serialise a lesson to clean, paste-ready text for the EduSim gem.
-function lessonToText(lesson: Lesson): string {
+const TYPE_ICON: Record<SimType, typeof FlaskConical> = {
+  simulation: FlaskConical,
+  game: Gamepad2,
+  adventure: Map,
+  worksheet: ClipboardCheck,
+};
+
+// Serialise a lesson to clean, paste-ready text for the EduSim gem, led by a
+// directive telling the gem WHICH kind of interactive resource to build.
+function lessonToText(lesson: Lesson, simType: SimType): string {
   const m = lesson.meta;
   const out: string[] = [];
+  out.push(simBuildDirective(simType), "");
   out.push(`# ${m.title}`);
   out.push(`${m.subject} · ${m.yearGroup} · ${m.durationMinutes} min · ${m.region}`);
   if (m.summary) out.push("", m.summary);
@@ -85,6 +95,7 @@ export function EduSimModal({
   const [tab, setTab] = useState<Tab>("create");
 
   // create-from-lesson state
+  const [simType, setSimType] = useState<SimType>("simulation");
   const [html, setHtml] = useState("");
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -98,7 +109,7 @@ export function EduSimModal({
 
   const copyLesson = async () => {
     try {
-      await navigator.clipboard.writeText(lessonToText(lesson));
+      await navigator.clipboard.writeText(lessonToText(lesson, simType));
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {
@@ -126,6 +137,7 @@ export function EduSimModal({
         description: meta.description || lesson.meta.summary || null,
         grade_level: meta.grade_level || null,
         subject: meta.subject || null,
+        sim_type: simType,
         concepts: meta.concepts.length ? meta.concepts : lesson.meta.topic ? [lesson.meta.topic] : [],
         standards: meta.standards.length ? meta.standards : lesson.meta.standards ?? [],
         html,
@@ -202,12 +214,39 @@ export function EduSimModal({
             </div>
           ) : (
             <>
+              <div className="mt-5">
+                <p className="text-sm font-semibold text-ink">What should we build?</p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {SIM_TYPES.map((t) => {
+                    const Icon = TYPE_ICON[t.id];
+                    const active = simType === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setSimType(t.id)}
+                        className={`flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-colors ${
+                          active ? "border-brand-400 bg-brand-50" : "border-line bg-white hover:border-brand-300"
+                        }`}
+                      >
+                        <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-50 text-brand-700">
+                          <Icon size={16} />
+                        </span>
+                        <span className="text-sm font-bold text-ink">{t.label}</span>
+                        <span className="text-[11px] leading-snug text-muted">{t.description}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <ol className="mt-5 space-y-4 text-sm">
                 <li>
                   <p className="font-semibold text-ink">1. Copy your lesson, then open EduSim</p>
                   <p className="mt-0.5 text-muted">
-                    Copies this lesson as clean text. Paste it into AISA&apos;s EduSim gem on Gemini and it codes an
-                    interactive simulation for your students.
+                    Copies this lesson as clean text, led by a note telling the gem to build{" "}
+                    {simType === "simulation" ? "a simulation" : simType === "game" ? "a game" : simType === "adventure" ? "a choose-your-own-adventure" : "an interactive worksheet"}.
+                    Paste it into AISA&apos;s EduSim gem on Gemini and it codes the activity for your students.
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <button

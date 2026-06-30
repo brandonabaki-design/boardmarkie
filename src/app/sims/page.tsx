@@ -5,12 +5,13 @@ import Link from "next/link";
 import { Plus, Search, ClipboardCheck, X } from "lucide-react";
 import { listSimulations, getAuthorNames, type Simulation, type SimFilters } from "@/lib/sims";
 import { GRADE_LEVELS, SUBJECTS } from "@/lib/taxonomy";
+import { SIM_TYPES } from "@/lib/simTypes";
 import { SimCard } from "@/components/app/SimCard";
 import { AppHeader } from "@/components/app/AppHeader";
 import { Select } from "@/components/app/ui";
 
 export default function SimsLibraryPage() {
-  const [filters, setFilters] = useState<SimFilters>({ search: "", grade: "", subject: "", sort: "created_at" });
+  const [filters, setFilters] = useState<SimFilters>({ search: "", grade: "", subject: "", type: "", sort: "created_at" });
   const [sims, setSims] = useState<Simulation[]>([]);
   const [authors, setAuthors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -72,7 +73,7 @@ export default function SimsLibraryPage() {
           </p>
         </div>
 
-        <div className="mb-5 grid gap-2 sm:grid-cols-[1fr_auto_auto_auto]">
+        <div className="mb-5 grid gap-2 sm:grid-cols-[1fr_auto_auto_auto_auto]">
           <div className="relative">
             <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
             <input
@@ -83,6 +84,14 @@ export default function SimsLibraryPage() {
               className="w-full rounded-xl border border-line bg-white py-2.5 pl-9 pr-3.5 text-sm text-ink outline-none transition-colors placeholder:text-muted/70 focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
             />
           </div>
+          <Select value={filters.type} onChange={(e) => set("type", e.target.value)} aria-label="Type">
+            <option value="">All types</option>
+            {SIM_TYPES.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </Select>
           <Select value={filters.grade} onChange={(e) => set("grade", e.target.value)} aria-label="Grade">
             <option value="">All grades</option>
             {GRADE_LEVELS.map((g) => (
