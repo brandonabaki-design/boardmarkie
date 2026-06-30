@@ -235,9 +235,11 @@ grant execute on function public.increment_view(uuid) to anon, authenticated;
 -- inside a deck. Public-read (students need no account); only signed-in teachers
 -- may upload, into a folder named after their own uid.
 -- ---------------------------------------------------------------------------
-insert into storage.buckets (id, name, public)
-values ('lesson-media', 'lesson-media', true)
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('lesson-media', 'lesson-media', true, 209715200)  -- 200MB (audio + video)
 on conflict (id) do nothing;
+-- Raise the cap on an already-created bucket (e.g. it predates video support).
+update storage.buckets set file_size_limit = 209715200, public = true where id = 'lesson-media';
 
 drop policy if exists media_read        on storage.objects;
 drop policy if exists media_insert_own  on storage.objects;

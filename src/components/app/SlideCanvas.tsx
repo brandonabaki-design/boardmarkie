@@ -379,6 +379,22 @@ function ElementContent({
       </div>
     );
   }
+  if (el.type === "video") {
+    return (
+      <div style={{ width: "100%", height: "100%", borderRadius: 8, overflow: "hidden", position: "relative", background: "#000" }}>
+        {interactive || editable ? (
+          // Playable in the editor AND when presenting; stop pointer-down so the
+          // controls don't start a drag/move gesture.
+          <video src={el.src} controls onPointerDown={(e) => e.stopPropagation()} style={{ width: "100%", height: "100%", objectFit: "contain", background: "#000" }} />
+        ) : (
+          // Thumbnails / print: no playback, so just label it.
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "1.5cqh", color: "#fff", fontSize: "3.6cqh", fontWeight: 800 }}>
+            🎬 {el.title || "Video"}
+          </div>
+        )}
+      </div>
+    );
+  }
   if (el.type === "audio") {
     return (
       <div

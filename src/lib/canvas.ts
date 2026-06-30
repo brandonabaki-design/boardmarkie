@@ -11,6 +11,7 @@ import type {
   ShapeElement,
   Slide,
   TextElement,
+  VideoElement,
   VocabItem,
   YoutubeElement,
 } from "./types";
@@ -114,6 +115,22 @@ export function audioElement(
     src: p.src,
     title: p.title,
     artworkSvg: p.artworkSvg,
+    x: p.x,
+    y: p.y,
+    w: p.w,
+    h: p.h,
+  };
+}
+
+export function videoElement(
+  p: Partial<VideoElement> & Pick<VideoElement, "src" | "x" | "y" | "w" | "h">,
+): VideoElement {
+  return {
+    id: cid("vid"),
+    type: "video",
+    z: p.z ?? 1,
+    src: p.src,
+    title: p.title,
     x: p.x,
     y: p.y,
     w: p.w,

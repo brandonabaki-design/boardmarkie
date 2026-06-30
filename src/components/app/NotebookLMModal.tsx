@@ -4,9 +4,9 @@ import { useState } from "react";
 import { X, Download, Copy, Check, ExternalLink, NotebookText, Headphones, Video, Layers, QrCode, Upload } from "lucide-react";
 import type { Lesson, Slide } from "@/lib/types";
 import { exportLessonToPptx } from "@/lib/export";
-import { cid, textElement, imageElement, audioElement, MUTED } from "@/lib/canvas";
+import { cid, textElement, imageElement, audioElement, videoElement, MUTED } from "@/lib/canvas";
 import { qrToSvg } from "@/lib/qr";
-import { uploadLessonAudio } from "@/lib/media";
+import { uploadLessonAudio, uploadLessonVideo } from "@/lib/media";
 import { useSupabaseUser } from "@/lib/supabaseAuth";
 import {
   NOTEBOOK_ACTIVITIES,
@@ -44,6 +44,20 @@ function buildAudioSlide(title: string, src: string): Slide {
     elements: [
       textElement({ text: `${title} 🎧`, x: 6, y: 8, w: 88, h: 12, fontSize: 7, bold: true, font: "display", align: "center", z: 1 }),
       audioElement({ src, title, x: 14, y: 34, w: 72, h: 34, z: 2 }),
+    ],
+  };
+}
+
+// A slide with an inline video player (the uploaded NotebookLM video overview).
+function buildVideoSlide(title: string, src: string): Slide {
+  return {
+    id: cid("sl"),
+    layout: "content",
+    title,
+    elements: [
+      textElement({ text: `${title} 🎬`, x: 6, y: 6, w: 88, h: 11, fontSize: 6, bold: true, font: "display", align: "center", z: 1 }),
+      // Square %-box ≈ 16:9 real aspect, so the video fills it without bars.
+      videoElement({ src, title, x: 20, y: 20, w: 60, h: 60, z: 2 }),
     ],
   };
 }
@@ -144,14 +158,19 @@ export function NotebookLMModal({
     }
   };
 
-  // Upload the downloaded audio overview → a slide with an inline player.
-  const uploadAudio = async () => {
+  // Upload the downloaded overview → a slide with an inline player (audio/video).
+  const uploadResource = async () => {
     if (!file) return;
     setUploadErr("");
     setUploading(true);
     try {
-      const src = await uploadLessonAudio(file);
-      onAddSlide?.(buildAudioSlide(RESOURCE_SLIDE.podcast.verb, src));
+      if (resourceKind === "video") {
+        const src = await uploadLessonVideo(file);
+        onAddSlide?.(buildVideoSlide(RESOURCE_SLIDE.video.verb, src));
+      } else {
+        const src = await uploadLessonAudio(file);
+        onAddSlide?.(buildAudioSlide(RESOURCE_SLIDE.podcast.verb, src));
+      }
       onClose();
     } catch (e) {
       setUploadErr((e as Error)?.message || "Upload failed.");
@@ -254,7 +273,11 @@ export function NotebookLMModal({
                     <button
                       key={a.id}
                       type="button"
-                      onClick={() => setResourceKind(a.id)}
+                      onClick={() => {
+                        setResourceKind(a.id);
+                        setFile(null);
+                        setUploadErr("");
+                      }}
                       className={`inline-flex flex-1 items-center justify-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors ${
                         on ? "bg-white text-brand-700 card-shadow" : "text-muted hover:text-ink"
                       }`}
@@ -265,21 +288,21 @@ export function NotebookLMModal({
                 })}
               </div>
 
-              {/* Podcasts can be uploaded and PLAYED inside the deck. */}
-              {resourceKind === "podcast" && (
+              {/* Audio + video overviews can be uploaded and PLAYED inside the deck. */}
+              {(resourceKind === "podcast" || resourceKind === "video") && (
                 <div className="mt-2 rounded-xl border border-line bg-paper/60 p-3">
                   <p className="text-xs font-semibold text-ink">Plays inside the deck (recommended)</p>
                   <p className="mt-0.5 text-[11px] text-muted">
-                    In NotebookLM, download the audio overview, then upload the file here — it becomes a player you can
-                    hit during the lesson.
+                    In NotebookLM, download the {resourceKind === "video" ? "video" : "audio"} overview, then upload the
+                    file here — it becomes a player you can hit during the lesson.
                   </p>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300">
                       <Upload size={15} className="text-brand-600" />
-                      {file ? "Choose a different file" : "Choose audio file"}
+                      {file ? "Choose a different file" : `Choose ${resourceKind === "video" ? "video" : "audio"} file`}
                       <input
                         type="file"
-                        accept="audio/*"
+                        accept={resourceKind === "video" ? "video/*" : "audio/*"}
                         className="hidden"
                         onChange={(e) => {
                           setFile(e.target.files?.[0] ?? null);
@@ -290,9 +313,9 @@ export function NotebookLMModal({
                     {file && <span className="max-w-[12rem] truncate text-xs text-muted">{file.name}</span>}
                   </div>
                   {uploadErr && <p className="mt-2 text-xs text-coral">{uploadErr}</p>}
-                  {!user && <p className="mt-2 text-xs text-muted">Sign in to upload audio.</p>}
+                  {!user && <p className="mt-2 text-xs text-muted">Sign in to upload {resourceKind === "video" ? "video" : "audio"}.</p>}
                   <button
-                    onClick={uploadAudio}
+                    onClick={uploadResource}
                     disabled={!file || uploading || !user}
                     className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
                   >

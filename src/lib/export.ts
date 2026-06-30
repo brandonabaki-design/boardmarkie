@@ -301,6 +301,16 @@ export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
           fill: { color: "0c6e62" },
           hyperlink: { url: el.src },
         });
+      } else if (el.type === "video") {
+        s.addText(`🎬 ${el.title || "Watch the video"}`, {
+          ...box,
+          fontSize: 16,
+          color: "ffffff",
+          align: "center",
+          valign: "middle",
+          fill: { color: "16181d" },
+          hyperlink: { url: el.src },
+        });
       }
     }
 

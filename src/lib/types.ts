@@ -71,7 +71,7 @@ export interface Slide {
 // Positions and sizes are PERCENTAGES of the slide canvas (0–100) so they scale
 // responsively across the editor, thumbnails, Present mode, and exports.
 
-export type CanvasElementType = "text" | "image" | "shape" | "youtube" | "audio";
+export type CanvasElementType = "text" | "image" | "shape" | "youtube" | "audio" | "video";
 
 interface CanvasElementBase {
   id: string;
@@ -131,7 +131,19 @@ export interface AudioElement extends CanvasElementBase {
   artworkSvg?: string; // optional decorative SVG behind the player (e.g. a podcast cover)
 }
 
-export type CanvasElement = TextElement | ImageElement | ShapeElement | YoutubeElement | AudioElement;
+export interface VideoElement extends CanvasElementBase {
+  type: "video";
+  src: string; // uploaded video file URL (e.g. a NotebookLM video overview)
+  title?: string;
+}
+
+export type CanvasElement =
+  | TextElement
+  | ImageElement
+  | ShapeElement
+  | YoutubeElement
+  | AudioElement
+  | VideoElement;
 
 export interface Lesson {
   id: string;
