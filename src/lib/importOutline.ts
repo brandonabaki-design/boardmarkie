@@ -26,6 +26,7 @@ export interface ImportPreview {
   subject: string;
   yearGroup: string;
   slideCount: number;
+  objectiveCount: number;
   standards: string[];
 }
 
@@ -39,6 +40,8 @@ const GRADE_PAREN_RE = /\(([^)]*\b(?:grade|year|kg|ks\s*\d|reception|stage|found
 const BULLET_MARKER_RE = /^\s*(?:[-*•·▪◦‣]|\d+[.)]|[a-z][.)])\s+/i;
 
 interface RawBlock {
+  fromMarker: boolean; // introduced by a "Slide N" line?
+  label: string; // text after "Slide N:" on the marker line (often a section name)
   lines: string[];
 }
 
@@ -49,15 +52,16 @@ function splitBlocks(text: string): RawBlock[] {
     const line = raw.replace(/\s+$/, "");
     const m = line.match(SLIDE_RE);
     if (m) {
-      current = { lines: [] };
+      // Keep the "Slide N:" label separate — it's a section name ("Title Slide",
+      // "Hook / Introduction"), not necessarily the real slide title.
+      current = { fromMarker: true, label: m[1].trim(), lines: [] };
       blocks.push(current);
-      const inline = m[1].trim(); // title on the same line as "Slide N", if any
-      if (inline) current.lines.push(inline);
       continue;
     }
     if (!current) {
-      // Content before the first "Slide N" marker — start an implicit first block.
-      current = { lines: [] };
+      // Content before the first "Slide N" marker — implicit block (may be a
+      // metadata preamble, or the whole thing if there are no markers at all).
+      current = { fromMarker: false, label: "", lines: [] };
       blocks.push(current);
     }
     current.lines.push(line);
@@ -178,11 +182,12 @@ export function detectSubject(text: string, gradeLabel = ""): string {
 // everyday numbers like "8-10" or "COVID-19" don't get mistaken for standards).
 const STANDARD_PATTERNS: RegExp[] = [
   /\bCCSS\.[A-Z0-9.\-]+/gi, // CCSS.ELA-LITERACY.RL.3.1
-  /\bNGSS\s+[A-Z0-9\-]+/gi, // NGSS MS-LS1-6
-  /\b(?:K|\d{1,2}|MS|HS)-(?:PS|LS|ESS|ETS)\d?-\d+\b/g, // 3-LS2-1, MS-LS1-6
+  /\b(?:K|\d{1,2}|MS|HS)-(?:PS|LS|ESS|ETS)\d?-\d+\b/g, // NGSS: 3-LS2-1, MS-LS1-6
   /\b(?:RL|RI|RF|SL|RH|RST|WHST|W|L)\.[K\d]+\.\d+[a-z]?\b/gi, // CCSS ELA e.g. RL.3.1
   /\b[K\d]+\.(?:OA|NBT|NF|MD|RP|NS|EE|SP|G)\.[A-Z]?\.?\d+[a-z]?\b/gi, // CCSS math e.g. 4.NF.B.3
 ];
+// NB: we deliberately don't match a bare "NGSS <word>" — it caught prose like
+// "NGSS concepts". Real NGSS codes are caught by the DCI pattern above.
 
 /** All curriculum-standard codes found anywhere in the text (deduped). */
 export function detectStandards(text: string): string[] {
@@ -212,67 +217,197 @@ function titleToQuery(title: string): string {
   return q || title.trim();
 }
 
-function pickLayout(index: number, title: string, bullets: string[]): SlideLayout {
+function pickLayout(index: number, title: string, bullets: string[], label = ""): SlideLayout {
   if (index === 0 && looksLikeTitleSlide(title, bullets)) return "title";
-  const t = title.toLowerCase();
-  if (/\bobjective|learning goal|i can\b|success criteria/.test(t)) return "objectives";
-  if (/\bactivit|hands-on|task\b/.test(t)) return "activity";
-  if (/\bdiscuss|turn[\s-]?and[\s-]?talk|think[\s-]?pair/.test(t)) return "discussion";
-  if (/\bexit ticket|recap|plenary|wrap[\s-]?up|summary|review\b/.test(t)) return "plenary";
+  const t = `${title} ${label}`.toLowerCase();
+  if (/\b(objective|learning goal|i can|success criteria)\b/.test(t)) return "objectives";
+  if (/\b(activit|hands-on|task)/.test(t)) return "activity";
+  if (/\b(discuss|turn[\s-]?and[\s-]?talk|think[\s-]?pair)/.test(t)) return "discussion";
+  if (/\b(exit ticket|recap|plenary|wrap[\s-]?up|summary|review|conclusion)\b/.test(t)) return "plenary";
   return "content";
+}
+
+// Labeled fields some outlines (e.g. Gemini) use inside a slide block.
+const FIELD_RE = /^(heading|title|subtitle|sub-title|visual idea|visual|image idea|image)\s*:\s*(.*)$/i;
+// Structural container labels whose own line carries no slide content.
+const CONTAINER_LABEL_RE =
+  /^(bullet points?|talking points?|key points?|main points?|content|body|teacher notes?|speaker notes?|notes?)\s*:?\s*(.*)$/i;
+
+/**
+ * Turn one slide block into a title/subtitle/bullets, understanding both the
+ * simple form (first line = title, rest = bullets) and the labeled form
+ * (Heading:/Title:/Subtitle:/Bullet Points:/Visual Idea:). `label` is the
+ * "Slide N: …" section name, used only as a fallback title.
+ */
+function parseSlideBlock(
+  lines: string[],
+  label: string,
+): { title: string; subtitle: string; bullets: string[]; imagePrompt: string } {
+  let heading = "";
+  let titleField = "";
+  let subtitle = "";
+  let visual = "";
+  let sawField = false;
+  const content: string[] = [];
+
+  for (const line of lines) {
+    if (!line) continue;
+    const fm = line.match(FIELD_RE);
+    if (fm) {
+      sawField = true;
+      const key = fm[1].toLowerCase();
+      const val = fm[2].trim();
+      if (key === "heading") heading ||= val;
+      else if (key === "title") titleField ||= val;
+      else if (key.startsWith("sub")) subtitle ||= val;
+      else visual ||= val; // "visual idea" / "image"
+      continue;
+    }
+    const cm = line.match(CONTAINER_LABEL_RE);
+    if (cm) {
+      sawField = true;
+      const val = cm[2].trim();
+      if (val) content.push(cleanBullet(val));
+      continue;
+    }
+    content.push(cleanBullet(line));
+  }
+
+  let title = heading || titleField;
+  if (!title && !sawField) title = content.shift() ?? ""; // simple form: first line is the title
+  if (!title) title = label;
+  return { title: title.trim(), subtitle: subtitle.trim(), bullets: content.filter(Boolean), imagePrompt: visual.trim() };
+}
+
+/**
+ * Parse a metadata preamble (the block before the first "Slide N") for grade,
+ * topic, learning objectives, and standards.
+ */
+function parsePreamble(lines: string[]): { grade: string; topic: string; objectives: string[]; standards: string[] } {
+  let grade = "";
+  let topic = "";
+  const objectives: string[] = [];
+  const standards: string[] = [];
+  let section: "none" | "standards" | "objectives" = "none";
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    let m: RegExpMatchArray | null;
+    if ((m = line.match(/^(?:target )?grade level\s*:\s*(.+)$/i))) {
+      grade = detectGrade(m[1]) || m[1].trim();
+      section = "none";
+      continue;
+    }
+    if ((m = line.match(/^(?:topic|subject\/topic|lesson topic)\s*:\s*(.+)$/i))) {
+      topic = m[1].trim();
+      section = "none";
+      continue;
+    }
+    if (/^(?:educational |curriculum )?standards\b/i.test(line)) {
+      section = "standards";
+      continue;
+    }
+    if (/^(?:learning |lesson )?objectives\b/i.test(line)) {
+      section = "objectives";
+      continue;
+    }
+    // A "…Slide Outline" / "Slides" / "Presentation" header ends the preamble
+    // sections (so it isn't captured as an objective/standard).
+    if (/^(?:powerpoint\s+)?slides?(?:\s+outline)?\b|^(?:presentation|lesson)\s+outline\b|^slide[-\s]?by[-\s]?slide\b/i.test(line)) {
+      section = "none";
+      continue;
+    }
+    if (section === "objectives") {
+      if (/^(by the end|students will|learners will|swbat|the student)\b/i.test(line)) continue; // intro line
+      objectives.push(cleanBullet(line).replace(/[.:;]+$/, "").trim());
+    } else if (section === "standards") {
+      const codes = detectStandards(line);
+      if (codes.length) {
+        for (const c of codes) standards.push(c);
+        continue;
+      }
+      const colon = line.indexOf(":");
+      const lbl = (colon > 0 ? line.slice(0, colon) : line).trim();
+      if (lbl && lbl.length <= 80 && /[a-z]/i.test(lbl)) standards.push(lbl);
+    }
+  }
+  return { grade, topic, objectives: objectives.filter(Boolean), standards };
 }
 
 /**
  * Parse pasted outline text into ready-to-edit slides. Returns null if no usable
  * content was found. Standards detected on a "Standards" slide are collected too.
  */
-export function parseOutline(
-  text: string,
-): { slides: Slide[]; title: string; subject: string; yearGroup: string; standards: string[] } | null {
+export function parseOutline(text: string): {
+  slides: Slide[];
+  title: string;
+  topic: string;
+  subject: string;
+  yearGroup: string;
+  objectives: string[];
+  standards: string[];
+} | null {
   const blocks = splitBlocks(text);
+  const hasMarkers = blocks.some((b) => b.fromMarker);
   const standards = new Set<string>();
+  const objectives: string[] = [];
   const slides: Slide[] = [];
 
   let lessonTitle = "";
+  let topic = "";
   let yearGroup = "";
 
-  blocks.forEach((block) => {
+  for (const block of blocks) {
     const lines = tidy(block.lines);
-    if (!lines.length) return;
 
-    const rawTitle = lines[0];
-    const rest = lines.slice(1).filter((l) => l !== "");
-    const bullets = rest.map(cleanBullet).filter(Boolean);
+    // Metadata preamble (before the first "Slide N") — parse, don't make a slide.
+    if (!block.fromMarker && hasMarkers) {
+      if (!lines.length) continue;
+      const pre = parsePreamble(lines);
+      if (pre.grade && !yearGroup) yearGroup = pre.grade;
+      if (pre.topic && !topic) topic = pre.topic;
+      for (const o of pre.objectives) objectives.push(o);
+      for (const s of pre.standards) standards.add(s);
+      continue;
+    }
+    if (!lines.length && !block.label) continue;
+
+    const parsed = parseSlideBlock(lines, block.label);
+    if (!parsed.title && !parsed.bullets.length) continue;
 
     const index = slides.length;
-    let title = rawTitle;
+    let title = parsed.title;
 
     // First slide: lift the lesson title + any "(Grade N)" parenthetical.
     if (index === 0) {
-      const gm = rawTitle.match(GRADE_PAREN_RE);
+      const gm = title.match(GRADE_PAREN_RE);
       if (gm) {
-        yearGroup = gm[1].trim();
-        title = rawTitle.replace(GRADE_PAREN_RE, "").trim();
+        if (!yearGroup) yearGroup = gm[1].trim();
+        title = title.replace(GRADE_PAREN_RE, "").trim();
       }
       lessonTitle = title;
     }
 
     // Collect curriculum standards from a standards-style slide.
-    if (STANDARDS_TITLE_RE.test(rawTitle)) {
-      for (const b of bullets) {
+    if (STANDARDS_TITLE_RE.test(parsed.title)) {
+      for (const b of parsed.bullets) {
         const code = leadingStandardCode(b);
         if (code) standards.add(code);
       }
     }
 
-    const layout = pickLayout(index, title, bullets);
+    const layout = pickLayout(index, title, parsed.bullets, block.label);
     const slide: Slide = { id: cid("sl"), layout, title };
-    if (layout !== "title" && bullets.length) slide.bullets = bullets;
+    if (parsed.subtitle) slide.subtitle = parsed.subtitle;
+    if (layout !== "title" && parsed.bullets.length) slide.bullets = parsed.bullets;
     // Seed a stock-image query so the optional free media pass has a target;
     // no image is embedded unless the teacher opts in.
     if (layout !== "title") slide.imageQuery = titleToQuery(title);
+    // A "Visual Idea:" line becomes a rich prompt if the teacher later AI-generates.
+    if (parsed.imagePrompt) slide.imagePrompt = parsed.imagePrompt;
     slides.push(slide);
-  });
+  }
 
   if (!slides.length) return null;
 
@@ -281,8 +416,17 @@ export function parseOutline(
   if (!yearGroup) yearGroup = detectGrade(text);
   for (const code of detectStandards(text)) standards.add(code);
   const subject = detectSubject(text, yearGroup);
+  const title = lessonTitle || topic || slides[0].title;
 
-  return { slides, title: lessonTitle || slides[0].title, subject, yearGroup, standards: [...standards] };
+  return {
+    slides,
+    title,
+    topic: topic || title,
+    subject,
+    yearGroup,
+    objectives: [...new Set(objectives)],
+    standards: [...standards],
+  };
 }
 
 /** Lightweight preview for the import dialog without building the full Lesson. */
@@ -294,6 +438,7 @@ export function previewOutline(text: string, opts: ImportOptions = {}): ImportPr
     subject: opts.subject?.trim() || parsed.subject,
     yearGroup: opts.yearGroup?.trim() || parsed.yearGroup,
     slideCount: parsed.slides.length,
+    objectiveCount: parsed.objectives.length,
     standards: parsed.standards,
   };
 }
@@ -314,12 +459,12 @@ export function lessonFromOutline(text: string, opts: ImportOptions = {}): Lesso
     meta: {
       title: parsed.title,
       subject: opts.subject?.trim() || parsed.subject,
-      topic: parsed.title,
+      topic: parsed.topic,
       yearGroup: opts.yearGroup?.trim() || parsed.yearGroup,
       region: opts.region?.trim() || "",
       durationMinutes: 45,
       summary: "",
-      objectives: [],
+      objectives: parsed.objectives,
       vocabulary: [],
       ...(parsed.standards.length ? { standards: parsed.standards } : {}),
     },

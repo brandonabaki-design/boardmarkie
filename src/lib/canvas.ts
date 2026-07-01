@@ -190,14 +190,26 @@ export function normalizeEduSimUrl(input: string): string | null {
 
 // ---- auto-layout: turn a generated/template slide into canvas elements ----
 
+/**
+ * Reflow a run-on enumerated list ("1. a 2. b 3. c") onto separate lines so it
+ * reads as a list instead of a wall of text. Only acts when there are 2+ markers,
+ * so ordinary prose (a stray "…by 3. ") is left untouched.
+ */
+export function splitInlineList(text: string): string {
+  if (!text) return text;
+  const markers = text.match(/(?:^|\s)\d{1,2}[.)]\s/g);
+  if (!markers || markers.length < 2) return text;
+  return text.replace(/([^\n])\s+(\d{1,2}[.)]\s)/g, "$1\n$2").trim();
+}
+
 function bodyText(slide: Slide): string {
   const lines: string[] = [];
-  if (slide.body) lines.push(slide.body);
+  if (slide.body) lines.push(splitInlineList(slide.body));
   for (const b of slide.bullets ?? []) lines.push(`•  ${b}`);
   for (const v of slide.vocabulary ?? []) lines.push(`**${v.term}:** ${v.definition}`);
   if (slide.activity) {
     lines.push(`**${slide.activity.title || "Activity"}**`);
-    if (slide.activity.instructions) lines.push(slide.activity.instructions);
+    if (slide.activity.instructions) lines.push(splitInlineList(slide.activity.instructions));
   }
   for (const q of slide.discussionQuestions ?? []) lines.push(`•  ${q}`);
   for (const q of slide.quiz ?? []) {

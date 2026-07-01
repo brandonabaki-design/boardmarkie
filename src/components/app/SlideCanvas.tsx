@@ -569,7 +569,9 @@ function TextBox({
       onPointerDown={(e) => {
         if (editing) e.stopPropagation();
       }}
-      onBlur={(e) => onCommit((e.currentTarget.textContent ?? "").replace(/ /g, " "))}
+      // innerText (not textContent) preserves the line breaks the user typed —
+      // textContent collapses <div>/<br> boundaries, which reverted manual lists.
+      onBlur={(e) => onCommit(((e.currentTarget as HTMLDivElement).innerText ?? "").replace(/ /g, " "))}
       className={el.font === "display" ? "font-display" : ""}
       style={{
         width: "100%",

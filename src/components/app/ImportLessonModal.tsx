@@ -137,6 +137,11 @@ export function ImportLessonModal({
                   <span className="text-brand-800/60">(edit above if needed)</span>
                 </span>
               )}
+              {preview.objectiveCount > 0 && (
+                <span className="block text-xs text-brand-800/80">
+                  {preview.objectiveCount} learning objective{preview.objectiveCount === 1 ? "" : "s"} detected
+                </span>
+              )}
               {preview.standards.length > 0 && (
                 <span className="block text-xs text-brand-800/80">
                   Standards found: {preview.standards.join(", ")}
