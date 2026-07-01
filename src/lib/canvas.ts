@@ -192,27 +192,57 @@ export function normalizeEduSimUrl(input: string): string | null {
 
 // ---- auto-layout: turn a generated/template slide into canvas elements ----
 
+// Success-criteria labels like "Apply (DOK 2):" or "Remember / Understand (DOK 1):".
+const BLOOM = "remember|understand|apply|analys[ez]e?|analyz\\w*|evaluat\\w*|creat\\w*|knowledge|comprehension|synthesis";
+const DOK_LABEL = new RegExp(`(?:(?:${BLOOM})(?:\\s*[/&,]\\s*(?:${BLOOM}))*\\s*)?\\(\\s*dok\\s*\\d\\s*\\)`, "gi");
+
 /**
- * Reflow a run-on enumerated list ("1. a 2. b 3. c") onto separate lines so it
- * reads as a list instead of a wall of text. Only acts when there are 2+ markers,
- * so ordinary prose (a stray "…by 3. ") is left untouched.
+ * Reflow a run-on list onto separate lines so it reads as a list, not a wall of
+ * text. Handles numbered lists ("1. a 2. b 3. c") and leveled success criteria
+ * ("… (DOK 1): I can… Apply (DOK 2): I can…"). Only acts when 2+ markers are
+ * present, so ordinary prose is left untouched.
  */
 export function splitInlineList(text: string): string {
   if (!text) return text;
-  const markers = text.match(/(?:^|\s)\d{1,2}[.)]\s/g);
-  if (!markers || markers.length < 2) return text;
-  return text.replace(/([^\n])\s+(\d{1,2}[.)]\s)/g, "$1\n$2").trim();
+  let out = text;
+
+  // Leveled success criteria: break before each Bloom/DOK label after the first.
+  const labels = [...out.matchAll(DOK_LABEL)];
+  if (labels.length >= 2) {
+    let res = "";
+    let last = 0;
+    for (const m of labels) {
+      const start = m.index ?? 0;
+      if (start <= last) continue;
+      res += out.slice(last, start).replace(/[ \t]+$/, "");
+      if (res && !res.endsWith("\n")) res += "\n";
+      last = start;
+    }
+    res += out.slice(last);
+    out = res;
+  }
+
+  // Numbered lists.
+  const markers = out.match(/(?:^|\s)\d{1,2}[.)]\s/g);
+  if (markers && markers.length >= 2) out = out.replace(/([^\n])\s+(\d{1,2}[.)]\s)/g, "$1\n$2");
+
+  return out.trim();
 }
 
-// Render one bullet, reflowing a run-on numbered list inside it. If the bullet
-// IS a numbered list, drop the "•" (no bullet-then-number); if it's intro text
-// followed by a list, keep the bullet and indent the numbered items beneath it.
+// Render one bullet, reflowing a run-on list inside it. A pure numbered list
+// drops the "•" (no bullet-then-number); intro text + a numbered list keeps the
+// bullet and indents the steps; anything else (e.g. leveled criteria) becomes
+// one bullet per line.
 function bulletLines(b: string): string {
   const s = splitInlineList(b);
   if (!s.includes("\n")) return `•  ${b}`;
-  const parts = s.split("\n");
+  const parts = s.split("\n").map((p) => p.trim()).filter(Boolean);
+  if (!parts.length) return `•  ${b}`;
   if (/^\d{1,2}[.)]\s/.test(parts[0])) return parts.join("\n");
-  return [`•  ${parts[0]}`, ...parts.slice(1).map((p) => `    ${p}`)].join("\n");
+  if (parts.slice(1).some((p) => /^\d{1,2}[.)]\s/.test(p))) {
+    return [`•  ${parts[0]}`, ...parts.slice(1).map((p) => `    ${p}`)].join("\n");
+  }
+  return parts.map((p) => `•  ${p}`).join("\n");
 }
 
 function bodyText(slide: Slide): string {

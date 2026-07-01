@@ -250,6 +250,7 @@ const STANDARD_PATTERNS: RegExp[] = [
   /\b(?:K|\d{1,2}|MS|HS)-(?:PS|LS|ESS|ETS)\d?-\d+\b/g, // NGSS: 3-LS2-1, MS-LS1-6
   /\b(?:RL|RI|RF|SL|RH|RST|WHST|W|L)\.[K\d]+\.\d+[a-z]?\b/gi, // CCSS ELA e.g. RL.3.1
   /\b[K\d]+\.(?:OA|NBT|NF|MD|RP|NS|EE|SP|G)\.[A-Z]?\.?\d+[a-z]?\b/gi, // CCSS math e.g. 4.NF.B.3
+  /\b\d{1,2}\.[A-Z][A-Za-z0-9]*(?:\.[A-Za-z0-9]+)+\b/g, // dotted codes e.g. 6.T3C.1, 6.T3C.7 (UAE MOE / state)
 ];
 // NB: we deliberately don't match a bare "NGSS <word>" — it caught prose like
 // "NGSS concepts". Real NGSS codes are caught by the DCI pattern above.
