@@ -13,9 +13,11 @@ import { SIM_TYPES, simBuildDirective, type SimType } from "@/lib/simTypes";
 import { SimSignIn } from "./SimSignIn";
 import { Spinner, TextArea } from "./ui";
 
-// The AISA "EduSim" gem on Gemini — turns a lesson into a student-facing,
-// interactive learning experience (it codes the HTML for you).
+// The AISA gems on Gemini that turn a lesson into a student-facing, interactive
+// build (they code the HTML for you). Games use the dedicated EduPlay gem
+// (arcade-style playable games); everything else uses the EduSim gem.
 const EDUSIM_GEM_URL = "https://gemini.google.com/gem/11QD4AkTJjpXVgEGw8SJ74nq99ntDfv8V?usp=sharing";
+const EDUPLAY_GEM_URL = "https://gemini.google.com/gem/1HauuBTu_wAx5JTkkVbqH_zAzrfuQ7kKk?usp=sharing";
 
 const TYPE_ICON: Record<SimType, typeof FlaskConical> = {
   simulation: FlaskConical,
@@ -96,6 +98,10 @@ export function EduSimModal({
 
   // create-from-lesson state
   const [simType, setSimType] = useState<SimType>("simulation");
+  // Games go to the dedicated EduPlay gem; everything else to the EduSim gem.
+  const isGame = simType === "game";
+  const gemUrl = isGame ? EDUPLAY_GEM_URL : EDUSIM_GEM_URL;
+  const gemName = isGame ? "EduPlay" : "EduSim";
   const [html, setHtml] = useState("");
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -192,7 +198,7 @@ export function EduSimModal({
       <div className="relative max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl border border-line bg-white p-6 card-shadow">
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 font-display text-xl font-bold text-ink">
-            <QrCode size={20} className="text-brand-600" /> EduSim
+            <QrCode size={20} className="text-brand-600" /> {gemName}
           </h2>
           <button onClick={onClose} disabled={busy} className="text-muted hover:text-ink disabled:opacity-40">
             <X size={20} />
@@ -242,11 +248,11 @@ export function EduSimModal({
 
               <ol className="mt-5 space-y-4 text-sm">
                 <li>
-                  <p className="font-semibold text-ink">1. Copy your lesson, then open EduSim</p>
+                  <p className="font-semibold text-ink">1. Copy your lesson, then open {gemName}</p>
                   <p className="mt-0.5 text-muted">
                     Copies this lesson as clean text, led by a note telling the gem to build{" "}
                     {simType === "simulation" ? "a simulation" : simType === "game" ? "a game" : simType === "adventure" ? "a choose-your-own-adventure" : "an interactive worksheet"}.
-                    Paste it into AISA&apos;s EduSim gem on Gemini and it codes the activity for your students.
+                    Paste it into AISA&apos;s {gemName} gem on Gemini and it codes the activity for your students.
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <button
@@ -257,12 +263,12 @@ export function EduSimModal({
                       {copied ? "Copied!" : "Copy lesson"}
                     </button>
                     <a
-                      href={EDUSIM_GEM_URL}
+                      href={gemUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
                     >
-                      <ExternalLink size={15} className="text-brand-600" /> Open EduSim
+                      <ExternalLink size={15} className="text-brand-600" /> Open {gemName}
                     </a>
                   </div>
                 </li>
