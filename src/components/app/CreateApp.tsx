@@ -306,10 +306,13 @@ export function CreateApp() {
     setPast([]);
     setFuture([]);
     refresh();
+    let working = seeded;
     if (addMedia) {
-      if (isHostedMode() || getGiphyKey()) await autoSearchMedia(seeded, "gif");
-      else await autoSearchMedia(seeded, "search");
+      working = isHostedMode() || getGiphyKey() ? await autoSearchMedia(seeded, "gif") : await autoSearchMedia(seeded, "search");
     }
+    // Embed a relevant YouTube clip where the parser tagged a slide (needs the proxy).
+    const hasProxy = isHostedMode() || !!getImageConfig().proxyUrl;
+    if (hasProxy) await autoEmbedYoutube(working);
   };
 
   const runGenerate = async (req: GenerateRequest, themeId?: string) => {

@@ -522,6 +522,24 @@ export function previewOutline(text: string, opts: ImportOptions = {}): ImportPr
   };
 }
 
+// Tag one slide with a topic YouTube query so the importer can auto-embed a
+// relevant clip (resolved via the proxy, same as AI/test lessons). Prefers a
+// hook/intro/explanation slide; falls back to the first content slide.
+function tagVideoSlide(slides: Slide[], topic: string, yearGroup: string): void {
+  if (slides.some((s) => s.youtube?.searchQuery)) return;
+  const clean = (topic || "")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\s*[-–—:].*$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!clean) return;
+  const query = `${clean} ${isElementary(yearGroup) ? "for kids" : "explained"}`;
+  let i = slides.findIndex((s, idx) => idx > 0 && /\b(hook|engage|intro|introduction|what is|why|overview|how)\b/i.test(s.title));
+  if (i === -1) i = slides.findIndex((s) => s.layout === "content");
+  if (i === -1 && slides.length > 1) i = 1;
+  if (i >= 0 && slides[i]) slides[i] = { ...slides[i], youtube: { title: "", searchQuery: query } };
+}
+
 /**
  * Build a complete Lesson from pasted outline text — no AI involved. Caller
  * supplies optional subject / grade / region to fill the lesson metadata.
@@ -530,6 +548,8 @@ export function lessonFromOutline(text: string, opts: ImportOptions = {}): Lesso
   const parsed = parseOutline(text);
   if (!parsed) return null;
   const now = Date.now();
+  const yearGroup = opts.yearGroup?.trim() || parsed.yearGroup;
+  tagVideoSlide(parsed.slides, parsed.topic, yearGroup);
   return {
     id: cid("lesson"),
     kind: "lesson",
@@ -539,7 +559,7 @@ export function lessonFromOutline(text: string, opts: ImportOptions = {}): Lesso
       title: parsed.title,
       subject: opts.subject?.trim() || parsed.subject,
       topic: parsed.topic,
-      yearGroup: opts.yearGroup?.trim() || parsed.yearGroup,
+      yearGroup,
       region: opts.region?.trim() || "",
       durationMinutes: 45,
       summary: "",
