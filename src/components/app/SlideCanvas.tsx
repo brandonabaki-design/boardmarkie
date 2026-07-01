@@ -569,9 +569,20 @@ function TextBox({
       onPointerDown={(e) => {
         if (editing) e.stopPropagation();
       }}
+      onKeyDown={(e) => {
+        if (!editing) return;
+        // Enter inserts a plain newline (rendered as a break via white-space:
+        // pre-wrap). Keeping content as pure text means the breaks read back
+        // cleanly on blur instead of contentEditable's <div>/<br> wrappers.
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.stopPropagation();
+          document.execCommand("insertText", false, "\n");
+        }
+      }}
       // innerText (not textContent) preserves the line breaks the user typed —
       // textContent collapses <div>/<br> boundaries, which reverted manual lists.
-      onBlur={(e) => onCommit(((e.currentTarget as HTMLDivElement).innerText ?? "").replace(/ /g, " "))}
+      onBlur={(e) => onCommit(((e.currentTarget as HTMLDivElement).innerText ?? "").replace(/\n{3,}/g, "\n\n").replace(/\n+$/, "").replace(/ /g, " "))}
       className={el.font === "display" ? "font-display" : ""}
       style={{
         width: "100%",
