@@ -202,10 +202,21 @@ export function splitInlineList(text: string): string {
   return text.replace(/([^\n])\s+(\d{1,2}[.)]\s)/g, "$1\n$2").trim();
 }
 
+// Render one bullet, reflowing a run-on numbered list inside it. If the bullet
+// IS a numbered list, drop the "•" (no bullet-then-number); if it's intro text
+// followed by a list, keep the bullet and indent the numbered items beneath it.
+function bulletLines(b: string): string {
+  const s = splitInlineList(b);
+  if (!s.includes("\n")) return `•  ${b}`;
+  const parts = s.split("\n");
+  if (/^\d{1,2}[.)]\s/.test(parts[0])) return parts.join("\n");
+  return [`•  ${parts[0]}`, ...parts.slice(1).map((p) => `    ${p}`)].join("\n");
+}
+
 function bodyText(slide: Slide): string {
   const lines: string[] = [];
   if (slide.body) lines.push(splitInlineList(slide.body));
-  for (const b of slide.bullets ?? []) lines.push(`•  ${b}`);
+  for (const b of slide.bullets ?? []) lines.push(bulletLines(b));
   for (const v of slide.vocabulary ?? []) lines.push(`**${v.term}:** ${v.definition}`);
   if (slide.activity) {
     lines.push(`**${slide.activity.title || "Activity"}**`);
