@@ -34,18 +34,21 @@ export function ImportLessonModal({
   const [grade, setGrade] = useState("");
   const [region, setRegion] = useState("");
   const [addMedia, setAddMedia] = useState(canAutoMedia);
-  // Track whether the teacher edited the grade so detection doesn't clobber it.
+  // Track whether the teacher edited a field so detection doesn't clobber it.
   const [gradeTouched, setGradeTouched] = useState(false);
+  const [subjectTouched, setSubjectTouched] = useState(false);
 
   const preview = useMemo(() => previewOutline(text), [text]);
 
-  // Auto-fill the grade from the pasted text until the teacher types their own.
+  // Auto-fill grade + subject from the pasted text until the teacher types over them.
   const detectedGrade = preview?.yearGroup ?? "";
   const gradeValue = gradeTouched ? grade : grade || detectedGrade;
+  const detectedSubject = preview?.subject ?? "";
+  const subjectValue = subjectTouched ? subject : subject || detectedSubject;
 
   const onCreate = () => {
     const lesson = lessonFromOutline(text, {
-      subject,
+      subject: subjectValue,
       yearGroup: gradeValue,
       region,
     });
@@ -88,10 +91,13 @@ export function ImportLessonModal({
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <Field label="Subject" hint="optional">
+          <Field label="Subject" hint="auto-detected">
             <input
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
+              value={subjectValue}
+              onChange={(e) => {
+                setSubjectTouched(true);
+                setSubject(e.target.value);
+              }}
               placeholder="e.g. Science"
               className={inputCls}
             />
@@ -124,6 +130,13 @@ export function ImportLessonModal({
             </div>
             <p className="mt-1 text-brand-800/90">
               <span className="font-semibold">{preview.title || "Untitled lesson"}</span>
+              {(detectedSubject || detectedGrade) && (
+                <span className="block text-xs text-brand-800/80">
+                  Detected: {[detectedSubject, detectedGrade].filter(Boolean).join(" · ")}
+                  {" "}
+                  <span className="text-brand-800/60">(edit above if needed)</span>
+                </span>
+              )}
               {preview.standards.length > 0 && (
                 <span className="block text-xs text-brand-800/80">
                   Standards found: {preview.standards.join(", ")}
