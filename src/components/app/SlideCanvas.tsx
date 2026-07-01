@@ -537,17 +537,36 @@ function TextBox({
   const plate = el.bg === "transparent" ? null : el.bg || autoPlate || null;
   const taRef = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState(el.text);
+  const draftRef = useRef(el.text); // latest draft
+  const committedRef = useRef(el.text); // last committed value (dedupe)
 
-  // Seed the editable draft each time we enter edit mode; focus at the end.
+  const cleanText = (t: string) =>
+    t.replace(/ /g, " ").replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n").replace(/\n+$/, "");
+
+  // Commit at most once per change. Safe to call from BOTH onBlur and the effect
+  // cleanup: clicking off the canvas fires onBlur; clicking another slide element
+  // (or the empty stage) clears editingId and unmounts the textarea on the same
+  // click — which can skip its native blur — so the cleanup is the backstop.
+  const commit = () => {
+    const next = cleanText(draftRef.current);
+    if (next !== committedRef.current) {
+      committedRef.current = next;
+      onCommit(next);
+    }
+  };
+
   useEffect(() => {
     if (!editing) return;
     setDraft(el.text);
+    draftRef.current = el.text;
+    committedRef.current = el.text;
     const t = taRef.current;
     if (t) {
       t.focus();
       const n = t.value.length;
       t.setSelectionRange(n, n);
     }
+    return () => commit();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
 
@@ -572,19 +591,19 @@ function TextBox({
     letterSpacing: el.font === "display" ? "-0.01em" : undefined,
   };
 
-  // Editing: a real <textarea> so newlines/blank lines are preserved natively
-  // (contentEditable mangled them). Shows raw markdown markers, same as before.
+  // Editing: a real <textarea> so newlines/blank lines are preserved natively.
   if (editing) {
     return (
       <textarea
         ref={taRef}
         value={draft}
         spellCheck
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          draftRef.current = e.target.value; // keep the ref current for commit()
+        }}
         onPointerDown={(e) => e.stopPropagation()}
-        onBlur={() =>
-          onCommit(draft.replace(/ /g, " ").replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n").replace(/\n+$/, ""))
-        }
+        onBlur={commit}
         className={el.font === "display" ? "font-display" : ""}
         style={{ ...shared, resize: "none", border: "none", outline: "none", background: plate ?? "transparent" }}
       />
