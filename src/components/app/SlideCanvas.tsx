@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   Replace,
   Copy,
@@ -535,74 +535,68 @@ function TextBox({
   // Readability plate: explicit "transparent" = none; an explicit colour wins;
   // otherwise fall back to the deck's auto plate (only set on themed backgrounds).
   const plate = el.bg === "transparent" ? null : el.bg || autoPlate || null;
-  const ref = useRef<HTMLDivElement>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  const [draft, setDraft] = useState(el.text);
 
-  // Editing → show raw text (with markdown markers); not editing → rendered bold/italic.
+  // Seed the editable draft each time we enter edit mode; focus at the end.
   useEffect(() => {
-    const node = ref.current;
-    if (!node) return;
-    if (editing) {
-      if (node.textContent !== el.text) node.textContent = el.text;
-    } else {
-      node.innerHTML = inlineHtml(el.text);
+    if (!editing) return;
+    setDraft(el.text);
+    const t = taRef.current;
+    if (t) {
+      t.focus();
+      const n = t.value.length;
+      t.setSelectionRange(n, n);
     }
-  }, [editing, el.text]);
-
-  useEffect(() => {
-    if (editing && ref.current) {
-      ref.current.focus();
-      // place caret at end
-      const sel = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(ref.current);
-      range.collapse(false);
-      sel?.removeAllRanges();
-      sel?.addRange(range);
-    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
 
+  // Shared typography so the editing box matches the rendered slide exactly.
+  const shared: CSSProperties = {
+    width: "100%",
+    height: "100%",
+    boxSizing: "border-box",
+    overflow: "hidden",
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+    padding: plate ? "1.4cqh 1.8cqh" : "1.2cqh 1.4cqh",
+    background: plate ?? undefined,
+    borderRadius: plate ? "1.6cqh" : undefined,
+    fontSize: `${el.fontSize}cqh`,
+    lineHeight: 1.2,
+    fontWeight: el.bold ? 800 : 500,
+    fontStyle: el.italic ? "italic" : "normal",
+    textAlign: el.align ?? "left",
+    color,
+    fontFamily: el.font === "display" ? displayFont : undefined,
+    letterSpacing: el.font === "display" ? "-0.01em" : undefined,
+  };
+
+  // Editing: a real <textarea> so newlines/blank lines are preserved natively
+  // (contentEditable mangled them). Shows raw markdown markers, same as before.
+  if (editing) {
+    return (
+      <textarea
+        ref={taRef}
+        value={draft}
+        spellCheck
+        onChange={(e) => setDraft(e.target.value)}
+        onPointerDown={(e) => e.stopPropagation()}
+        onBlur={() =>
+          onCommit(draft.replace(/ /g, " ").replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n").replace(/\n+$/, ""))
+        }
+        className={el.font === "display" ? "font-display" : ""}
+        style={{ ...shared, resize: "none", border: "none", outline: "none", background: plate ?? "transparent" }}
+      />
+    );
+  }
+
+  // Display: rendered bold/italic markdown; line breaks kept via pre-wrap.
   return (
     <div
-      ref={ref}
-      contentEditable={editing}
-      suppressContentEditableWarning
-      onPointerDown={(e) => {
-        if (editing) e.stopPropagation();
-      }}
-      onKeyDown={(e) => {
-        if (!editing) return;
-        // Enter inserts a plain newline (rendered as a break via white-space:
-        // pre-wrap). Keeping content as pure text means the breaks read back
-        // cleanly on blur instead of contentEditable's <div>/<br> wrappers.
-        if (e.key === "Enter") {
-          e.preventDefault();
-          e.stopPropagation();
-          document.execCommand("insertText", false, "\n");
-        }
-      }}
-      // innerText (not textContent) preserves the line breaks the user typed —
-      // textContent collapses <div>/<br> boundaries, which reverted manual lists.
-      onBlur={(e) => onCommit(((e.currentTarget as HTMLDivElement).innerText ?? "").replace(/\n{3,}/g, "\n\n").replace(/\n+$/, "").replace(/ /g, " "))}
       className={el.font === "display" ? "font-display" : ""}
-      style={{
-        width: "100%",
-        height: "100%",
-        overflow: "hidden",
-        whiteSpace: "pre-wrap",
-        wordBreak: "break-word",
-        outline: "none",
-        padding: plate ? "1.4cqh 1.8cqh" : "1.2cqh 1.4cqh",
-        background: plate ?? undefined,
-        borderRadius: plate ? "1.6cqh" : undefined,
-        fontSize: `${el.fontSize}cqh`,
-        lineHeight: 1.2,
-        fontWeight: el.bold ? 800 : 500,
-        fontStyle: el.italic ? "italic" : "normal",
-        textAlign: el.align ?? "left",
-        color,
-        fontFamily: el.font === "display" ? displayFont : undefined,
-        letterSpacing: el.font === "display" ? "-0.01em" : undefined,
-      }}
+      style={shared}
+      dangerouslySetInnerHTML={{ __html: inlineHtml(el.text) }}
     />
   );
 }
