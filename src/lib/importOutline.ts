@@ -50,7 +50,7 @@ function splitBlocks(text: string): RawBlock[] {
   let current: RawBlock | null = null;
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.replace(/\s+$/, "");
-    const m = line.match(SLIDE_RE);
+    const m = bareLabel(line).match(SLIDE_RE);
     if (m) {
       // Keep the "Slide N:" label separate — it's a section name ("Title Slide",
       // "Hook / Introduction"), not necessarily the real slide title.
@@ -86,6 +86,17 @@ function tidy(lines: string[]): string[] {
 
 function cleanBullet(line: string): string {
   return line.replace(BULLET_MARKER_RE, "").trim();
+}
+
+// Strip a leading Markdown heading ("## ") or blockquote (">") marker, keeping
+// the text and any inline **bold** — so ChatGPT/Markdown outlines parse cleanly.
+function stripLead(line: string): string {
+  return line.replace(/^\s{0,3}#{1,6}\s+/, "").replace(/^\s{0,3}>\s+/, "");
+}
+// A structural "label" probe: heading, bullet and bold/italic markers removed, so
+// we still recognise "## Slide 1:", "- Subtitle:", "- **3-LS1-1**:", etc.
+function bareLabel(line: string): string {
+  return stripLead(line).replace(BULLET_MARKER_RE, "").replace(/\*\*/g, "").replace(/__/g, "").trim();
 }
 
 // Pull a leading curriculum-standard code out of a line like
@@ -233,6 +244,11 @@ const FIELD_RE = /^(heading|title|subtitle|sub-title|visual idea|visual|image id
 const CONTAINER_LABEL_RE =
   /^(bullet points?|talking points?|key points?|main points?|content|body|teacher notes?|speaker notes?|notes?)\s*:?\s*(.*)$/i;
 
+// Generic slide section names (as opposed to a real slide title). When the
+// "Slide N: <label>" label is one of these, we look elsewhere for the title.
+const GENERIC_LABEL =
+  /^(title|title slide|cover|cover slide|intro|introduction|hook|opening|warm[\s-]?up|do now|agenda|objectives?|learning objectives?|conclusion|closing|summary|wrap[\s-]?up|recap|review|discussion|activity|class activity|questions?|q&a|plenary)$/i;
+
 /**
  * Turn one slide block into a title/subtitle/bullets, understanding both the
  * simple form (first line = title, rest = bullets) and the labeled form
@@ -250,9 +266,10 @@ function parseSlideBlock(
   let sawField = false;
   const content: string[] = [];
 
-  for (const line of lines) {
-    if (!line) continue;
-    const fm = line.match(FIELD_RE);
+  for (const raw of lines) {
+    if (!raw) continue;
+    const bare = bareLabel(raw); // heading/bold markers removed for classification
+    const fm = bare.match(FIELD_RE);
     if (fm) {
       sawField = true;
       const key = fm[1].toLowerCase();
@@ -263,19 +280,33 @@ function parseSlideBlock(
       else visual ||= val; // "visual idea" / "image"
       continue;
     }
-    const cm = line.match(CONTAINER_LABEL_RE);
+    const cm = bare.match(CONTAINER_LABEL_RE);
     if (cm) {
       sawField = true;
       const val = cm[2].trim();
       if (val) content.push(cleanBullet(val));
       continue;
     }
-    content.push(cleanBullet(line));
+    // Content: drop a leading heading marker but keep inline **bold**.
+    content.push(cleanBullet(stripLead(raw)));
   }
 
   let title = heading || titleField;
-  if (!title && !sawField) title = content.shift() ?? ""; // simple form: first line is the title
-  if (!title) title = label;
+  if (!title) {
+    // A specific "Slide N: <title>" label is the title. A generic section name
+    // ("Title", "Introduction", "Conclusion"…) is not — prefer a standalone
+    // **bold** line, else the label, else (MagicSchool) the first content line.
+    const specificLabel = !!label && !GENERIC_LABEL.test(label);
+    if (specificLabel) {
+      title = label;
+    } else {
+      const fb = content.findIndex((c) => /^\*\*.+\*\*$/.test(c.trim()));
+      if (fb >= 0) title = content.splice(fb, 1)[0];
+      else if (label) title = label;
+      else if (!sawField) title = content.shift() ?? "";
+    }
+  }
+  title = (title || "").replace(/^\*\*(.+)\*\*$/, "$1").trim(); // drop wrapping bold
   return { title: title.trim(), subtitle: subtitle.trim(), bullets: content.filter(Boolean), imagePrompt: visual.trim() };
 }
 
@@ -283,19 +314,31 @@ function parseSlideBlock(
  * Parse a metadata preamble (the block before the first "Slide N") for grade,
  * topic, learning objectives, and standards.
  */
-function parsePreamble(lines: string[]): { grade: string; topic: string; objectives: string[]; standards: string[] } {
+function parsePreamble(lines: string[]): {
+  grade: string;
+  subject: string;
+  topic: string;
+  objectives: string[];
+  standards: string[];
+} {
   let grade = "";
+  let subject = "";
   let topic = "";
   const objectives: string[] = [];
   const standards: string[] = [];
   let section: "none" | "standards" | "objectives" = "none";
 
   for (const raw of lines) {
-    const line = raw.trim();
+    const line = bareLabel(raw); // tolerate "## Standards", "**Objectives:**", etc.
     if (!line) continue;
     let m: RegExpMatchArray | null;
     if ((m = line.match(/^(?:target )?grade level\s*:\s*(.+)$/i))) {
       grade = detectGrade(m[1]) || m[1].trim();
+      section = "none";
+      continue;
+    }
+    if ((m = line.match(/^subject\s*:\s*(.+)$/i))) {
+      subject = m[1].trim();
       section = "none";
       continue;
     }
@@ -332,7 +375,7 @@ function parsePreamble(lines: string[]): { grade: string; topic: string; objecti
       if (lbl && lbl.length <= 80 && /[a-z]/i.test(lbl)) standards.push(lbl);
     }
   }
-  return { grade, topic, objectives: objectives.filter(Boolean), standards };
+  return { grade, subject, topic, objectives: objectives.filter(Boolean), standards };
 }
 
 /**
@@ -356,6 +399,7 @@ export function parseOutline(text: string): {
 
   let lessonTitle = "";
   let topic = "";
+  let subjectPre = "";
   let yearGroup = "";
 
   for (const block of blocks) {
@@ -366,6 +410,7 @@ export function parseOutline(text: string): {
       if (!lines.length) continue;
       const pre = parsePreamble(lines);
       if (pre.grade && !yearGroup) yearGroup = pre.grade;
+      if (pre.subject && !subjectPre) subjectPre = pre.subject;
       if (pre.topic && !topic) topic = pre.topic;
       for (const o of pre.objectives) objectives.push(o);
       for (const s of pre.standards) standards.add(s);
@@ -415,7 +460,7 @@ export function parseOutline(text: string): {
   // keywords, plus any standard codes written inline, not just on a standards slide).
   if (!yearGroup) yearGroup = detectGrade(text);
   for (const code of detectStandards(text)) standards.add(code);
-  const subject = detectSubject(text, yearGroup);
+  const subject = subjectPre || detectSubject(text, yearGroup);
   const title = lessonTitle || topic || slides[0].title;
 
   return {
