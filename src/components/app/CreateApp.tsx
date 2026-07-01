@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { FolderOpen, Settings, Plus, ArrowLeft, AlertCircle, X, FlaskConical, BookOpen, ClipboardPaste } from "lucide-react";
+import { FolderOpen, Settings, Plus, ArrowLeft, AlertCircle, X, FlaskConical, BookOpen, ClipboardPaste, Sparkles, ExternalLink } from "lucide-react";
 import type {
   Artifact,
   EditAction,
@@ -46,7 +46,7 @@ import { WorksheetView } from "./WorksheetView";
 import { SeriesView } from "./SeriesView";
 import { SettingsModal } from "./SettingsModal";
 import { LibraryDrawer } from "./LibraryDrawer";
-import { ImportLessonModal } from "./ImportLessonModal";
+import { ImportLessonModal, MAGICSCHOOL_URL } from "./ImportLessonModal";
 import { ExportMenu } from "./ExportMenu";
 import { PresentMode } from "./PresentMode";
 import { ShareLessonDialog } from "./ShareLessonDialog";
@@ -119,6 +119,7 @@ export function CreateApp() {
   const [shareOpen, setShareOpen] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [createMode, setCreateMode] = useState<"ai" | "noai">("ai");
   const [imageProgress, setImageProgress] = useState<{ done: number; total: number } | null>(null);
   const [past, setPast] = useState<Lesson[]>([]);
   const [future, setFuture] = useState<Lesson[]>([]);
@@ -767,24 +768,57 @@ export function CreateApp() {
           <>
             {/* Form stays mounted (just hidden) during Refine so inputs are preserved on Back. */}
             <div className={refine ? "hidden" : ""}>
-              <GeneratorForm initialMode={initialMode} loading={false} onSubmit={handleGenerate} />
+              {/* AI vs no-AI mode selector */}
+              <div className="mx-auto mb-6 grid w-full max-w-xs grid-cols-2 gap-1 rounded-2xl border border-line bg-paper p-1">
+                {(
+                  [
+                    { id: "ai", label: "AI Mode", icon: Sparkles },
+                    { id: "noai", label: "No-AI Mode", icon: ClipboardPaste },
+                  ] as const
+                ).map((m) => {
+                  const on = createMode === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => setCreateMode(m.id)}
+                      className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition-all ${
+                        on ? "bg-white text-brand-700 card-shadow" : "text-muted hover:text-ink"
+                      }`}
+                    >
+                      <m.icon size={15} /> {m.label}
+                    </button>
+                  );
+                })}
+              </div>
 
-              <div className="mx-auto mt-4 flex max-w-2xl items-center justify-center gap-3 text-xs text-muted">
-                <span className="h-px flex-1 bg-line" />
-                <span className="font-semibold uppercase tracking-wide">or</span>
-                <span className="h-px flex-1 bg-line" />
-              </div>
-              <div className="mx-auto mt-4 max-w-2xl text-center">
-                <button
-                  onClick={() => setImportOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-5 py-2.5 text-sm font-semibold text-ink transition-colors hover:border-brand-300 hover:text-brand-700 card-shadow"
-                >
-                  <ClipboardPaste size={16} className="text-brand-600" /> Paste an outline (no AI)
-                </button>
-                <p className="mt-1.5 text-[11px] text-muted">
-                  Already have an outline (e.g. from MagicSchool)? Build the slides instantly — no Claude credits used.
-                </p>
-              </div>
+              {createMode === "ai" ? (
+                <GeneratorForm initialMode={initialMode} loading={false} onSubmit={handleGenerate} />
+              ) : (
+                <div className="mx-auto max-w-2xl rounded-2xl border border-line bg-white p-6 card-shadow">
+                  <h2 className="font-display text-lg font-bold text-ink">Paste a lesson outline — no AI</h2>
+                  <p className="mt-1 text-sm text-muted">
+                    Already have an outline (MagicSchool, ChatGPT, Gemini…)? Paste it and Boardmarkie builds the slides
+                    instantly — no Claude credits used. No outline yet? Make one in MagicSchool&apos;s presentation
+                    generator, then paste it back.
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <a
+                      href={MAGICSCHOOL_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
+                    >
+                      <ExternalLink size={16} className="text-brand-600" /> Create outline in MagicSchool
+                    </a>
+                    <button
+                      onClick={() => setImportOpen(true)}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
+                    >
+                      <ClipboardPaste size={16} /> Paste your outline
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="mx-auto mt-7 max-w-2xl text-center">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">

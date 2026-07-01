@@ -1,10 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { X, ClipboardPaste, Sparkles, FileText } from "lucide-react";
+import { X, ClipboardPaste, Sparkles, FileText, ExternalLink } from "lucide-react";
 import type { Lesson } from "@/lib/types";
 import { lessonFromOutline, previewOutline } from "@/lib/importOutline";
 import { Field } from "./ui";
+
+// MagicSchool's presentation-generator tool — a quick way to make an outline to
+// paste back here (any outline works: MagicSchool, ChatGPT, Gemini…).
+export const MAGICSCHOOL_URL = "https://app.magicschool.ai/tools/teacher/presentation-generator";
 
 const PLACEHOLDER = `Slide 1
 Photosynthesis: How Plants Make Their Own Food (Grade 3)
@@ -72,10 +76,24 @@ export function ImportLessonModal({
           </button>
         </div>
         <p className="mt-1 text-sm text-muted">
-          Already have an outline from MagicSchool (or anywhere)? Paste it below and Boardmarkie builds the slides
+          Already have an outline (MagicSchool, ChatGPT, Gemini…)? Paste it below and Boardmarkie builds the slides
           instantly — no Claude credits used. Each <span className="font-semibold text-ink">Slide N</span> becomes a slide;
           the first line of each is its title.
         </p>
+
+        <div className="mt-3 rounded-xl border border-line bg-paper/60 px-4 py-3">
+          <p className="text-xs text-muted">
+            Don&apos;t have an outline yet? Make one in MagicSchool&apos;s presentation generator, then copy it back here.
+          </p>
+          <a
+            href={MAGICSCHOOL_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
+          >
+            <ExternalLink size={15} className="text-brand-600" /> Create outline in MagicSchool
+          </a>
+        </div>
 
         <div className="mt-4">
           <Field label="Paste your lesson outline">
