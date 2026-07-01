@@ -15,6 +15,60 @@
 import type { Lesson, Slide, SlideLayout } from "./types";
 import { cid } from "./canvas";
 
+// A copy-paste prompt teachers give to ChatGPT/Gemini/MagicSchool so the outline
+// comes back in exactly the shape this parser reads most accurately (metadata
+// preamble + "Slide N:" blocks + Bloom's/DOK leveled success criteria).
+export const OUTLINE_FORMAT_PROMPT = `You are helping me build a lesson slide-deck outline that I will paste into Boardmarkie (it converts the text into slides — no AI on its side, so the format matters).
+
+Output ONLY the outline in the EXACT plain-text format below. No intro, no closing remarks, no markdown tables. Keep every "Slide N:" on its own line, and put each bullet on its own line starting with "- ".
+
+=== FORMAT (fill in the <...> parts, keep the labels) ===
+
+Grade Level: <grade, e.g. Grade 3>
+Subject: <subject, e.g. Science>
+Topic: <the lesson topic>
+
+Standards
+- <real standard code + short description, e.g. NGSS 3-LS1-1: Develop models to describe...>
+- <another standard if relevant>
+
+Learning Objectives
+- <measurable objective: "Students will be able to ...">
+- <objective 2>
+- <objective 3>
+
+Slide 1: Title
+- <the lesson title>
+- <a short, student-friendly subtitle>
+
+Slide 2: Standards & Success Criteria
+- Standards: <list the standard codes>
+- Remember / Understand (DOK 1): I can <...>
+- Apply (DOK 2): I can <...>
+- Analyze / Evaluate / Create (DOK 3): I can <...>
+
+Slide 3: <engaging hook or big question>
+- <bullet>
+- <bullet>
+
+Slide 4: <key concept>
+- <bullet>
+- <bullet>
+
+<continue with ONE clear idea per slide — aim for 8–12 slides total>
+
+Slide N: Review & Exit Ticket
+- <2–3 quick review questions or prompts>
+
+=== RULES ===
+- Use real curriculum standard codes where you can (NGSS / Common Core / IB / UAE MOE).
+- Success criteria must be "I can..." statements, leveled with Bloom's/DOK as shown.
+- One concept per slide; keep bullets short and classroom-ready.
+- Localise real-world examples where it helps. Do not output anything outside this structure.
+
+=== MY LESSON ===
+<describe your topic, grade level, and subject here>`;
+
 export interface ImportOptions {
   subject?: string;
   yearGroup?: string;

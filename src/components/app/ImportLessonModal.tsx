@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { X, ClipboardPaste, Sparkles, FileText, ExternalLink } from "lucide-react";
+import { X, ClipboardPaste, Sparkles, FileText, ExternalLink, Copy, Check } from "lucide-react";
 import type { Lesson } from "@/lib/types";
-import { lessonFromOutline, previewOutline } from "@/lib/importOutline";
+import { lessonFromOutline, previewOutline, OUTLINE_FORMAT_PROMPT } from "@/lib/importOutline";
 import { Field } from "./ui";
 
 // MagicSchool's presentation-generator tool — a quick way to make an outline to
@@ -41,6 +41,17 @@ export function ImportLessonModal({
   // Track whether the teacher edited a field so detection doesn't clobber it.
   const [gradeTouched, setGradeTouched] = useState(false);
   const [subjectTouched, setSubjectTouched] = useState(false);
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
+
+  const copyPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(OUTLINE_FORMAT_PROMPT);
+      setCopiedPrompt(true);
+      setTimeout(() => setCopiedPrompt(false), 1800);
+    } catch {
+      /* clipboard blocked */
+    }
+  };
 
   const preview = useMemo(() => previewOutline(text), [text]);
 
@@ -83,16 +94,26 @@ export function ImportLessonModal({
 
         <div className="mt-3 rounded-xl border border-line bg-paper/60 px-4 py-3">
           <p className="text-xs text-muted">
-            Don&apos;t have an outline yet? Make one in MagicSchool&apos;s presentation generator, then copy it back here.
+            Don&apos;t have an outline yet? Copy the structure prompt into ChatGPT / Gemini / MagicSchool, add your topic,
+            and paste the result back — the set format gives the most accurate slides.
           </p>
-          <a
-            href={MAGICSCHOOL_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
-          >
-            <ExternalLink size={15} className="text-brand-600" /> Create outline in MagicSchool
-          </a>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              onClick={copyPrompt}
+              className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
+            >
+              {copiedPrompt ? <Check size={15} className="text-brand-600" /> : <Copy size={15} className="text-brand-600" />}
+              {copiedPrompt ? "Copied!" : "Copy structure prompt"}
+            </button>
+            <a
+              href={MAGICSCHOOL_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
+            >
+              <ExternalLink size={15} className="text-brand-600" /> Open MagicSchool
+            </a>
+          </div>
         </div>
 
         <div className="mt-4">

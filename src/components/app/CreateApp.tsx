@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { FolderOpen, Settings, Plus, ArrowLeft, AlertCircle, X, FlaskConical, BookOpen, ClipboardPaste, Sparkles, ExternalLink } from "lucide-react";
+import { FolderOpen, Settings, Plus, ArrowLeft, AlertCircle, X, FlaskConical, BookOpen, ClipboardPaste, Sparkles, ExternalLink, Copy, Check } from "lucide-react";
 import type {
   Artifact,
   EditAction,
@@ -47,6 +47,7 @@ import { SeriesView } from "./SeriesView";
 import { SettingsModal } from "./SettingsModal";
 import { LibraryDrawer } from "./LibraryDrawer";
 import { ImportLessonModal, MAGICSCHOOL_URL } from "./ImportLessonModal";
+import { OUTLINE_FORMAT_PROMPT } from "@/lib/importOutline";
 import { ExportMenu } from "./ExportMenu";
 import { PresentMode } from "./PresentMode";
 import { ShareLessonDialog } from "./ShareLessonDialog";
@@ -120,6 +121,7 @@ export function CreateApp() {
   const [askOpen, setAskOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [createMode, setCreateMode] = useState<"ai" | "noai">("ai");
+  const [copiedFmt, setCopiedFmt] = useState(false);
   const [imageProgress, setImageProgress] = useState<{ done: number; total: number } | null>(null);
   const [past, setPast] = useState<Lesson[]>([]);
   const [future, setFuture] = useState<Lesson[]>([]);
@@ -797,18 +799,46 @@ export function CreateApp() {
                 <div className="mx-auto max-w-2xl rounded-2xl border border-line bg-white p-6 card-shadow">
                   <h2 className="font-display text-lg font-bold text-ink">Paste a lesson outline — no AI</h2>
                   <p className="mt-1 text-sm text-muted">
-                    Already have an outline (MagicSchool, ChatGPT, Gemini…)? Paste it and Boardmarkie builds the slides
-                    instantly — no Claude credits used. No outline yet? Make one in MagicSchool&apos;s presentation
-                    generator, then paste it back.
+                    For the most accurate slides: <span className="font-semibold text-ink">copy the structure prompt</span>{" "}
+                    into ChatGPT / Gemini / MagicSchool, add your topic, then paste the result back. Any outline works —
+                    building the slides here uses no Claude credits.
                   </p>
+                  <ol className="mt-3 space-y-1.5 text-sm text-muted">
+                    <li>
+                      <span className="font-semibold text-ink">1.</span> Copy the structure prompt (sets grade, standards,
+                      objectives &amp; Bloom&apos;s/DOK success criteria).
+                    </li>
+                    <li>
+                      <span className="font-semibold text-ink">2.</span> Paste it into your AI tool, fill in your content,
+                      copy its answer.
+                    </li>
+                    <li>
+                      <span className="font-semibold text-ink">3.</span> Paste that back here — we build the slides.
+                    </li>
+                  </ol>
                   <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(OUTLINE_FORMAT_PROMPT);
+                          setCopiedFmt(true);
+                          setTimeout(() => setCopiedFmt(false), 1800);
+                        } catch {
+                          /* clipboard blocked */
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
+                    >
+                      {copiedFmt ? <Check size={16} className="text-brand-600" /> : <Copy size={16} className="text-brand-600" />}
+                      {copiedFmt ? "Copied!" : "Copy structure prompt"}
+                    </button>
                     <a
                       href={MAGICSCHOOL_URL}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:border-brand-300"
                     >
-                      <ExternalLink size={16} className="text-brand-600" /> Create outline in MagicSchool
+                      <ExternalLink size={16} className="text-brand-600" /> Open MagicSchool
                     </a>
                     <button
                       onClick={() => setImportOpen(true)}
