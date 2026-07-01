@@ -72,8 +72,8 @@ function buildEduSimSlide(link: string, qrSvg: string, simTitle: string): Slide 
     elements: [
       textElement({ text: "Try the Simulation 🔬", x: 6, y: 8, w: 88, h: 12, fontSize: 7, bold: true, font: "display", align: "center", z: 1 }),
       textElement({ text: `Scan to launch: ${simTitle}`, x: 12, y: 22, w: 76, h: 8, fontSize: 3.2, color: MUTED, align: "center", z: 2 }),
-      imageElement({ svg: qrSvg, eduSimUrl: link, alt: "EduSim QR code", x: 38, y: 32, w: 24, h: 43, z: 3 }),
-      textElement({ text: link, x: 8, y: 80, w: 84, h: 6, fontSize: 2.2, color: MUTED, align: "center", z: 4 }),
+      imageElement({ svg: qrSvg, eduSimUrl: link, linkUrl: link, alt: "EduSim QR code", x: 38, y: 32, w: 24, h: 43, z: 3 }),
+      textElement({ text: link, linkUrl: link, x: 8, y: 80, w: 84, h: 6, fontSize: 2.2, color: MUTED, align: "center", z: 4 }),
     ],
   };
 }

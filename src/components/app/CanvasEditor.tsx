@@ -166,7 +166,7 @@ export function CanvasEditor({
   // sized square in real pixels (w·16 ≈ h·9 on the 16:9 canvas) so it never
   // distorts. Embeds a pasted link onto the current slide.
   const embedEduSim = (svg: string, url: string) => {
-    addAndSelect(imageElement({ svg, eduSimUrl: url, alt: "EduSim QR code", x: 73, y: 55, w: 18, h: 32, z: topZ(els) }));
+    addAndSelect(imageElement({ svg, eduSimUrl: url, linkUrl: url, alt: "EduSim QR code", x: 73, y: 55, w: 18, h: 32, z: topZ(els) }));
   };
 
   // Append a freshly-created EduSim slide (QR for a new simulation) and open it.

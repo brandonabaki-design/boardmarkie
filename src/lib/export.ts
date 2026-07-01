@@ -256,6 +256,7 @@ export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
           color: hex(el.color ?? inkColor),
           fontFace: "Arial",
           ...(fill ? { fill } : {}),
+          ...(el.linkUrl ? { hyperlink: { url: el.linkUrl } } : {}),
         });
       } else if (el.type === "shape") {
         const shapeType = el.shape === "ellipse" ? "ellipse" : el.radius != null ? "roundRect" : "rect";
@@ -272,8 +273,9 @@ export async function exportLessonToPptx(lesson: Lesson): Promise<void> {
       } else if (el.type === "image") {
         const data = await imageData(el);
         if (data) {
+          const link = el.eduSimUrl || el.linkUrl;
           // "contain" shows the whole image (never cropped) — boxes are sized ~16:9 to match.
-          s.addImage({ data, ...box, sizing: { type: "contain", w: box.w, h: box.h } });
+          s.addImage({ data, ...box, sizing: { type: "contain", w: box.w, h: box.h }, ...(link ? { hyperlink: { url: link } } : {}) });
         }
       } else if (el.type === "youtube") {
         const url = `https://www.youtube.com/watch?v=${el.videoId}`;

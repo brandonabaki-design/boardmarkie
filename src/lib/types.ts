@@ -81,6 +81,7 @@ interface CanvasElementBase {
   w: number; // % width
   h: number; // % height
   z: number; // stacking order (higher = front)
+  linkUrl?: string; // clickable link (opens in Present/view mode + exports as a hyperlink)
 }
 
 export interface TextElement extends CanvasElementBase {

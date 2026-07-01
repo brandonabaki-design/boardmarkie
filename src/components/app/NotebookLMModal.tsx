@@ -73,8 +73,8 @@ function buildResourceSlide(kind: NotebookActivity, url: string, qrSvg: string):
     elements: [
       textElement({ text: `${r.verb} ${r.emoji}`, x: 6, y: 8, w: 88, h: 12, fontSize: 7, bold: true, font: "display", align: "center", z: 1 }),
       textElement({ text: `${r.scan}, or open the link below`, x: 12, y: 22, w: 76, h: 8, fontSize: 3.2, color: MUTED, align: "center", z: 2 }),
-      imageElement({ svg: qrSvg, alt: `${r.verb} QR code`, x: 38, y: 32, w: 24, h: 43, z: 3 }),
-      textElement({ text: url, x: 6, y: 80, w: 88, h: 6, fontSize: 2, color: MUTED, align: "center", z: 4 }),
+      imageElement({ svg: qrSvg, linkUrl: url, alt: `${r.verb} QR code`, x: 38, y: 32, w: 24, h: 43, z: 3 }),
+      textElement({ text: url, linkUrl: url, x: 6, y: 80, w: 88, h: 6, fontSize: 2, color: MUTED, align: "center", z: 4 }),
     ],
   };
 }

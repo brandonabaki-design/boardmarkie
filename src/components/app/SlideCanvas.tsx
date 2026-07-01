@@ -228,10 +228,16 @@ export function SlideCanvas({
       {sorted.map((el) => {
         const b = boxOf(el);
         const isSel = selected?.id === el.id;
+        // A clickable link (QR / URL text) — only actionable when NOT editing the
+        // deck, so it doesn't fight selection/drag in the editor.
+        const link = el.linkUrl || (el.type === "image" ? el.eduSimUrl : undefined);
+        const clickable = !editable && !!link;
         return (
           <div
             key={el.id}
             onPointerDown={(e) => startMove(e, el)}
+            onClick={clickable ? () => window.open(link!, "_blank", "noopener,noreferrer") : undefined}
+            title={clickable ? `Open ${link}` : undefined}
             onDoubleClick={() => {
               if (editable && el.type === "text") {
                 onSelect?.(el.id);
@@ -245,7 +251,7 @@ export function SlideCanvas({
               width: `${b.w}%`,
               height: `${b.h}%`,
               zIndex: el.z,
-              cursor: editable ? (editingId === el.id ? "text" : "move") : "default",
+              cursor: editable ? (editingId === el.id ? "text" : "move") : clickable ? "pointer" : "default",
               outline: isSel ? `2px solid ${SELECT}` : "none",
               outlineOffset: "1px",
             }}
@@ -770,9 +776,9 @@ function FloatingToolbar({
     onInline?.(cmd);
   };
   const above = box.y > 14;
-  // EduSim QR images get an "open link" action instead of "swap" — so a teacher
-  // can't accidentally replace the scannable code with an arbitrary picture.
-  const eduSimUrl = el.type === "image" ? el.eduSimUrl : undefined;
+  // A clickable link on this element (QR / URL text). Linked images get an
+  // "open link" action instead of "swap" so the scannable code can't be replaced.
+  const link = el.linkUrl || (el.type === "image" ? el.eduSimUrl : undefined);
   return (
     <div
       onPointerDown={(e) => e.stopPropagation()}
@@ -785,16 +791,16 @@ function FloatingToolbar({
       }}
       className="flex items-center gap-0.5 rounded-xl border border-line bg-white px-1 py-1 card-shadow"
     >
-      {el.type === "image" &&
-        (eduSimUrl ? (
-          <TBtn title="Open EduSim link" onClick={() => window.open(eduSimUrl, "_blank", "noopener,noreferrer")}>
-            <ExternalLink size={15} />
-          </TBtn>
-        ) : (
-          <TBtn title="Swap image" onClick={onSwap}>
-            <Replace size={15} />
-          </TBtn>
-        ))}
+      {link && (
+        <TBtn title="Open link" onClick={() => window.open(link, "_blank", "noopener,noreferrer")}>
+          <ExternalLink size={15} />
+        </TBtn>
+      )}
+      {el.type === "image" && !link && (
+        <TBtn title="Swap image" onClick={onSwap}>
+          <Replace size={15} />
+        </TBtn>
+      )}
 
       {el.type === "text" && (
         <>
