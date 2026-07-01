@@ -8,6 +8,7 @@ import {
   BringToFront,
   SendToBack,
   Bold,
+  Italic,
   AArrowUp,
   AArrowDown,
   AlignLeft,
@@ -185,6 +186,16 @@ export function SlideCanvas({
     return () => window.removeEventListener("keydown", onKey);
   }, [editable, editingId, selectedId, elements, onChange, onSelect]);
 
+  // Apply bold/italic/size to the CURRENT SELECTION inside the focused text box
+  // (toolbar buttons use onMouseDown+preventDefault so the selection is kept).
+  const inlineFormat = (cmd: "bold" | "italic" | "bigger" | "smaller") => {
+    if (cmd === "bold") document.execCommand("bold");
+    else if (cmd === "italic") document.execCommand("italic");
+    else applyRelativeSize(cmd === "bigger" ? 1 : -1);
+    const ae = document.activeElement as HTMLElement | null;
+    if (ae && ae.isContentEditable) ae.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+
   const stageStyle: React.CSSProperties = {
     background, // colour fallback / base; the image (if any) layers on top
     ...(backgroundImage
@@ -248,8 +259,8 @@ export function SlideCanvas({
               muted={muted}
               displayFont={displayFont}
               textPlate={textPlate}
-              onCommitText={(t) => {
-                update(el.id, { text: t });
+              onCommitText={(html, text) => {
+                update(el.id, { html, text });
                 setEditingId(null);
               }}
             />
@@ -295,6 +306,8 @@ export function SlideCanvas({
         <FloatingToolbar
           el={selected}
           box={boxOf(selected)}
+          editing={editingId === selected.id}
+          onInline={inlineFormat}
           onSwap={() => onRequestSwap?.(selected.id)}
           onUpdate={(patch) => update(selected.id, patch)}
           onDuplicate={() => {
@@ -335,7 +348,7 @@ function ElementContent({
   muted: string;
   displayFont: string;
   textPlate?: string;
-  onCommitText: (text: string) => void;
+  onCommitText: (html: string, text: string) => void;
 }) {
   if (el.type === "text") {
     return (
@@ -513,6 +526,116 @@ export function inlineHtml(text: string): string {
   return out;
 }
 
+// Keep only safe inline formatting when storing rich text (defence-in-depth;
+// only our editor writes this html, and it's sanitized here before it's stored).
+function filterStyle(style: string): string {
+  const keep: string[] = [];
+  for (const decl of style.split(";")) {
+    const i = decl.indexOf(":");
+    if (i < 0) continue;
+    const prop = decl.slice(0, i).trim().toLowerCase();
+    const val = decl.slice(i + 1).trim();
+    if (!val) continue;
+    if (
+      ["font-size", "font-weight", "font-style", "text-decoration"].includes(prop) &&
+      /^[\w%.\s-]+$/.test(val)
+    ) {
+      keep.push(`${prop}: ${val}`);
+    }
+  }
+  return keep.join("; ");
+}
+
+function sanitizeRich(html: string): string {
+  if (typeof document === "undefined") return "";
+  const tpl = document.createElement("template");
+  tpl.innerHTML = html;
+  const ALLOWED = new Set(["B", "STRONG", "I", "EM", "U", "SPAN", "BR", "DIV", "P"]);
+  const clean = (node: Node) => {
+    for (const child of Array.from(node.childNodes)) {
+      if (child.nodeType === Node.TEXT_NODE) continue;
+      if (child.nodeType !== Node.ELEMENT_NODE) {
+        node.removeChild(child);
+        continue;
+      }
+      const el = child as HTMLElement;
+      clean(el); // sanitize subtree first so unwrapped children are already clean
+      if (!ALLOWED.has(el.tagName)) {
+        while (el.firstChild) node.insertBefore(el.firstChild, el);
+        node.removeChild(el);
+        continue;
+      }
+      const style = el.tagName === "SPAN" ? filterStyle(el.getAttribute("style") || "") : "";
+      for (const attr of Array.from(el.attributes)) el.removeAttribute(attr.name);
+      if (style) el.setAttribute("style", style);
+    }
+  };
+  clean(tpl.content);
+  return tpl.innerHTML;
+}
+
+// Rich html -> lightweight markdown (for exports/search/legacy `text`). Bold and
+// italic survive (via ** and *); per-span size is web/Present only.
+function htmlToMarkdown(html: string): string {
+  if (typeof document === "undefined") return "";
+  const root = document.createElement("div");
+  root.innerHTML = html;
+  const walk = (node: Node): string => {
+    let out = "";
+    node.childNodes.forEach((child) => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        out += child.textContent ?? "";
+        return;
+      }
+      if (child.nodeType !== Node.ELEMENT_NODE) return;
+      const el = child as HTMLElement;
+      const tag = el.tagName;
+      if (tag === "BR") {
+        out += "\n";
+        return;
+      }
+      let inner = walk(el);
+      if (inner) {
+        if (tag === "B" || tag === "STRONG") inner = `**${inner}**`;
+        else if (tag === "I" || tag === "EM") inner = `*${inner}*`;
+        else if (tag === "SPAN") {
+          const fw = el.style.fontWeight;
+          if (fw === "bold" || (parseInt(fw, 10) || 0) >= 600) inner = `**${inner}**`;
+          if (el.style.fontStyle === "italic") inner = `*${inner}*`;
+        }
+      }
+      if (tag === "DIV" || tag === "P") {
+        if (out && !out.endsWith("\n")) out += "\n";
+        out += inner + "\n";
+      } else {
+        out += inner;
+      }
+    });
+    return out;
+  };
+  return walk(root).replace(/ /g, " ").replace(/\n{3,}/g, "\n\n").replace(/\n+$/, "").trim();
+}
+
+// Wrap the current selection in a span that scales its font size, so "bigger"/
+// "smaller" affects only the highlighted text. Repeated clicks compound.
+export function applyRelativeSize(dir: number): void {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+  const range = sel.getRangeAt(0);
+  const span = document.createElement("span");
+  span.style.fontSize = dir > 0 ? "1.2em" : "0.83em";
+  try {
+    span.appendChild(range.extractContents());
+    range.insertNode(span);
+    sel.removeAllRanges();
+    const r = document.createRange();
+    r.selectNodeContents(span);
+    sel.addRange(r);
+  } catch {
+    /* selection crosses incompatible boundaries — ignore */
+  }
+}
+
 function TextBox({
   el,
   editing,
@@ -524,53 +647,48 @@ function TextBox({
 }: {
   el: TextElement;
   editing: boolean;
-  onCommit: (t: string) => void;
+  onCommit: (html: string, text: string) => void;
   ink?: string;
   muted?: string;
   displayFont?: string;
   autoPlate?: string;
 }) {
-  // Map the canvas default ink/muted to the deck theme; explicit user colours stay.
   const color = !el.color || el.color === INK ? ink : el.color === MUTED ? muted : el.color;
-  // Readability plate: explicit "transparent" = none; an explicit colour wins;
-  // otherwise fall back to the deck's auto plate (only set on themed backgrounds).
   const plate = el.bg === "transparent" ? null : el.bg || autoPlate || null;
-  const taRef = useRef<HTMLTextAreaElement>(null);
-  const [draft, setDraft] = useState(el.text);
-  const draftRef = useRef(el.text); // latest draft
-  const committedRef = useRef(el.text); // last committed value (dedupe)
+  const ref = useRef<HTMLDivElement>(null);
+  const htmlRef = useRef(el.html ?? inlineHtml(el.text)); // latest editor html (updated on input)
+  const committedRef = useRef(""); // last committed (sanitized) html — dedupe
 
-  const cleanText = (t: string) =>
-    t.replace(/ /g, " ").replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n").replace(/\n+$/, "");
-
-  // Commit at most once per change. Safe to call from BOTH onBlur and the effect
-  // cleanup: clicking off the canvas fires onBlur; clicking another slide element
-  // (or the empty stage) clears editingId and unmounts the textarea on the same
-  // click — which can skip its native blur — so the cleanup is the backstop.
   const commit = () => {
-    const next = cleanText(draftRef.current);
-    if (next !== committedRef.current) {
-      committedRef.current = next;
-      onCommit(next);
-    }
+    const cleaned = sanitizeRich(htmlRef.current);
+    if (cleaned === committedRef.current) return;
+    committedRef.current = cleaned;
+    onCommit(cleaned, htmlToMarkdown(cleaned));
   };
 
+  // Enter edit: seed the editor's html + focus at the end. Leave edit / unmount:
+  // commit from the html ref (cleanup fires even when a click-off unmounts the
+  // node before its blur, which is what made edits revert before).
   useEffect(() => {
     if (!editing) return;
-    setDraft(el.text);
-    draftRef.current = el.text;
-    committedRef.current = el.text;
-    const t = taRef.current;
-    if (t) {
-      t.focus();
-      const n = t.value.length;
-      t.setSelectionRange(n, n);
+    const seed = el.html ?? inlineHtml(el.text);
+    htmlRef.current = seed;
+    committedRef.current = sanitizeRich(seed);
+    const node = ref.current;
+    if (node) {
+      node.innerHTML = seed;
+      node.focus();
+      const sel = window.getSelection();
+      const r = document.createRange();
+      r.selectNodeContents(node);
+      r.collapse(false);
+      sel?.removeAllRanges();
+      sel?.addRange(r);
     }
     return () => commit();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
 
-  // Shared typography so the editing box matches the rendered slide exactly.
   const shared: CSSProperties = {
     width: "100%",
     height: "100%",
@@ -591,31 +709,31 @@ function TextBox({
     letterSpacing: el.font === "display" ? "-0.01em" : undefined,
   };
 
-  // Editing: a real <textarea> so newlines/blank lines are preserved natively.
+  // Editing: a rich contentEditable. Newlines are stored as html, so they never
+  // collapse; bold/italic/size apply to the current selection via the toolbar.
   if (editing) {
     return (
-      <textarea
-        ref={taRef}
-        value={draft}
-        spellCheck
-        onChange={(e) => {
-          setDraft(e.target.value);
-          draftRef.current = e.target.value; // keep the ref current for commit()
-        }}
+      <div
+        ref={ref}
+        contentEditable
+        suppressContentEditableWarning
         onPointerDown={(e) => e.stopPropagation()}
+        onInput={(e) => {
+          htmlRef.current = (e.currentTarget as HTMLDivElement).innerHTML;
+        }}
         onBlur={commit}
         className={el.font === "display" ? "font-display" : ""}
-        style={{ ...shared, resize: "none", border: "none", outline: "none", background: plate ?? "transparent" }}
+        style={{ ...shared, outline: "none", background: plate ?? "transparent" }}
       />
     );
   }
 
-  // Display: rendered bold/italic markdown; line breaks kept via pre-wrap.
+  // Display: rich html when present (full fidelity), else legacy markdown.
   return (
     <div
       className={el.font === "display" ? "font-display" : ""}
       style={shared}
-      dangerouslySetInnerHTML={{ __html: inlineHtml(el.text) }}
+      dangerouslySetInnerHTML={{ __html: el.html ?? inlineHtml(el.text) }}
     />
   );
 }
@@ -625,6 +743,8 @@ function TextBox({
 function FloatingToolbar({
   el,
   box,
+  editing = false,
+  onInline,
   onSwap,
   onUpdate,
   onDuplicate,
@@ -634,6 +754,8 @@ function FloatingToolbar({
 }: {
   el: CanvasElement;
   box: Box;
+  editing?: boolean;
+  onInline?: (cmd: "bold" | "italic" | "bigger" | "smaller") => void;
   onSwap: () => void;
   onUpdate: (patch: Partial<CanvasElement>) => void;
   onDuplicate: () => void;
@@ -641,6 +763,12 @@ function FloatingToolbar({
   onBack: () => void;
   onDelete: () => void;
 }) {
+  // While editing text, B/I/size act on the highlighted selection (keep focus via
+  // onMouseDown+preventDefault). Otherwise they set the whole box's defaults.
+  const inline = (cmd: "bold" | "italic" | "bigger" | "smaller") => (e: React.MouseEvent) => {
+    e.preventDefault();
+    onInline?.(cmd);
+  };
   const above = box.y > 14;
   // EduSim QR images get an "open link" action instead of "swap" — so a teacher
   // can't accidentally replace the scannable code with an arbitrary picture.
@@ -670,9 +798,36 @@ function FloatingToolbar({
 
       {el.type === "text" && (
         <>
-          <TBtn title="Bold" active={el.bold} onClick={() => onUpdate({ bold: !el.bold })}><Bold size={15} /></TBtn>
-          <TBtn title="Smaller" onClick={() => onUpdate({ fontSize: Math.max(1.5, +(el.fontSize - 0.5).toFixed(1)) })}><AArrowDown size={16} /></TBtn>
-          <TBtn title="Bigger" onClick={() => onUpdate({ fontSize: Math.min(20, +(el.fontSize + 0.5).toFixed(1)) })}><AArrowUp size={16} /></TBtn>
+          <TBtn
+            title={editing ? "Bold selection" : "Bold"}
+            active={!editing && el.bold}
+            onMouseDown={editing ? inline("bold") : undefined}
+            onClick={editing ? undefined : () => onUpdate({ bold: !el.bold })}
+          >
+            <Bold size={15} />
+          </TBtn>
+          <TBtn
+            title={editing ? "Italic selection" : "Italic"}
+            active={!editing && el.italic}
+            onMouseDown={editing ? inline("italic") : undefined}
+            onClick={editing ? undefined : () => onUpdate({ italic: !el.italic })}
+          >
+            <Italic size={15} />
+          </TBtn>
+          <TBtn
+            title={editing ? "Smaller selection" : "Smaller"}
+            onMouseDown={editing ? inline("smaller") : undefined}
+            onClick={editing ? undefined : () => onUpdate({ fontSize: Math.max(1.5, +(el.fontSize - 0.5).toFixed(1)) })}
+          >
+            <AArrowDown size={16} />
+          </TBtn>
+          <TBtn
+            title={editing ? "Bigger selection" : "Bigger"}
+            onMouseDown={editing ? inline("bigger") : undefined}
+            onClick={editing ? undefined : () => onUpdate({ fontSize: Math.min(20, +(el.fontSize + 0.5).toFixed(1)) })}
+          >
+            <AArrowUp size={16} />
+          </TBtn>
           <TBtn
             title="Align"
             onClick={() => onUpdate({ align: el.align === "left" ? "center" : el.align === "center" ? "right" : "left" })}
@@ -705,12 +860,14 @@ function FloatingToolbar({
 function TBtn({
   title,
   onClick,
+  onMouseDown,
   children,
   active,
   danger,
 }: {
   title: string;
-  onClick: () => void;
+  onClick?: () => void;
+  onMouseDown?: (e: React.MouseEvent) => void;
   children: React.ReactNode;
   active?: boolean;
   danger?: boolean;
@@ -720,6 +877,7 @@ function TBtn({
       type="button"
       title={title}
       aria-label={title}
+      onMouseDown={onMouseDown}
       onClick={onClick}
       className={`grid h-8 w-8 place-items-center rounded-lg transition-colors ${
         danger ? "text-coral hover:bg-coral/10" : active ? "bg-brand-50 text-brand-700" : "text-ink hover:bg-paper"

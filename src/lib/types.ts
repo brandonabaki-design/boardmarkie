@@ -86,6 +86,10 @@ interface CanvasElementBase {
 export interface TextElement extends CanvasElementBase {
   type: "text";
   text: string;
+  // Optional rich inline formatting (sanitized HTML) for per-selection bold/
+  // italic/size. When present it's the source of truth for on-screen rendering;
+  // `text` is kept as a markdown mirror for exports/search/legacy.
+  html?: string;
   fontSize: number; // % of canvas height (rendered via cqh units)
   bold?: boolean;
   italic?: boolean;
