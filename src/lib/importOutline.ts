@@ -249,6 +249,25 @@ const CONTAINER_LABEL_RE =
 const GENERIC_LABEL =
   /^(title|title slide|cover|cover slide|intro|introduction|hook|opening|warm[\s-]?up|do now|agenda|objectives?|learning objectives?|conclusion|closing|summary|wrap[\s-]?up|recap|review|discussion|activity|class activity|questions?|q&a|plenary)$/i;
 
+// Placeholder labels that mean "this is the title slide" — the real title lives
+// in the slide's content, not the label.
+const TITLE_PLACEHOLDER = /^(title|title slide|cover|cover slide|opening slide)$/i;
+
+// Headers that END a preamble section (so their items aren't read as objectives
+// or standards). These are lesson extras, not learning objectives/standards.
+const PREAMBLE_STOP =
+  /^(success criteria|i can|essential question|driving question|science (and|&) engineering|scientific practices|seps?|crosscutting|cccs?|vocabulary|materials|differentiation|extension|assessment|homework|agenda|overview|time|duration|resources|note on standards)\b/i;
+
+// Standalone appendix headers that END a slide's content (everything after is
+// lesson resources, not slide bullets). Must be the whole line.
+const APPENDIX_STOP =
+  /^(vocabulary|materials|differentiation|extension|assessment|homework|note on standards|teacher resources|resources|references)\s*:?\s*$/i;
+
+// Only capture a non-code standards line as a descriptor when it names a real
+// curriculum strand — avoids junk like "Connection" or "Primary Standard".
+const STANDARD_DESC =
+  /\b(life science|physical science|earth (and|&) space|reading|writing|speaking|listening|language|number|operations|algebra|geometry|measurement|statistics|literacy)\b/i;
+
 /**
  * Turn one slide block into a title/subtitle/bullets, understanding both the
  * simple form (first line = title, rest = bullets) and the labeled form
@@ -269,6 +288,7 @@ function parseSlideBlock(
   for (const raw of lines) {
     if (!raw) continue;
     const bare = bareLabel(raw); // heading/bold markers removed for classification
+    if (APPENDIX_STOP.test(bare)) break; // rest of the block is lesson appendix, not slide content
     const fm = bare.match(FIELD_RE);
     if (fm) {
       sawField = true;
@@ -293,16 +313,23 @@ function parseSlideBlock(
 
   let title = heading || titleField;
   if (!title) {
-    // A specific "Slide N: <title>" label is the title. A generic section name
-    // ("Title", "Introduction", "Conclusion"…) is not — prefer a standalone
-    // **bold** line, else the label, else (MagicSchool) the first content line.
     const specificLabel = !!label && !GENERIC_LABEL.test(label);
+    const firstBold = () => content.findIndex((c) => /^\*\*.+\*\*$/.test(c.trim()));
     if (specificLabel) {
+      // "Slide N: What Plants Need" — the label is the real title.
+      title = label;
+    } else if (label && TITLE_PLACEHOLDER.test(label)) {
+      // "Slide N: Title" — placeholder; the real title is the content (bold line
+      // if present, else the first line).
+      const fb = firstBold();
+      title = (fb >= 0 ? content.splice(fb, 1)[0] : content.shift()) ?? label;
+    } else if (label) {
+      // Generic but real title ("Conclusion", "Introduction", "Activity"…).
       title = label;
     } else {
-      const fb = content.findIndex((c) => /^\*\*.+\*\*$/.test(c.trim()));
+      // Bare "Slide N" then a title line (MagicSchool): first content line is title.
+      const fb = firstBold();
       if (fb >= 0) title = content.splice(fb, 1)[0];
-      else if (label) title = label;
       else if (!sawField) title = content.shift() ?? "";
     }
   }
@@ -361,6 +388,12 @@ function parsePreamble(lines: string[]): {
       section = "none";
       continue;
     }
+    // Any other lesson-extra header ends the current section (so Success Criteria,
+    // Essential Question, SEPs/CCCs, etc. aren't swept up as objectives/standards).
+    if (PREAMBLE_STOP.test(line)) {
+      section = "none";
+      continue;
+    }
     if (section === "objectives") {
       if (/^(by the end|students will|learners will|swbat|the student)\b/i.test(line)) continue; // intro line
       objectives.push(cleanBullet(line).replace(/[.:;]+$/, "").trim());
@@ -370,9 +403,10 @@ function parsePreamble(lines: string[]): {
         for (const c of codes) standards.push(c);
         continue;
       }
+      // Only keep a prose line if it names a real curriculum strand.
       const colon = line.indexOf(":");
       const lbl = (colon > 0 ? line.slice(0, colon) : line).trim();
-      if (lbl && lbl.length <= 80 && /[a-z]/i.test(lbl)) standards.push(lbl);
+      if (lbl && lbl.length <= 80 && STANDARD_DESC.test(lbl)) standards.push(lbl);
     }
   }
   return { grade, subject, topic, objectives: objectives.filter(Boolean), standards };
